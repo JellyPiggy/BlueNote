@@ -1,0 +1,19 @@
+.codex/
+方案/.codex/
+
+# Local/editor files
+.vscode/
+.idea/
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Local reference material
+方案/临时参考资料/
+方案/参考资料/
