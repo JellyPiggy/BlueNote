@@ -151,62 +151,7 @@ BlueNote/
 
 修改共享契约时必须说明影响范围。影响移动端、多个后端模块、数据库或 MQ 的变更，不能只在某个业务模块里悄悄修改。
 
-## 8. 多 Codex 分工建议
-
-推荐从两个 Codex 开始：
-
-| Codex | 分支 | 负责范围 |
-|---|---|---|
-| 后端基础 | `codex/backend-base` | `backend/` 骨架、公共能力、第一批 DDL、local compose、API 契约 |
-| 移动端 | `codex/mobile-app` | `mobile/` 工程、页面骨架、请求封装、登录态、第一条主链路页面 |
-
-第一条主链路稳定后，再增加：
-
-| Codex | 分支 | 负责范围 |
-|---|---|---|
-| 内容域 | `codex/backend-content` | file、note、comment |
-| 社交分发域 | `codex/backend-social` | relation、counter、feed、rank、notification |
-| 实时通信域 | `codex/backend-im` | push、im |
-| 交易域 | `codex/backend-order` | order |
-| 部署运维 | `codex/deploy-ops` | test/prod compose、Nacos、监控、备份、发布回滚 |
-
-不要一开始让 13 个 Codex 分别实现 13 个逻辑服务。那会让公共依赖、接口契约、错误码和 DDL 很快分叉。
-
-## 9. Git 协作规则
-
-默认主干为 `main`。
-
-每个 Codex 必须基于最新 `main` 创建自己的分支：
-
-```text
-codex/backend-base
-codex/mobile-app
-codex/backend-content
-codex/backend-social
-codex/backend-im
-codex/backend-order
-codex/deploy-ops
-```
-
-分支协作原则：
-
-1. 每个 Codex 只改自己负责的目录和模块。
-2. 共享目录由后端基础或指定负责人先建立。
-3. 其他 Codex 如需改共享契约，先在提交说明或 PR 描述中明确影响范围。
-4. 合并顺序优先为：基础契约 -> 后端基础 -> 移动端骨架 -> 内容域 -> 社交域 -> IM -> 订单 -> 部署运维。
-5. 合并前必须确保当前分支能通过相关构建或测试。
-
-高冲突目录：
-
-1. `backend/pom.xml`
-2. `backend/bluenote-common-*`
-3. `docs/contracts/**`
-4. `backend/sql/**`
-5. `deploy/**`
-
-这些目录不建议多个 Codex 同时随意修改。
-
-## 10. 开发顺序
+## 8. 开发顺序
 
 优先补齐第一批可执行产物：
 
@@ -241,7 +186,7 @@ codex/deploy-ops
 活动预热 -> 秒杀令牌 -> Redis Lua 预扣库存 -> RocketMQ 异步下单 -> 订单查询 -> 支付/发券 -> 超时关单
 ```
 
-## 11. 变更方案的规则
+## 9. 变更方案的规则
 
 如果实现过程中发现现有方案明显不合理，应先输出变更建议，说明：
 
@@ -252,7 +197,7 @@ codex/deploy-ops
 
 未经确认，不要直接推翻已确定的总体技术路线、服务边界、部署原则和核心基础设施。
 
-## 12. 交付检查
+## 10. 交付检查
 
 每个 Codex 完成任务时，至少说明：
 
