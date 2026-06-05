@@ -1,0 +1,127 @@
+# BlueNote 契约目录
+
+版本：v0.1  
+状态：第一条主链路开发基线  
+更新时间：2026-06-05
+
+## 1. 目录目标
+
+`docs/contracts/` 用来保存前后端、服务间、数据库、Redis、MQ 和安全权限的共享契约。它不是方案讨论文档，而是编码、mock、OpenAPI、DDL、联调和验收时共同对照的基线。
+
+第一版只冻结第一条主链路：
+
+```text
+注册/登录 -> 获取用户资料 -> 上传图片 -> 发布笔记 -> 查看笔记详情
+```
+
+涉及逻辑服务：
+
+1. `bluenote-auth`
+2. `bluenote-user`
+3. `bluenote-file`
+4. `bluenote-note`
+
+## 2. 目录结构
+
+```text
+docs/contracts/
+  README.md
+  api/
+    00-common.md
+    01-error-codes.md
+    02-auth-api.md
+    03-user-api.md
+    04-file-api.md
+    05-note-api.md
+  db/
+    01-main-chain-schema.md
+  redis/
+    01-main-chain-keys.md
+  mq/
+    01-main-chain-events.md
+  security/
+    01-permission-matrix.md
+```
+
+## 3. 权威来源
+
+本目录从以下方案收口而来：
+
+1. `方案/01-总体技术方案.md`
+2. `方案/02-服务划分方案.md`
+3. `方案/08-落地实施方案.md`
+4. `方案/services/01-登录服务设计.md`
+5. `方案/services/02-用户服务设计.md`
+6. `方案/services/03-文件服务设计.md`
+7. `方案/services/04-笔记发布服务设计.md`
+
+如果本目录与旧方案示例冲突，以本目录为开发契约。典型例子：旧方案中部分响应示例使用字符串型 `"code": "OK"`，本目录统一改为数字型 `"code": 0`。
+
+## 4. 契约冻结规则
+
+冻结后允许新增兼容字段，不允许静默破坏已有字段。
+
+兼容变更：
+
+1. 响应对象新增可选字段。
+2. 新增错误码。
+3. 新增接口，但不改变旧接口语义。
+4. MQ payload 新增消费者可忽略字段。
+5. 数据表新增可空字段或有默认值字段。
+
+破坏性变更：
+
+1. 删除或重命名接口字段。
+2. 改变字段类型，例如 `id` 从 string 改为 number。
+3. 改变错误码含义。
+4. 改变接口鉴权要求。
+5. 改变幂等键语义。
+6. 删除表字段、重命名字段、修改唯一约束。
+7. MQ 事件 payload 删除字段或改变含义。
+
+破坏性变更必须先写明：
+
+1. 为什么需要改。
+2. 影响哪些 API、后端模块、移动端页面、DDL、Redis Key、MQ 事件。
+3. 是否需要迁移脚本或兼容期。
+4. 是否需要同步修改 `方案/decisions/` 下的 ADR。
+
+## 5. 后端实现要求
+
+后端必须：
+
+1. Controller 响应结构与 `api/00-common.md` 一致。
+2. 错误码与 `api/01-error-codes.md` 一致。
+3. 外部接口只暴露 `/api/**`。
+4. 内部接口只暴露 `/internal/**`，不得给移动端调用。
+5. OpenAPI / Knife4j 输出与本目录一致。
+6. 关键写接口支持幂等。
+7. 数据表、唯一约束和索引符合 `db/01-main-chain-schema.md`。
+8. Redis Key 符合 `redis/01-main-chain-keys.md`。
+9. Outbox 和 MQ envelope 符合 `mq/01-main-chain-events.md`。
+
+## 6. 移动端实现要求
+
+移动端必须：
+
+1. 所有请求集中在 `mobile/src/api/`。
+2. 页面不直接拼接后端路径。
+3. TypeScript 类型以本目录或后端 OpenAPI 为准。
+4. mock 数据必须严格贴合本契约。
+5. 统一处理 `code`、`message`、`data`、`traceId`。
+6. 对 `20xxx` 认证错误统一刷新 Token 或跳转登录。
+7. 发布、上传确认、资料更新等写操作防重复点击。
+8. 每个核心页面处理 loading、empty、error、网络失败和 token 过期。
+
+## 7. 联调验收
+
+第一条主链路联调必须通过：
+
+1. 注册成功后返回 TokenPair。
+2. 登录成功后可调用 `/api/users/me`。
+3. 上传凭证返回 `fileId` 和 `uploadUrl`。
+4. 对象存储上传完成后可确认文件。
+5. 发布笔记时文件归属和状态校验通过。
+6. 查询笔记详情返回作者、媒体、标题、正文和计数结构。
+7. 所有失败场景返回统一错误码和 `traceId`。
+
