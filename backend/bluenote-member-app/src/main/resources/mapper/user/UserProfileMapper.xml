@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.member.user.infrastructure.mapper.UserProfileMapper">
+
+    <resultMap id="UserProfileResultMap" type="com.bluenote.member.user.infrastructure.entity.UserProfileEntity">
+        <id column="user_id" property="userId"/>
+        <result column="bluenote_no" property="bluenoteNo"/>
+        <result column="nickname" property="nickname"/>
+        <result column="avatar_file_id" property="avatarFileId"/>
+        <result column="avatar_url" property="avatarUrl"/>
+        <result column="bio" property="bio"/>
+        <result column="gender" property="gender"/>
+        <result column="birthday" property="birthday"/>
+        <result column="region_code" property="regionCode"/>
+        <result column="home_cover_file_id" property="homeCoverFileId"/>
+        <result column="home_cover_url" property="homeCoverUrl"/>
+        <result column="user_status" property="userStatus"/>
+        <result column="profile_version" property="profileVersion"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="deleted" property="deleted"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.bluenote.member.user.infrastructure.entity.UserProfileEntity">
+        INSERT INTO bluenote_user.user_profile (
+            user_id, bluenote_no, nickname, avatar_file_id, avatar_url, bio, gender, birthday,
+            region_code, home_cover_file_id, home_cover_url, user_status, profile_version,
+            created_at, updated_at, deleted
+        ) VALUES (
+            #{userId}, #{bluenoteNo}, #{nickname}, #{avatarFileId}, #{avatarUrl}, #{bio}, #{gender}, #{birthday},
+            #{regionCode}, #{homeCoverFileId}, #{homeCoverUrl}, #{userStatus}, #{profileVersion},
+            #{createdAt}, #{updatedAt}, #{deleted}
+        )
+    </insert>
+
+    <select id="selectByUserId" resultMap="UserProfileResultMap">
+        SELECT user_id, bluenote_no, nickname, avatar_file_id, avatar_url, bio, gender, birthday,
+               region_code, home_cover_file_id, home_cover_url, user_status, profile_version,
+               created_at, updated_at, deleted
+        FROM bluenote_user.user_profile
+        WHERE user_id = #{userId}
+          AND deleted = 0
+    </select>
+
+    <select id="selectByUserIds" resultMap="UserProfileResultMap">
+        SELECT user_id, bluenote_no, nickname, avatar_file_id, avatar_url, bio, gender, birthday,
+               region_code, home_cover_file_id, home_cover_url, user_status, profile_version,
+               created_at, updated_at, deleted
+        FROM bluenote_user.user_profile
+        WHERE deleted = 0
+          AND user_id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+    </select>
+
+    <update id="updateByVersion">
+        UPDATE bluenote_user.user_profile
+        SET nickname = #{entity.nickname},
+            avatar_file_id = #{entity.avatarFileId},
+            avatar_url = #{entity.avatarUrl},
+            bio = #{entity.bio},
+            gender = #{entity.gender},
+            birthday = #{entity.birthday},
+            region_code = #{entity.regionCode},
+            home_cover_file_id = #{entity.homeCoverFileId},
+            home_cover_url = #{entity.homeCoverUrl},
+            user_status = #{entity.userStatus},
+            profile_version = #{entity.profileVersion},
+            updated_at = #{entity.updatedAt}
+        WHERE user_id = #{entity.userId}
+          AND profile_version = #{baseProfileVersion}
+          AND deleted = 0
+    </update>
+</mapper>

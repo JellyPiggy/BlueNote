@@ -4,6 +4,19 @@ server:
 spring:
   application:
     name: bluenote-member-app
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${BLUENOTE_MEMBER_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/bluenote_auth?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${BLUENOTE_MEMBER_DATASOURCE_USERNAME:root}
+    password: ${BLUENOTE_MEMBER_DATASOURCE_PASSWORD:bluenote_root_local}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
 
 management:
   endpoints:

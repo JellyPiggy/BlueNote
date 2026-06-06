@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.member.auth.infrastructure.mapper.AuthAccountMapper">
+
+    <resultMap id="AuthAccountResultMap" type="com.bluenote.member.auth.infrastructure.entity.AuthAccountEntity">
+        <id column="user_id" property="userId"/>
+        <result column="username" property="username"/>
+        <result column="account_status" property="accountStatus"/>
+        <result column="register_channel" property="registerChannel"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="deleted" property="deleted"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.bluenote.member.auth.infrastructure.entity.AuthAccountEntity">
+        INSERT INTO bluenote_auth.auth_account (
+            user_id, username, account_status, register_channel, created_at, updated_at, deleted
+        ) VALUES (
+            #{userId}, #{username}, #{accountStatus}, #{registerChannel}, #{createdAt}, #{updatedAt}, #{deleted}
+        )
+    </insert>
+
+    <select id="selectByUserId" resultMap="AuthAccountResultMap">
+        SELECT user_id, username, account_status, register_channel, created_at, updated_at, deleted
+        FROM bluenote_auth.auth_account
+        WHERE user_id = #{userId}
+          AND deleted = 0
+    </select>
+
+    <select id="selectByUsername" resultMap="AuthAccountResultMap">
+        SELECT user_id, username, account_status, register_channel, created_at, updated_at, deleted
+        FROM bluenote_auth.auth_account
+        WHERE username = #{username}
+          AND deleted = 0
+    </select>
+</mapper>

@@ -1,7 +1,11 @@
 package com.bluenote.member.auth.api.external;
 
 import com.bluenote.common.core.ApiResponse;
+import com.bluenote.common.core.ApiErrorCode;
+import com.bluenote.common.core.BusinessException;
 import com.bluenote.common.observability.TraceIdHolder;
+import com.bluenote.common.security.UserContext;
+import com.bluenote.common.security.UserContextHolder;
 import com.bluenote.member.auth.api.dto.ChangePasswordRequest;
 import com.bluenote.member.auth.api.dto.LoginRequest;
 import com.bluenote.member.auth.api.dto.LogoutRequest;
@@ -48,6 +52,14 @@ public class AuthController {
 
     @PostMapping("/password/change")
     public ApiResponse<TokenPairResponse> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
-        return ApiResponse.success(authApplicationService.changePassword(request), TraceIdHolder.currentOrNew());
+        return ApiResponse.success(authApplicationService.changePassword(requireUserId(), request), TraceIdHolder.currentOrNew());
+    }
+
+    private String requireUserId() {
+        UserContext userContext = UserContextHolder.current();
+        if (userContext == null || !userContext.authenticated()) {
+            throw new BusinessException(ApiErrorCode.ACCESS_TOKEN_INVALID);
+        }
+        return userContext.userId();
     }
 }

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.member.auth.infrastructure.mapper.AuthSessionMapper">
+
+    <resultMap id="AuthSessionResultMap" type="com.bluenote.member.auth.infrastructure.entity.AuthSessionEntity">
+        <id column="session_id" property="sessionId"/>
+        <result column="user_id" property="userId"/>
+        <result column="device_id" property="deviceId"/>
+        <result column="device_name" property="deviceName"/>
+        <result column="platform" property="platform"/>
+        <result column="app_version" property="appVersion"/>
+        <result column="refresh_token_hash" property="refreshTokenHash"/>
+        <result column="refresh_token_expires_at" property="refreshTokenExpiresAt"/>
+        <result column="session_status" property="sessionStatus"/>
+        <result column="login_ip" property="loginIp"/>
+        <result column="last_active_at" property="lastActiveAt"/>
+        <result column="revoked_at" property="revokedAt"/>
+        <result column="revoke_reason" property="revokeReason"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.bluenote.member.auth.infrastructure.entity.AuthSessionEntity">
+        INSERT INTO bluenote_auth.auth_session (
+            session_id, user_id, device_id, device_name, platform, app_version, refresh_token_hash,
+            refresh_token_expires_at, session_status, login_ip, last_active_at, revoked_at,
+            revoke_reason, created_at, updated_at
+        ) VALUES (
+            #{sessionId}, #{userId}, #{deviceId}, #{deviceName}, #{platform}, #{appVersion}, #{refreshTokenHash},
+            #{refreshTokenExpiresAt}, #{sessionStatus}, #{loginIp}, #{lastActiveAt}, #{revokedAt},
+            #{revokeReason}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectByRefreshTokenHash" resultMap="AuthSessionResultMap">
+        SELECT session_id, user_id, device_id, device_name, platform, app_version, refresh_token_hash,
+               refresh_token_expires_at, session_status, login_ip, last_active_at, revoked_at,
+               revoke_reason, created_at, updated_at
+        FROM bluenote_auth.auth_session
+        WHERE refresh_token_hash = #{refreshTokenHash}
+    </select>
+
+    <update id="revokeActiveByUserDevice">
+        UPDATE bluenote_auth.auth_session
+        SET session_status = 'REVOKED',
+            revoked_at = #{now},
+            revoke_reason = #{reason},
+            updated_at = #{now}
+        WHERE user_id = #{userId}
+          AND device_id = #{deviceId}
+          AND session_status = 'ACTIVE'
+    </update>
+
+    <update id="revokeByRefreshTokenHash">
+        UPDATE bluenote_auth.auth_session
+        SET session_status = 'LOGGED_OUT',
+            revoked_at = #{now},
+            revoke_reason = #{reason},
+            updated_at = #{now}
+        WHERE refresh_token_hash = #{refreshTokenHash}
+          AND session_status = 'ACTIVE'
+    </update>
+
+    <update id="updateStatus">
+        UPDATE bluenote_auth.auth_session
+        SET session_status = #{status},
+            revoked_at = #{now},
+            revoke_reason = #{reason},
+            updated_at = #{now}
+        WHERE session_id = #{sessionId}
+    </update>
+
+    <update id="rotateRefreshToken">
+        UPDATE bluenote_auth.auth_session
+        SET refresh_token_hash = #{newRefreshTokenHash},
+            refresh_token_expires_at = #{refreshTokenExpiresAt},
+            last_active_at = #{now},
+            updated_at = #{now}
+        WHERE session_id = #{sessionId}
+          AND refresh_token_hash = #{oldRefreshTokenHash}
+          AND session_status = 'ACTIVE'
+    </update>
+</mapper>
