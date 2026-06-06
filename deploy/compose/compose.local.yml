@@ -1,0 +1,29 @@
+services:
+  bluenote-mysql:
+    ports:
+      - "${BLUENOTE_MYSQL_PORT:-3306}:3306"
+
+  bluenote-redis:
+    ports:
+      - "${BLUENOTE_REDIS_PORT:-6379}:6379"
+
+  bluenote-nacos:
+    ports:
+      - "${BLUENOTE_NACOS_PORT:-8848}:8848"
+      - "${BLUENOTE_NACOS_GRPC_PORT:-9848}:9848"
+      - "${BLUENOTE_NACOS_RAFT_PORT:-9849}:9849"
+
+  bluenote-rocketmq-namesrv:
+    ports:
+      - "${BLUENOTE_ROCKETMQ_NAMESRV_PORT:-9876}:9876"
+
+  bluenote-rocketmq-broker:
+    ports:
+      - "${BLUENOTE_ROCKETMQ_BROKER_PORT:-10911}:10911"
+      - "${BLUENOTE_ROCKETMQ_BROKER_HA_PORT:-10909}:10909"
+      - "${BLUENOTE_ROCKETMQ_PROXY_PORT:-8081}:8081"
+
+  bluenote-minio:
+    ports:
+      - "${BLUENOTE_MINIO_API_PORT:-9000}:9000"
+      - "${BLUENOTE_MINIO_CONSOLE_PORT:-9001}:9001"

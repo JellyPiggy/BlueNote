@@ -1,0 +1,92 @@
+package com.bluenote.common.core;
+
+public enum ApiErrorCode implements ErrorCode {
+    SUCCESS(0, "SUCCESS", "success"),
+
+    SYSTEM_ERROR(10000, "SYSTEM_ERROR", "系统繁忙，请稍后再试"),
+    PARAM_INVALID(10001, "PARAM_INVALID", "请求参数不正确"),
+    REQUEST_BODY_INVALID(10002, "REQUEST_BODY_INVALID", "请求内容格式不正确"),
+    METHOD_NOT_ALLOWED(10003, "METHOD_NOT_ALLOWED", "请求方式不支持"),
+    RESOURCE_NOT_FOUND(10004, "RESOURCE_NOT_FOUND", "资源不存在"),
+    RATE_LIMITED(10005, "RATE_LIMITED", "操作太频繁，请稍后再试"),
+    IDEMPOTENCY_CONFLICT(10006, "IDEMPOTENCY_CONFLICT", "请求正在处理，请勿重复提交"),
+    DOWNSTREAM_FAILED(10007, "DOWNSTREAM_FAILED", "服务暂时不可用，请稍后再试"),
+    DATA_CONFLICT(10008, "DATA_CONFLICT", "数据已变化，请刷新后重试"),
+    UNSUPPORTED_MEDIA_TYPE(10009, "UNSUPPORTED_MEDIA_TYPE", "请求内容类型不支持"),
+    REQUEST_TOO_LARGE(10010, "REQUEST_TOO_LARGE", "请求内容过大"),
+    INTERNAL_AUTH_FAILED(10011, "INTERNAL_AUTH_FAILED", "服务调用未授权"),
+
+    ACCESS_TOKEN_EXPIRED(20001, "ACCESS_TOKEN_EXPIRED", "登录已过期，请重新登录"),
+    ACCESS_TOKEN_INVALID(20002, "ACCESS_TOKEN_INVALID", "登录状态无效，请重新登录"),
+    REFRESH_TOKEN_EXPIRED(20003, "REFRESH_TOKEN_EXPIRED", "登录已过期，请重新登录"),
+    REFRESH_TOKEN_INVALID(20004, "REFRESH_TOKEN_INVALID", "登录状态无效，请重新登录"),
+    USERNAME_OR_PASSWORD_ERROR(20005, "USERNAME_OR_PASSWORD_ERROR", "用户名或密码错误"),
+    ACCOUNT_DISABLED(20006, "ACCOUNT_DISABLED", "账号不可用"),
+    SESSION_REVOKED(20007, "SESSION_REVOKED", "当前设备已退出登录"),
+    PASSWORD_TOO_WEAK(20008, "PASSWORD_TOO_WEAK", "密码强度不足"),
+    OLD_PASSWORD_ERROR(20009, "OLD_PASSWORD_ERROR", "原密码错误"),
+    USERNAME_ALREADY_EXISTS(20010, "USERNAME_ALREADY_EXISTS", "用户名已被使用"),
+    DEVICE_ID_INVALID(20011, "DEVICE_ID_INVALID", "设备信息不正确"),
+    TOKEN_REFRESH_REPLAYED(20012, "TOKEN_REFRESH_REPLAYED", "登录状态存在风险，请重新登录"),
+
+    USER_NOT_FOUND(21001, "USER_NOT_FOUND", "用户不存在"),
+    USER_DISABLED(21002, "USER_DISABLED", "用户不可用"),
+    NICKNAME_INVALID(21003, "NICKNAME_INVALID", "昵称不符合要求"),
+    BIO_INVALID(21004, "BIO_INVALID", "简介不符合要求"),
+    AVATAR_FILE_INVALID(21005, "AVATAR_FILE_INVALID", "头像文件不可用"),
+    HOME_COVER_FILE_INVALID(21006, "HOME_COVER_FILE_INVALID", "主页背景文件不可用"),
+    PROFILE_VERSION_CONFLICT(21007, "PROFILE_VERSION_CONFLICT", "资料已变化，请刷新后重试"),
+    BIRTHDAY_INVALID(21008, "BIRTHDAY_INVALID", "生日不符合要求"),
+    REGION_INVALID(21009, "REGION_INVALID", "地区不符合要求"),
+
+    FILE_NOT_FOUND(22001, "FILE_NOT_FOUND", "文件不存在"),
+    FILE_OWNER_MISMATCH(22002, "FILE_OWNER_MISMATCH", "无权使用该文件"),
+    FILE_SCENE_INVALID(22003, "FILE_SCENE_INVALID", "文件场景不正确"),
+    FILE_TYPE_NOT_SUPPORTED(22004, "FILE_TYPE_NOT_SUPPORTED", "文件类型不支持"),
+    FILE_SIZE_EXCEEDED(22005, "FILE_SIZE_EXCEEDED", "文件大小超出限制"),
+    UPLOAD_TOKEN_EXPIRED(22006, "UPLOAD_TOKEN_EXPIRED", "上传凭证已过期"),
+    UPLOAD_NOT_COMPLETED(22007, "UPLOAD_NOT_COMPLETED", "文件尚未上传完成"),
+    FILE_STATUS_INVALID(22008, "FILE_STATUS_INVALID", "文件状态不允许当前操作"),
+    FILE_BATCH_VALIDATE_FAILED(22009, "FILE_BATCH_VALIDATE_FAILED", "文件校验失败"),
+    OBJECT_STORAGE_FAILED(22010, "OBJECT_STORAGE_FAILED", "文件服务暂时不可用"),
+    FILE_BIND_FAILED(22011, "FILE_BIND_FAILED", "文件绑定失败"),
+
+    NOTE_NOT_FOUND(23001, "NOTE_NOT_FOUND", "笔记不存在"),
+    NOTE_STATUS_INVALID(23002, "NOTE_STATUS_INVALID", "笔记状态不允许当前操作"),
+    NOTE_AUTHOR_FORBIDDEN(23003, "NOTE_AUTHOR_FORBIDDEN", "无权操作该笔记"),
+    NOTE_VISIBILITY_INVALID(23004, "NOTE_VISIBILITY_INVALID", "可见性参数不正确"),
+    NOTE_TITLE_INVALID(23005, "NOTE_TITLE_INVALID", "标题不符合要求"),
+    NOTE_CONTENT_INVALID(23006, "NOTE_CONTENT_INVALID", "正文不符合要求"),
+    NOTE_MEDIA_INVALID(23007, "NOTE_MEDIA_INVALID", "笔记图片或视频不可用"),
+    NOTE_MEDIA_COUNT_EXCEEDED(23008, "NOTE_MEDIA_COUNT_EXCEEDED", "媒体数量超出限制"),
+    NOTE_VERSION_CONFLICT(23009, "NOTE_VERSION_CONFLICT", "笔记已变化，请刷新后重试"),
+    NOTE_PUBLISH_RATE_LIMITED(23010, "NOTE_PUBLISH_RATE_LIMITED", "发布太频繁，请稍后再试"),
+    NOTE_INTERACTION_RATE_LIMITED(23011, "NOTE_INTERACTION_RATE_LIMITED", "操作太频繁，请稍后再试"),
+    NOTE_COMMENT_DISABLED(23012, "NOTE_COMMENT_DISABLED", "作者已关闭评论"),
+    NOTE_IDEMPOTENCY_MISMATCH(23013, "NOTE_IDEMPOTENCY_MISMATCH", "重复请求内容不一致");
+
+    private final int code;
+    private final String reason;
+    private final String message;
+
+    ApiErrorCode(int code, String reason, String message) {
+        this.code = code;
+        this.reason = reason;
+        this.message = message;
+    }
+
+    @Override
+    public int code() {
+        return code;
+    }
+
+    @Override
+    public String reason() {
+        return reason;
+    }
+
+    @Override
+    public String message() {
+        return message;
+    }
+}

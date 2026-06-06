@@ -8,6 +8,7 @@
 *.tmp
 .DS_Store
 Thumbs.db
+target/
 
 # Environment / secrets
 .env

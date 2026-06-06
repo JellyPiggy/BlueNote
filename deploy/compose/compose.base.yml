@@ -1,0 +1,146 @@
+name: bluenote
+
+services:
+  bluenote-mysql:
+    image: ${BLUENOTE_MYSQL_IMAGE:-mysql:8.4}
+    container_name: bluenote-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${BLUENOTE_MYSQL_ROOT_PASSWORD:-bluenote_root_local}
+      TZ: Asia/Shanghai
+    command:
+      - mysqld
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+      - --max-connections=200
+    volumes:
+      - bluenote-mysql-data:/var/lib/mysql
+      - ../../backend/sql:/docker-entrypoint-initdb.d:ro
+    networks:
+      - bluenote-local
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  bluenote-redis:
+    image: ${BLUENOTE_REDIS_IMAGE:-redis:7.4-alpine}
+    container_name: bluenote-redis
+    environment:
+      BLUENOTE_REDIS_PASSWORD: ${BLUENOTE_REDIS_PASSWORD:-bluenote_redis_local}
+      TZ: Asia/Shanghai
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${BLUENOTE_REDIS_PASSWORD:-bluenote_redis_local}
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+    volumes:
+      - bluenote-redis-data:/data
+    networks:
+      - bluenote-local
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $${BLUENOTE_REDIS_PASSWORD} ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  bluenote-nacos:
+    image: ${BLUENOTE_NACOS_IMAGE:-nacos/nacos-server:v2.4.3}
+    container_name: bluenote-nacos
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "false"
+      PREFER_HOST_MODE: hostname
+      JVM_XMS: 256m
+      JVM_XMX: 256m
+      JVM_XMN: 128m
+      TZ: Asia/Shanghai
+    volumes:
+      - bluenote-nacos-data:/home/nacos/data
+      - bluenote-nacos-logs:/home/nacos/logs
+    networks:
+      - bluenote-local
+
+  bluenote-rocketmq-namesrv:
+    image: ${BLUENOTE_ROCKETMQ_IMAGE:-apache/rocketmq:5.3.2}
+    container_name: bluenote-rocketmq-namesrv
+    environment:
+      JAVA_OPT_EXT: "-server -Xms128m -Xmx128m -Xmn64m"
+      TZ: Asia/Shanghai
+    command: ["sh", "mqnamesrv"]
+    volumes:
+      - bluenote-rocketmq-namesrv-logs:/home/rocketmq/logs
+    networks:
+      - bluenote-local
+
+  bluenote-rocketmq-broker:
+    image: ${BLUENOTE_ROCKETMQ_IMAGE:-apache/rocketmq:5.3.2}
+    container_name: bluenote-rocketmq-broker
+    depends_on:
+      - bluenote-rocketmq-namesrv
+    environment:
+      NAMESRV_ADDR: bluenote-rocketmq-namesrv:9876
+      JAVA_OPT_EXT: "-server -Xms256m -Xmx256m -Xmn128m"
+      TZ: Asia/Shanghai
+    command: ["sh", "mqbroker", "-c", "/home/rocketmq/conf/broker-local.conf", "--enable-proxy"]
+    volumes:
+      - ../rocketmq/broker-local.conf:/home/rocketmq/conf/broker-local.conf:ro
+      - bluenote-rocketmq-broker-store:/home/rocketmq/store
+      - bluenote-rocketmq-broker-logs:/home/rocketmq/logs
+    networks:
+      - bluenote-local
+
+  bluenote-minio:
+    image: ${BLUENOTE_MINIO_IMAGE:-quay.io/minio/minio:latest}
+    container_name: bluenote-minio
+    environment:
+      MINIO_ROOT_USER: ${BLUENOTE_MINIO_ROOT_USER:-bluenote_minio}
+      MINIO_ROOT_PASSWORD: ${BLUENOTE_MINIO_ROOT_PASSWORD:-bluenote_minio_local}
+      TZ: Asia/Shanghai
+    command: ["server", "/data", "--console-address", ":9001"]
+    volumes:
+      - bluenote-minio-data:/data
+    networks:
+      - bluenote-local
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  bluenote-minio-init:
+    image: ${BLUENOTE_MINIO_MC_IMAGE:-quay.io/minio/mc:latest}
+    container_name: bluenote-minio-init
+    depends_on:
+      - bluenote-minio
+    environment:
+      MINIO_ROOT_USER: ${BLUENOTE_MINIO_ROOT_USER:-bluenote_minio}
+      MINIO_ROOT_PASSWORD: ${BLUENOTE_MINIO_ROOT_PASSWORD:-bluenote_minio_local}
+      BLUENOTE_MINIO_BUCKET: ${BLUENOTE_MINIO_BUCKET:-bluenote-files}
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "until mc alias set local http://bluenote-minio:9000 \"$${MINIO_ROOT_USER}\" \"$${MINIO_ROOT_PASSWORD}\"; do sleep 2; done;
+      mc mb --ignore-existing local/$${BLUENOTE_MINIO_BUCKET};
+      mc anonymous set download local/$${BLUENOTE_MINIO_BUCKET};"
+    networks:
+      - bluenote-local
+
+networks:
+  bluenote-local:
+    name: bluenote-local
+
+volumes:
+  bluenote-mysql-data:
+  bluenote-redis-data:
+  bluenote-nacos-data:
+  bluenote-nacos-logs:
+  bluenote-rocketmq-namesrv-logs:
+  bluenote-rocketmq-broker-store:
+  bluenote-rocketmq-broker-logs:
+  bluenote-minio-data:
