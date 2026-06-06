@@ -18,11 +18,11 @@ docker compose -f deploy/compose/compose.base.yml -f deploy/compose/compose.loca
 
 | 服务 | 本地端口 | 用途 |
 |---|---:|---|
-| MySQL | 3306 | auth、user、file、note schema |
-| Redis | 6379 | 登录限流、Token 黑名单、缓存 |
+| MySQL | 13306 | auth、user、file、note schema |
+| Redis | 16379 | 登录限流、Token 黑名单、缓存 |
 | Nacos | 8848 | 注册中心和配置中心 |
 | RocketMQ NameServer | 9876 | MQ NameServer |
-| RocketMQ Broker / Proxy | 10911 / 8081 | MQ Broker 和代理 |
+| RocketMQ Broker | 10911 | MQ Broker |
 | MinIO API / Console | 9000 / 9001 | 对象存储 |
 
 默认值只用于 local 开发。test/prod 必须通过环境变量或独立 env 文件覆盖敏感配置。

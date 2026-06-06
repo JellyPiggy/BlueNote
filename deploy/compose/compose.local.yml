@@ -1,11 +1,11 @@
 services:
   bluenote-mysql:
     ports:
-      - "${BLUENOTE_MYSQL_PORT:-3306}:3306"
+      - "${BLUENOTE_MYSQL_PORT:-13306}:3306"
 
   bluenote-redis:
     ports:
-      - "${BLUENOTE_REDIS_PORT:-6379}:6379"
+      - "${BLUENOTE_REDIS_PORT:-16379}:6379"
 
   bluenote-nacos:
     ports:
@@ -21,7 +21,6 @@ services:
     ports:
       - "${BLUENOTE_ROCKETMQ_BROKER_PORT:-10911}:10911"
       - "${BLUENOTE_ROCKETMQ_BROKER_HA_PORT:-10909}:10909"
-      - "${BLUENOTE_ROCKETMQ_PROXY_PORT:-8081}:8081"
 
   bluenote-minio:
     ports:
