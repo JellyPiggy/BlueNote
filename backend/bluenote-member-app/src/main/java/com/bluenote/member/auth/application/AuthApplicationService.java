@@ -3,6 +3,7 @@ package com.bluenote.member.auth.application;
 import com.bluenote.common.core.ApiErrorCode;
 import com.bluenote.common.core.BusinessException;
 import com.bluenote.common.observability.TraceIdHolder;
+import com.bluenote.common.security.JwtAccessTokenService;
 import com.bluenote.common.security.UserContext;
 import com.bluenote.common.security.UserContextHolder;
 import com.bluenote.member.auth.api.dto.ChangePasswordRequest;
@@ -49,7 +50,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @Service
 public class AuthApplicationService {
 
-    private static final long ACCESS_TOKEN_EXPIRES_IN = 3600L;
     private static final long REFRESH_TOKEN_EXPIRES_IN = 2_592_000L;
     private static final String DEFAULT_NICKNAME = "小蓝";
     private static final ZoneId CHINA_ZONE = ZoneId.of("Asia/Shanghai");
@@ -62,6 +62,7 @@ public class AuthApplicationService {
     private final AuthOutboxEventMapper outboxEventMapper;
     private final UserApplicationService userApplicationService;
     private final PasswordEncoder passwordEncoder;
+    private final JwtAccessTokenService accessTokenService;
     private final MemberIdGenerator idGenerator;
     private final JsonPayloads jsonPayloads;
 
@@ -73,6 +74,7 @@ public class AuthApplicationService {
             AuthOutboxEventMapper outboxEventMapper,
             UserApplicationService userApplicationService,
             PasswordEncoder passwordEncoder,
+            JwtAccessTokenService accessTokenService,
             MemberIdGenerator idGenerator,
             JsonPayloads jsonPayloads
     ) {
@@ -83,6 +85,7 @@ public class AuthApplicationService {
         this.outboxEventMapper = outboxEventMapper;
         this.userApplicationService = userApplicationService;
         this.passwordEncoder = passwordEncoder;
+        this.accessTokenService = accessTokenService;
         this.idGenerator = idGenerator;
         this.jsonPayloads = jsonPayloads;
     }
@@ -187,7 +190,7 @@ public class AuthApplicationService {
         }
         ensureNormalAccount(session.getUserId());
 
-        TokenMaterial token = newTokenMaterial();
+        TokenMaterial token = newTokenMaterial(session.getUserId(), session.getDeviceId(), session.getSessionId());
         int updated = sessionMapper.rotateRefreshToken(
                 session.getSessionId(),
                 oldRefreshTokenHash,
@@ -275,9 +278,10 @@ public class AuthApplicationService {
             String appVersion,
             LocalDateTime now
     ) {
-        TokenMaterial token = newTokenMaterial();
+        Long sessionId = idGenerator.nextId();
+        TokenMaterial token = newTokenMaterial(userId, deviceId, sessionId);
         AuthSessionEntity session = new AuthSessionEntity();
-        session.setSessionId(idGenerator.nextId());
+        session.setSessionId(sessionId);
         session.setUserId(userId);
         session.setDeviceId(deviceId);
         session.setDeviceName(deviceName);
@@ -380,13 +384,17 @@ public class AuthApplicationService {
                 String.valueOf(userId),
                 token.accessToken(),
                 token.refreshToken(),
-                ACCESS_TOKEN_EXPIRES_IN,
+                accessTokenService.expiresInSeconds(),
                 REFRESH_TOKEN_EXPIRES_IN
         );
     }
 
-    private TokenMaterial newTokenMaterial() {
-        String accessToken = "access." + randomToken();
+    private TokenMaterial newTokenMaterial(Long userId, String deviceId, Long sessionId) {
+        String accessToken = accessTokenService.issue(
+                String.valueOf(userId),
+                deviceId,
+                String.valueOf(sessionId)
+        );
         String refreshToken = "refresh." + randomToken();
         return new TokenMaterial(accessToken, refreshToken, sha256Hex(refreshToken));
     }

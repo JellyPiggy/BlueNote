@@ -47,12 +47,12 @@ public class UserController {
     }
 
     @GetMapping("/{userId}/public")
-    public ApiResponse<UserSummaryResponse> publicProfile(@PathVariable String userId) {
+    public ApiResponse<UserSummaryResponse> publicProfile(@PathVariable("userId") String userId) {
         return ApiResponse.success(userApplicationService.publicProfile(userId), TraceIdHolder.currentOrNew());
     }
 
     @GetMapping("/{userId}/home")
-    public ApiResponse<UserHomeResponse> home(@PathVariable String userId) {
+    public ApiResponse<UserHomeResponse> home(@PathVariable("userId") String userId) {
         return ApiResponse.success(userApplicationService.home(userId), TraceIdHolder.currentOrNew());
     }
 

@@ -25,3 +25,13 @@ management:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+
+bluenote:
+  routes:
+    member-uri: ${BLUENOTE_MEMBER_URI:http://127.0.0.1:8081}
+    content-uri: ${BLUENOTE_CONTENT_URI:http://127.0.0.1:8082}
+  security:
+    access-token:
+      secret: ${BLUENOTE_ACCESS_TOKEN_SECRET:bluenote-local-access-token-secret-change-me-32chars}
+      issuer: ${BLUENOTE_ACCESS_TOKEN_ISSUER:bluenote}
+      expires-in-seconds: ${BLUENOTE_ACCESS_TOKEN_EXPIRES_IN_SECONDS:3600}
