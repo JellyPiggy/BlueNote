@@ -1,0 +1,17 @@
+{
+  "name": "BlueNote",
+  "appid": "__UNI__BLUENOTE",
+  "description": "BlueNote mobile app",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "h5": {
+    "title": "BlueNote"
+  },
+  "app-plus": {
+    "usingComponents": true,
+    "nvueStyleCompiler": "uni-app",
+    "compilerVersion": 3
+  }
+}
+
