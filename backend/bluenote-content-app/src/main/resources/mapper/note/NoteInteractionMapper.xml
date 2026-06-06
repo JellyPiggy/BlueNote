@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.content.note.infrastructure.mapper.NoteInteractionMapper">
+
+    <select id="countLikes" resultType="long">
+        SELECT COUNT(*)
+        FROM bluenote_note.note_like
+        WHERE note_id = #{noteId}
+          AND like_status = 'ACTIVE'
+    </select>
+
+    <select id="countCollections" resultType="long">
+        SELECT COUNT(*)
+        FROM bluenote_note.note_collection
+        WHERE note_id = #{noteId}
+          AND collection_status = 'ACTIVE'
+    </select>
+
+    <select id="likedByViewer" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM bluenote_note.note_like
+        WHERE note_id = #{noteId}
+          AND user_id = #{userId}
+          AND like_status = 'ACTIVE'
+    </select>
+
+    <select id="collectedByViewer" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM bluenote_note.note_collection
+        WHERE note_id = #{noteId}
+          AND user_id = #{userId}
+          AND collection_status = 'ACTIVE'
+    </select>
+</mapper>
+

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.content.note.infrastructure.mapper.NoteTopicMapper">
+
+    <resultMap id="NoteTopicResultMap" type="com.bluenote.content.note.infrastructure.entity.NoteTopicEntity">
+        <id column="id" property="id"/>
+        <result column="note_id" property="noteId"/>
+        <result column="version_no" property="versionNo"/>
+        <result column="topic_name" property="topicName"/>
+        <result column="sort_order" property="sortOrder"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.bluenote.content.note.infrastructure.entity.NoteTopicEntity">
+        INSERT INTO bluenote_note.note_topic (
+            id, note_id, version_no, topic_name, sort_order, created_at
+        ) VALUES (
+            #{id}, #{noteId}, #{versionNo}, #{topicName}, #{sortOrder}, #{createdAt}
+        )
+    </insert>
+
+    <select id="selectByNoteAndVersion" resultMap="NoteTopicResultMap">
+        SELECT id, note_id, version_no, topic_name, sort_order, created_at
+        FROM bluenote_note.note_topic
+        WHERE note_id = #{noteId}
+          AND version_no = #{versionNo}
+        ORDER BY sort_order ASC, id ASC
+    </select>
+</mapper>
+

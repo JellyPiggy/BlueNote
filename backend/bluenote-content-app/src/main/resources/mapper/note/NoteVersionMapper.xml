@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.content.note.infrastructure.mapper.NoteVersionMapper">
+
+    <resultMap id="NoteVersionResultMap" type="com.bluenote.content.note.infrastructure.entity.NoteVersionEntity">
+        <id column="id" property="id"/>
+        <result column="note_id" property="noteId"/>
+        <result column="version_no" property="versionNo"/>
+        <result column="title" property="title"/>
+        <result column="content" property="content"/>
+        <result column="content_preview" property="contentPreview"/>
+        <result column="version_status" property="versionStatus"/>
+        <result column="audit_status" property="auditStatus"/>
+        <result column="audit_reason" property="auditReason"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.bluenote.content.note.infrastructure.entity.NoteVersionEntity">
+        INSERT INTO bluenote_note.note_version (
+            id, note_id, version_no, title, content, content_preview, version_status,
+            audit_status, audit_reason, created_by, created_at, updated_at
+        ) VALUES (
+            #{id}, #{noteId}, #{versionNo}, #{title}, #{content}, #{contentPreview}, #{versionStatus},
+            #{auditStatus}, #{auditReason}, #{createdBy}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectByNoteAndVersion" resultMap="NoteVersionResultMap">
+        SELECT id, note_id, version_no, title, content, content_preview, version_status,
+               audit_status, audit_reason, created_by, created_at, updated_at
+        FROM bluenote_note.note_version
+        WHERE note_id = #{noteId}
+          AND version_no = #{versionNo}
+    </select>
+
+    <update id="markActive">
+        UPDATE bluenote_note.note_version
+        SET version_status = 'ACTIVE',
+            audit_status = 'SKIPPED'
+        WHERE note_id = #{noteId}
+          AND version_no = #{versionNo}
+    </update>
+</mapper>
+

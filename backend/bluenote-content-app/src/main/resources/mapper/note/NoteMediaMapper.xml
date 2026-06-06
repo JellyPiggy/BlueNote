@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.content.note.infrastructure.mapper.NoteMediaMapper">
+
+    <resultMap id="NoteMediaResultMap" type="com.bluenote.content.note.infrastructure.entity.NoteMediaEntity">
+        <id column="id" property="id"/>
+        <result column="note_id" property="noteId"/>
+        <result column="version_no" property="versionNo"/>
+        <result column="file_id" property="fileId"/>
+        <result column="media_type" property="mediaType"/>
+        <result column="sort_order" property="sortOrder"/>
+        <result column="is_cover" property="cover"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.bluenote.content.note.infrastructure.entity.NoteMediaEntity">
+        INSERT INTO bluenote_note.note_media (
+            id, note_id, version_no, file_id, media_type, sort_order, is_cover, created_at
+        ) VALUES (
+            #{id}, #{noteId}, #{versionNo}, #{fileId}, #{mediaType}, #{sortOrder}, #{cover}, #{createdAt}
+        )
+    </insert>
+
+    <select id="selectByNoteAndVersion" resultMap="NoteMediaResultMap">
+        SELECT id, note_id, version_no, file_id, media_type, sort_order, is_cover, created_at
+        FROM bluenote_note.note_media
+        WHERE note_id = #{noteId}
+          AND version_no = #{versionNo}
+        ORDER BY sort_order ASC, id ASC
+    </select>
+</mapper>
+

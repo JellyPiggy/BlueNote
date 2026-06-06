@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.content.file.infrastructure.mapper.FileObjectMapper">
+
+    <resultMap id="FileObjectResultMap" type="com.bluenote.content.file.infrastructure.entity.FileObjectEntity">
+        <id column="file_id" property="fileId"/>
+        <result column="owner_id" property="ownerId"/>
+        <result column="scene" property="scene"/>
+        <result column="storage_type" property="storageType"/>
+        <result column="bucket" property="bucket"/>
+        <result column="object_key" property="objectKey"/>
+        <result column="original_filename" property="originalFilename"/>
+        <result column="file_ext" property="fileExt"/>
+        <result column="mime_type" property="mimeType"/>
+        <result column="file_size" property="fileSize"/>
+        <result column="etag" property="etag"/>
+        <result column="width" property="width"/>
+        <result column="height" property="height"/>
+        <result column="duration_ms" property="durationMs"/>
+        <result column="file_status" property="fileStatus"/>
+        <result column="audit_status" property="auditStatus"/>
+        <result column="access_level" property="accessLevel"/>
+        <result column="uploaded_at" property="uploadedAt"/>
+        <result column="bound_at" property="boundAt"/>
+        <result column="deleted_at" property="deletedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="deleted" property="deleted"/>
+    </resultMap>
+
+    <sql id="FileObjectColumns">
+        file_id, owner_id, scene, storage_type, bucket, object_key, original_filename, file_ext,
+        mime_type, file_size, etag, width, height, duration_ms, file_status, audit_status,
+        access_level, uploaded_at, bound_at, deleted_at, created_at, updated_at, deleted
+    </sql>
+
+    <insert id="insert" parameterType="com.bluenote.content.file.infrastructure.entity.FileObjectEntity">
+        INSERT INTO bluenote_file.file_object (
+            file_id, owner_id, scene, storage_type, bucket, object_key, original_filename, file_ext,
+            mime_type, file_size, etag, width, height, duration_ms, file_status, audit_status,
+            access_level, uploaded_at, bound_at, deleted_at, created_at, updated_at, deleted
+        ) VALUES (
+            #{fileId}, #{ownerId}, #{scene}, #{storageType}, #{bucket}, #{objectKey}, #{originalFilename}, #{fileExt},
+            #{mimeType}, #{fileSize}, #{etag}, #{width}, #{height}, #{durationMs}, #{fileStatus}, #{auditStatus},
+            #{accessLevel}, #{uploadedAt}, #{boundAt}, #{deletedAt}, #{createdAt}, #{updatedAt}, #{deleted}
+        )
+    </insert>
+
+    <select id="selectByFileId" resultMap="FileObjectResultMap">
+        SELECT <include refid="FileObjectColumns"/>
+        FROM bluenote_file.file_object
+        WHERE file_id = #{fileId}
+          AND deleted = 0
+    </select>
+
+    <select id="selectByFileIds" resultMap="FileObjectResultMap">
+        SELECT <include refid="FileObjectColumns"/>
+        FROM bluenote_file.file_object
+        WHERE deleted = 0
+          AND file_id IN
+        <foreach collection="fileIds" item="fileId" open="(" separator="," close=")">
+            #{fileId}
+        </foreach>
+    </select>
+
+    <update id="markUploaded">
+        UPDATE bluenote_file.file_object
+        SET file_status = 'UPLOADED',
+            etag = #{etag},
+            file_size = #{fileSize},
+            uploaded_at = #{uploadedAt},
+            updated_at = #{updatedAt}
+        WHERE file_id = #{fileId}
+          AND file_status = 'INIT'
+          AND deleted = 0
+    </update>
+
+    <update id="markBound">
+        UPDATE bluenote_file.file_object
+        SET file_status = 'BOUND',
+            bound_at = COALESCE(bound_at, #{boundAt}),
+            updated_at = #{updatedAt}
+        WHERE file_id = #{fileId}
+          AND file_status IN ('UPLOADED', 'BOUND')
+          AND deleted = 0
+    </update>
+</mapper>
+

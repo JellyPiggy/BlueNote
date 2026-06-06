@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.content.file.infrastructure.mapper.FileBindingMapper">
+
+    <resultMap id="FileBindingResultMap" type="com.bluenote.content.file.infrastructure.entity.FileBindingEntity">
+        <id column="id" property="id"/>
+        <result column="file_id" property="fileId"/>
+        <result column="owner_id" property="ownerId"/>
+        <result column="bind_type" property="bindType"/>
+        <result column="bind_id" property="bindId"/>
+        <result column="bind_status" property="bindStatus"/>
+        <result column="bind_version" property="bindVersion"/>
+        <result column="bound_at" property="boundAt"/>
+        <result column="unbound_at" property="unboundAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.bluenote.content.file.infrastructure.entity.FileBindingEntity">
+        INSERT INTO bluenote_file.file_binding (
+            id, file_id, owner_id, bind_type, bind_id, bind_status, bind_version,
+            bound_at, unbound_at, created_at, updated_at
+        ) VALUES (
+            #{id}, #{fileId}, #{ownerId}, #{bindType}, #{bindId}, #{bindStatus}, #{bindVersion},
+            #{boundAt}, #{unboundAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectBinding" resultMap="FileBindingResultMap">
+        SELECT id, file_id, owner_id, bind_type, bind_id, bind_status, bind_version,
+               bound_at, unbound_at, created_at, updated_at
+        FROM bluenote_file.file_binding
+        WHERE file_id = #{fileId}
+          AND bind_type = #{bindType}
+          AND bind_id = #{bindId}
+    </select>
+
+    <update id="markBound">
+        UPDATE bluenote_file.file_binding
+        SET owner_id = #{entity.ownerId},
+            bind_status = 'BOUND',
+            bind_version = bind_version + 1,
+            bound_at = #{entity.boundAt},
+            unbound_at = NULL,
+            updated_at = #{entity.updatedAt}
+        WHERE file_id = #{fileId}
+          AND bind_type = #{bindType}
+          AND bind_id = #{bindId}
+    </update>
+</mapper>
+

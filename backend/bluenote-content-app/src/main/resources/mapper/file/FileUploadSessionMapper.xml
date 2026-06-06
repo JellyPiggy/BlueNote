@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.content.file.infrastructure.mapper.FileUploadSessionMapper">
+
+    <resultMap id="FileUploadSessionResultMap" type="com.bluenote.content.file.infrastructure.entity.FileUploadSessionEntity">
+        <id column="upload_id" property="uploadId"/>
+        <result column="file_id" property="fileId"/>
+        <result column="owner_id" property="ownerId"/>
+        <result column="upload_method" property="uploadMethod"/>
+        <result column="upload_status" property="uploadStatus"/>
+        <result column="expected_size" property="expectedSize"/>
+        <result column="expected_mime_type" property="expectedMimeType"/>
+        <result column="upload_url_expire_at" property="uploadUrlExpireAt"/>
+        <result column="confirmed_at" property="confirmedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.bluenote.content.file.infrastructure.entity.FileUploadSessionEntity">
+        INSERT INTO bluenote_file.file_upload_session (
+            upload_id, file_id, owner_id, upload_method, upload_status, expected_size,
+            expected_mime_type, upload_url_expire_at, confirmed_at, created_at, updated_at
+        ) VALUES (
+            #{uploadId}, #{fileId}, #{ownerId}, #{uploadMethod}, #{uploadStatus}, #{expectedSize},
+            #{expectedMimeType}, #{uploadUrlExpireAt}, #{confirmedAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectLatestByFileId" resultMap="FileUploadSessionResultMap">
+        SELECT upload_id, file_id, owner_id, upload_method, upload_status, expected_size,
+               expected_mime_type, upload_url_expire_at, confirmed_at, created_at, updated_at
+        FROM bluenote_file.file_upload_session
+        WHERE file_id = #{fileId}
+        ORDER BY created_at DESC
+        LIMIT 1
+    </select>
+
+    <update id="markUploaded">
+        UPDATE bluenote_file.file_upload_session
+        SET upload_status = 'UPLOADED',
+            confirmed_at = #{confirmedAt},
+            updated_at = #{updatedAt}
+        WHERE upload_id = #{uploadId}
+          AND upload_status IN ('INIT', 'UPLOADED')
+    </update>
+
+    <update id="markExpired">
+        UPDATE bluenote_file.file_upload_session
+        SET upload_status = 'EXPIRED',
+            updated_at = #{updatedAt}
+        WHERE upload_id = #{uploadId}
+          AND upload_status = 'INIT'
+    </update>
+</mapper>
+

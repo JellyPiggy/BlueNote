@@ -4,6 +4,31 @@ server:
 spring:
   application:
     name: bluenote-content-app
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${BLUENOTE_CONTENT_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/bluenote_file?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${BLUENOTE_CONTENT_DATASOURCE_USERNAME:root}
+    password: ${BLUENOTE_CONTENT_DATASOURCE_PASSWORD:bluenote_root_local}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+bluenote:
+  storage:
+    minio:
+      endpoint: ${BLUENOTE_MINIO_ENDPOINT:http://127.0.0.1:9000}
+      public-endpoint: ${BLUENOTE_MINIO_PUBLIC_ENDPOINT:http://127.0.0.1:9000}
+      access-key: ${BLUENOTE_MINIO_ACCESS_KEY:bluenote_minio}
+      secret-key: ${BLUENOTE_MINIO_SECRET_KEY:bluenote_minio_local}
+      bucket: ${BLUENOTE_MINIO_BUCKET:bluenote-files}
+      upload-url-expires-seconds: ${BLUENOTE_MINIO_UPLOAD_URL_EXPIRES_SECONDS:600}
+  internal:
+    member-uri: ${BLUENOTE_MEMBER_INTERNAL_URI:http://127.0.0.1:8081}
 
 management:
   endpoints:

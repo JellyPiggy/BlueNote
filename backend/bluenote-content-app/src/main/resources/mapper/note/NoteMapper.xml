@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.content.note.infrastructure.mapper.NoteMapper">
+
+    <resultMap id="NoteResultMap" type="com.bluenote.content.note.infrastructure.entity.NoteEntity">
+        <id column="note_id" property="noteId"/>
+        <result column="author_id" property="authorId"/>
+        <result column="note_type" property="noteType"/>
+        <result column="note_status" property="noteStatus"/>
+        <result column="visibility" property="visibility"/>
+        <result column="current_version" property="currentVersion"/>
+        <result column="latest_version" property="latestVersion"/>
+        <result column="cover_file_id" property="coverFileId"/>
+        <result column="comment_enabled" property="commentEnabled"/>
+        <result column="published_at" property="publishedAt"/>
+        <result column="last_edited_at" property="lastEditedAt"/>
+        <result column="offline_reason" property="offlineReason"/>
+        <result column="deleted_at" property="deletedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="deleted" property="deleted"/>
+    </resultMap>
+
+    <sql id="NoteColumns">
+        note_id, author_id, note_type, note_status, visibility, current_version, latest_version,
+        cover_file_id, comment_enabled, published_at, last_edited_at, offline_reason,
+        deleted_at, created_at, updated_at, deleted
+    </sql>
+
+    <insert id="insert" parameterType="com.bluenote.content.note.infrastructure.entity.NoteEntity">
+        INSERT INTO bluenote_note.note (
+            note_id, author_id, note_type, note_status, visibility, current_version, latest_version,
+            cover_file_id, comment_enabled, published_at, last_edited_at, offline_reason,
+            deleted_at, created_at, updated_at, deleted
+        ) VALUES (
+            #{noteId}, #{authorId}, #{noteType}, #{noteStatus}, #{visibility}, #{currentVersion}, #{latestVersion},
+            #{coverFileId}, #{commentEnabled}, #{publishedAt}, #{lastEditedAt}, #{offlineReason},
+            #{deletedAt}, #{createdAt}, #{updatedAt}, #{deleted}
+        )
+    </insert>
+
+    <select id="selectByNoteId" resultMap="NoteResultMap">
+        SELECT <include refid="NoteColumns"/>
+        FROM bluenote_note.note
+        WHERE note_id = #{noteId}
+          AND deleted = 0
+    </select>
+
+    <select id="selectByNoteIds" resultMap="NoteResultMap">
+        SELECT <include refid="NoteColumns"/>
+        FROM bluenote_note.note
+        WHERE deleted = 0
+          AND note_id IN
+        <foreach collection="noteIds" item="noteId" open="(" separator="," close=")">
+            #{noteId}
+        </foreach>
+    </select>
+
+    <update id="publishDraft">
+        UPDATE bluenote_note.note
+        SET note_status = #{noteStatus},
+            visibility = #{visibility},
+            published_at = #{publishedAt},
+            last_edited_at = #{updatedAt},
+            current_version = latest_version,
+            updated_at = #{updatedAt}
+        WHERE note_id = #{noteId}
+          AND author_id = #{authorId}
+          AND note_status = 'DRAFT'
+          AND deleted = 0
+    </update>
+
+    <update id="markDeleted">
+        UPDATE bluenote_note.note
+        SET note_status = 'DELETED',
+            deleted_at = #{deletedAt},
+            updated_at = #{updatedAt},
+            deleted = 1
+        WHERE note_id = #{noteId}
+          AND author_id = #{authorId}
+          AND deleted = 0
+    </update>
+
+    <select id="selectAuthorPublishedPage" resultMap="NoteResultMap">
+        SELECT <include refid="NoteColumns"/>
+        FROM bluenote_note.note
+        WHERE author_id = #{authorId}
+          AND note_status = 'PUBLISHED'
+          AND visibility = 'PUBLIC'
+          AND deleted = 0
+        <if test="cursorPublishedAt != null and cursorNoteId != null">
+          AND (
+            published_at &lt; #{cursorPublishedAt}
+            OR (published_at = #{cursorPublishedAt} AND note_id &lt; #{cursorNoteId})
+          )
+        </if>
+        ORDER BY published_at DESC, note_id DESC
+        LIMIT #{size}
+    </select>
+
+    <select id="selectMyNotesPage" resultMap="NoteResultMap">
+        SELECT <include refid="NoteColumns"/>
+        FROM bluenote_note.note
+        WHERE author_id = #{authorId}
+          AND deleted = 0
+        <if test="status != null and status != ''">
+          AND note_status = #{status}
+        </if>
+        <if test="cursorSortAt != null and cursorNoteId != null">
+          AND (
+            COALESCE(published_at, updated_at) &lt; #{cursorSortAt}
+            OR (COALESCE(published_at, updated_at) = #{cursorSortAt} AND note_id &lt; #{cursorNoteId})
+          )
+        </if>
+        ORDER BY COALESCE(published_at, updated_at) DESC, note_id DESC
+        LIMIT #{size}
+    </select>
+</mapper>
+
