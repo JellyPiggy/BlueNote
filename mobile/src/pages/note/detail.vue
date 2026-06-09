@@ -230,8 +230,13 @@ function shareNote() {
   border: 1rpx solid rgba(255, 95, 87, 0.52);
   color: var(--bn-coral);
   background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 28rpx;
   font-weight: 760;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .gallery-section {
