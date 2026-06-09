@@ -3,7 +3,8 @@ import { computed, ref } from 'vue'
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 import { getMyNotes } from '@/api/note'
 import { showApiError } from '@/api/request'
-import type { NoteCard } from '@/api/types'
+import type { NoteCard, UserHome } from '@/api/types'
+import { getUserHome } from '@/api/user'
 import AvatarCircle from '@/components/AvatarCircle.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import NoteCardView from '@/components/NoteCard.vue'
@@ -11,12 +12,30 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const notes = ref<NoteCard[]>([])
+const profileHome = ref<UserHome | null>(null)
 const loading = ref(false)
 const accountMenuOpen = ref(false)
 
 const profile = computed(() => auth.profile)
 const leftNotes = computed(() => notes.value.filter((_, index) => index % 2 === 0))
 const rightNotes = computed(() => notes.value.filter((_, index) => index % 2 === 1))
+const heroStats = computed(() => {
+  const counts = profileHome.value?.counts
+  return [
+    {
+      label: '关注',
+      value: formatCount(counts?.followingCount ?? 0)
+    },
+    {
+      label: '粉丝',
+      value: formatCount(counts?.followerCount ?? 0)
+    },
+    {
+      label: '获赞',
+      value: formatCount(counts?.likedCount ?? 0)
+    }
+  ]
+})
 const coverStyle = computed(() => {
   const coverUrl = profile.value?.homeCoverUrl
   if (!coverUrl) {
@@ -45,8 +64,13 @@ async function loadProfile() {
   loading.value = true
   try {
     await auth.fetchCurrentUser()
-    const page = await getMyNotes(undefined, null, 30)
+    const userId = auth.profile?.userId ?? auth.userId
+    const [page, home] = await Promise.all([
+      getMyNotes(undefined, null, 30),
+      userId ? getUserHome(userId).catch(() => null) : Promise.resolve(null)
+    ])
     notes.value = page.items
+    profileHome.value = home
   } catch (error) {
     showApiError(error, '个人页加载失败')
   } finally {
@@ -74,6 +98,14 @@ function closeAccountMenu() {
   accountMenuOpen.value = false
 }
 
+function editProfileFromMenu() {
+  accountMenuOpen.value = false
+  uni.showToast({
+    title: '编辑主页功能接入中',
+    icon: 'none'
+  })
+}
+
 async function refreshFromMenu() {
   accountMenuOpen.value = false
   await loadProfile()
@@ -83,6 +115,7 @@ async function logout() {
   accountMenuOpen.value = false
   await auth.logoutCurrentDevice()
   notes.value = []
+  profileHome.value = null
   uni.navigateTo({ url: '/pages/login/index' })
 }
 
@@ -90,12 +123,21 @@ async function switchAccount() {
   accountMenuOpen.value = false
   await auth.logoutCurrentDevice()
   notes.value = []
+  profileHome.value = null
   uni.navigateTo({ url: '/pages/login/index' })
+}
+
+function formatCount(value: number) {
+  if (value >= 10000) {
+    const formatted = (value / 10000).toFixed(value >= 100000 ? 0 : 1)
+    return `${formatted.replace(/\.0$/, '')}万`
+  }
+  return String(value)
 }
 </script>
 
 <template>
-  <view class="screen top-safe">
+  <view class="screen profile-screen">
     <EmptyState
       v-if="!auth.isAuthenticated"
       title="还没有登录"
@@ -123,36 +165,18 @@ async function switchAccount() {
               <view class="bio">{{ profile?.bio || '记录生活，慢慢变成自己的地图。' }}</view>
             </view>
           </view>
-        </view>
-
-        <view class="profile-summary">
-          <view class="profile-stats">
-            <view class="profile-stat">
-              <text class="stat-value">{{ notes.length }}</text>
-              <text class="stat-label">笔记</text>
+          <view class="hero-stats">
+            <view v-for="stat in heroStats" :key="stat.label" class="hero-stat">
+              <text class="hero-stat-value">{{ stat.value }}</text>
+              <text class="hero-stat-label">{{ stat.label }}</text>
             </view>
-            <view class="profile-stat">
-              <text class="stat-value">0</text>
-              <text class="stat-label">获赞</text>
-            </view>
-            <view class="profile-stat">
-              <text class="stat-value">0</text>
-              <text class="stat-label">关注</text>
-            </view>
-            <view class="profile-stat">
-              <text class="stat-value">0</text>
-              <text class="stat-label">粉丝</text>
-            </view>
-          </view>
-          <view class="profile-actions">
-            <button class="edit-profile-button">编辑主页</button>
           </view>
         </view>
 
         <view class="profile-tabs">
-          <button class="profile-tab active">笔记</button>
-          <button class="profile-tab">收藏</button>
-          <button class="profile-tab">赞过</button>
+          <view class="profile-tab active">笔记</view>
+          <view class="profile-tab">收藏</view>
+          <view class="profile-tab">赞过</view>
         </view>
       </view>
 
@@ -175,6 +199,10 @@ async function switchAccount() {
         <view class="account-drawer" @tap.stop>
           <view class="drawer-handle"></view>
           <view class="drawer-title">账号管理</view>
+          <button class="drawer-item" @tap="editProfileFromMenu">
+            <text>编辑主页</text>
+            <text class="drawer-arrow">›</text>
+          </button>
           <button class="drawer-item" @tap="refreshFromMenu">
             <text>刷新资料</text>
             <text class="drawer-arrow">›</text>
@@ -200,23 +228,26 @@ async function switchAccount() {
   margin-top: 12rpx;
 }
 
+.profile-screen {
+  padding: 0 0 calc(24rpx + env(safe-area-inset-bottom));
+  background: var(--bn-bg);
+}
+
 .profile-card {
   overflow: hidden;
-  border-radius: 18rpx;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0), #fff 78%),
-    #fff;
-  box-shadow: var(--bn-shadow);
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none;
 }
 
 .profile-hero {
   position: relative;
-  min-height: 360rpx;
-  padding: 56rpx 30rpx 42rpx;
+  min-height: 430rpx;
+  padding: 58rpx 48rpx 36rpx;
   background:
-    linear-gradient(180deg, rgba(9, 36, 54, 0.06), rgba(9, 36, 54, 0.66)),
-    radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.48), transparent 28%),
-    linear-gradient(135deg, #5eb9e8 0%, #1e7ba2 48%, #15526f 100%);
+    linear-gradient(180deg, rgba(7, 27, 39, 0.1), rgba(7, 27, 39, 0.7)),
+    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.28), transparent 30%),
+    linear-gradient(135deg, #5eb9e8 0%, #1b779b 48%, #0f3f58 100%);
   background-size: cover;
   background-position: center;
 }
@@ -235,8 +266,9 @@ async function switchAccount() {
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 24rpx;
-  min-height: 260rpx;
+  gap: 28rpx;
+  min-height: 178rpx;
+  padding-right: 72rpx;
 }
 
 .avatar-wrap {
@@ -244,10 +276,16 @@ async function switchAccount() {
   flex: 0 0 auto;
 }
 
+.avatar-wrap :deep(.avatar-large) {
+  width: 146rpx;
+  height: 146rpx;
+  font-size: 42rpx;
+}
+
 .account-menu-button {
   position: absolute;
-  top: 24rpx;
-  right: 24rpx;
+  top: 28rpx;
+  right: 28rpx;
   z-index: 2;
   width: 64rpx;
   height: 64rpx;
@@ -278,7 +316,7 @@ async function switchAccount() {
 
 .nickname {
   color: #fff;
-  font-size: 48rpx;
+  font-size: 50rpx;
   font-weight: 900;
   line-height: 1.1;
   text-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.25);
@@ -293,96 +331,80 @@ async function switchAccount() {
 
 .bio {
   margin-top: 14rpx;
-  max-width: 420rpx;
+  max-width: 460rpx;
   color: rgba(255, 255, 255, 0.92);
   font-size: 25rpx;
   line-height: 1.48;
 }
 
-.profile-summary {
+.hero-stats {
   position: relative;
-  z-index: 2;
+  z-index: 1;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 20rpx;
-  min-height: 150rpx;
-  margin-top: -20rpx;
-  padding: 26rpx 26rpx 28rpx;
-  border-radius: 22rpx 22rpx 0 0;
-  background: #fff;
+  gap: 26rpx 48rpx;
+  margin-top: 72rpx;
+  color: #fff;
 }
 
-.profile-stats {
-  flex: 1;
+.hero-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 10rpx;
   min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8rpx;
+  text-shadow: 0 4rpx 14rpx rgba(0, 0, 0, 0.28);
 }
 
-.profile-stat {
-  min-height: 96rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4rpx;
+.hero-stat-value {
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 680;
+  line-height: 1.1;
 }
 
-.stat-value {
-  color: var(--bn-ink);
-  font-size: 36rpx;
-  font-weight: 900;
-}
-
-.stat-label {
-  color: var(--bn-muted);
-  font-size: 23rpx;
-}
-
-.profile-actions {
-  flex: 0 0 178rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 12rpx;
-}
-
-.edit-profile-button {
-  min-height: 72rpx;
-  border-radius: 14rpx;
-  background: #f3f3f4;
-  color: var(--bn-ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28rpx;
-  font-weight: 820;
+.hero-stat-label {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 32rpx;
+  font-weight: 620;
+  line-height: 1.1;
 }
 
 .profile-tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8rpx;
   margin: 0;
-  padding: 10rpx 18rpx 12rpx;
-  border-top: 1rpx solid rgba(236, 238, 240, 0.96);
-  border-radius: 0 0 18rpx 18rpx;
+  padding: 0 40rpx;
+  border-bottom: 1rpx solid rgba(236, 238, 240, 0.96);
   background: #fff;
 }
 
 .profile-tab {
   position: relative;
-  height: 62rpx;
-  border-radius: 14rpx;
+  min-height: 92rpx;
   color: var(--bn-muted);
-  font-size: 25rpx;
-  font-weight: 720;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 760;
 }
 
 .profile-tab.active {
   color: var(--bn-ink);
-  background: #f4f4f5;
-  font-weight: 860;
+  font-weight: 900;
+}
+
+.profile-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 52rpx;
+  height: 6rpx;
+  border-radius: 999rpx;
+  background: var(--bn-coral);
+  transform: translateX(-50%);
 }
 
 .masonry {
@@ -390,6 +412,7 @@ async function switchAccount() {
   align-items: flex-start;
   gap: 16rpx;
   margin-top: 16rpx;
+  padding: 0 20rpx;
 }
 
 .column {
