@@ -23,12 +23,14 @@ const className = computed(() => `avatar avatar-${props.size ?? 'medium'}`)
   flex: 0 0 auto;
   overflow: hidden;
   border-radius: 50%;
-  background: linear-gradient(135deg, #2f80ed, #2eb7a6);
+  background: linear-gradient(135deg, var(--bn-blue), var(--bn-teal));
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 760;
+  border: 4rpx solid rgba(255, 255, 255, 0.88);
+  box-shadow: 0 10rpx 22rpx rgba(27, 43, 56, 0.12);
 }
 
 .avatar-small {
@@ -58,4 +60,3 @@ const className = computed(() => `avatar avatar-${props.size ?? 'medium'}`)
   color: #fff;
 }
 </style>
-

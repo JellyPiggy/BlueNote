@@ -75,13 +75,30 @@ async function logout() {
 
     <view v-else>
       <view class="profile-card panel">
-        <view class="cover-band"></view>
+        <view class="cover-band">
+          <view class="cover-label">个人主页</view>
+          <view class="cover-title">{{ profile?.nickname || 'BlueNote 用户' }}</view>
+        </view>
         <view class="profile-main">
           <AvatarCircle :src="profile?.avatarUrl" :name="profile?.nickname" size="large" />
           <view class="profile-copy">
             <view class="nickname">{{ profile?.nickname || 'BlueNote 用户' }}</view>
             <view class="bn-no">{{ profile?.bluenoteNo || 'BN' }}</view>
             <view class="bio">{{ profile?.bio || '记录生活，慢慢变成自己的地图。' }}</view>
+          </view>
+        </view>
+        <view class="profile-stats">
+          <view class="profile-stat">
+            <text class="stat-value">{{ notes.length }}</text>
+            <text class="stat-label">笔记</text>
+          </view>
+          <view class="profile-stat">
+            <text class="stat-value">0</text>
+            <text class="stat-label">关注</text>
+          </view>
+          <view class="profile-stat">
+            <text class="stat-value">0</text>
+            <text class="stat-label">粉丝</text>
           </view>
         </view>
         <view class="status-row">
@@ -125,21 +142,38 @@ async function logout() {
 
 .profile-card {
   overflow: hidden;
+  box-shadow: var(--bn-shadow);
 }
 
 .cover-band {
-  height: 190rpx;
+  height: 218rpx;
+  padding: 30rpx 30rpx 0;
   background:
-    linear-gradient(120deg, rgba(47, 128, 237, 0.94), rgba(46, 183, 166, 0.82)),
+    linear-gradient(135deg, rgba(39, 118, 223, 0.94), rgba(36, 181, 159, 0.84) 68%, rgba(244, 191, 69, 0.72)),
     var(--bn-blue);
+}
+
+.cover-label {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 22rpx;
+  font-weight: 760;
+}
+
+.cover-title {
+  margin-top: 12rpx;
+  max-width: 480rpx;
+  color: #fff;
+  font-size: 42rpx;
+  font-weight: 860;
+  line-height: 1.2;
 }
 
 .profile-main {
   display: flex;
   align-items: flex-end;
   gap: 24rpx;
-  padding: 0 28rpx 24rpx;
-  margin-top: -64rpx;
+  padding: 0 28rpx 22rpx;
+  margin-top: -68rpx;
 }
 
 .profile-copy {
@@ -149,7 +183,7 @@ async function logout() {
 
 .nickname {
   font-size: 38rpx;
-  font-weight: 820;
+  font-weight: 860;
 }
 
 .bn-no {
@@ -165,6 +199,35 @@ async function logout() {
   line-height: 1.5;
 }
 
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12rpx;
+  padding: 0 28rpx 24rpx;
+}
+
+.profile-stat {
+  min-height: 86rpx;
+  border-radius: 16rpx;
+  background: #f7fbf9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
+}
+
+.stat-value {
+  color: var(--bn-ink);
+  font-size: 30rpx;
+  font-weight: 820;
+}
+
+.stat-label {
+  color: var(--bn-muted);
+  font-size: 21rpx;
+}
+
 .status-row {
   display: flex;
   align-items: center;
@@ -176,8 +239,8 @@ async function logout() {
   flex: 1;
   min-height: 62rpx;
   padding: 0 18rpx;
-  border-radius: 8rpx;
-  background: rgba(46, 183, 166, 0.12);
+  border-radius: 16rpx;
+  background: rgba(36, 181, 159, 0.12);
   color: #16786d;
   display: flex;
   align-items: center;
@@ -195,12 +258,12 @@ async function logout() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 34rpx 0 22rpx;
+  margin: 36rpx 0 22rpx;
 }
 
 .section-title {
-  font-size: 34rpx;
-  font-weight: 800;
+  font-size: 36rpx;
+  font-weight: 860;
 }
 
 .section-subtitle {
@@ -213,18 +276,19 @@ async function logout() {
   width: 70rpx;
   height: 70rpx;
   border-radius: 50%;
-  background: var(--bn-coral);
+  background: linear-gradient(135deg, var(--bn-coral), #ff9b62);
   color: #fff;
   font-size: 42rpx;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 16rpx 30rpx rgba(243, 107, 90, 0.2);
 }
 
 .masonry {
   display: flex;
   align-items: flex-start;
-  gap: 18rpx;
+  gap: 20rpx;
 }
 
 .column {
@@ -232,4 +296,3 @@ async function logout() {
   min-width: 0;
 }
 </style>
-

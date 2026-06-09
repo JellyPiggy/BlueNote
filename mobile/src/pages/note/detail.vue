@@ -80,6 +80,7 @@ function openAuthor() {
       </view>
 
       <view class="detail-card">
+        <view class="card-handle"></view>
         <view class="author-row" @tap="openAuthor">
           <AvatarCircle :src="note.author.avatarUrl" :name="note.author.nickname" size="medium" />
           <view class="author-copy">
@@ -118,7 +119,7 @@ function openAuthor() {
 <style scoped lang="scss">
 .detail-screen {
   min-height: 100vh;
-  background: #101820;
+  background: #111820;
 }
 
 .floating-nav {
@@ -134,10 +135,11 @@ function openAuthor() {
 }
 
 .round-button {
-  width: 74rpx;
-  height: 74rpx;
+  width: 78rpx;
+  height: 78rpx;
   border-radius: 50%;
-  background: rgba(16, 24, 32, 0.58);
+  background: rgba(17, 24, 32, 0.58);
+  backdrop-filter: blur(12rpx);
   color: #fff;
   font-size: 42rpx;
   display: flex;
@@ -148,13 +150,15 @@ function openAuthor() {
 
 .detail-content {
   min-height: 100vh;
-  background: var(--bn-bg);
+  background:
+    linear-gradient(180deg, #111820 0, #111820 520rpx, var(--bn-bg) 521rpx),
+    var(--bn-bg);
 }
 
 .media-swiper,
 .media-fallback {
   width: 100%;
-  height: 780rpx;
+  height: 720rpx;
   background: #dfe8e5;
 }
 
@@ -170,15 +174,24 @@ function openAuthor() {
   color: #fff;
   font-size: 50rpx;
   font-weight: 800;
-  background: linear-gradient(135deg, var(--bn-blue), var(--bn-teal));
+  background: linear-gradient(135deg, var(--bn-blue), var(--bn-teal), var(--bn-lemon));
 }
 
 .detail-card {
   position: relative;
-  margin-top: -28rpx;
-  padding: 28rpx;
-  border-radius: 8rpx 8rpx 0 0;
+  margin-top: -34rpx;
+  padding: 18rpx 28rpx 34rpx;
+  border-radius: 16rpx 16rpx 0 0;
   background: var(--bn-bg);
+  box-shadow: 0 -12rpx 34rpx rgba(17, 24, 32, 0.08);
+}
+
+.card-handle {
+  width: 72rpx;
+  height: 8rpx;
+  margin: 0 auto 22rpx;
+  border-radius: 999rpx;
+  background: rgba(154, 164, 172, 0.36);
 }
 
 .author-row {
@@ -194,7 +207,7 @@ function openAuthor() {
 
 .author-name {
   font-size: 28rpx;
-  font-weight: 740;
+  font-weight: 800;
 }
 
 .author-meta {
@@ -215,15 +228,15 @@ function openAuthor() {
   margin-top: 34rpx;
   color: var(--bn-ink);
   font-size: 42rpx;
-  font-weight: 820;
+  font-weight: 860;
   line-height: 1.28;
 }
 
 .content {
   margin-top: 22rpx;
   color: #27323a;
-  font-size: 29rpx;
-  line-height: 1.72;
+  font-size: 30rpx;
+  line-height: 1.78;
   white-space: pre-wrap;
 }
 
@@ -242,9 +255,10 @@ function openAuthor() {
 }
 
 .stat-item {
-  min-height: 96rpx;
-  border-radius: 8rpx;
+  min-height: 100rpx;
+  border-radius: 16rpx;
   background: #fff;
+  border: 1rpx solid rgba(229, 236, 232, 0.74);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -267,4 +281,3 @@ function openAuthor() {
   margin-top: 12rpx;
 }
 </style>
-

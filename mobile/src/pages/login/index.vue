@@ -43,8 +43,10 @@ async function submit() {
 
 <template>
   <view class="screen login-screen top-safe">
-    <view class="brand">
-      <view class="brand-mark">BN</view>
+    <view class="brand-panel">
+      <view class="brand-mark">
+        <text>BN</text>
+      </view>
       <view>
         <view class="brand-name">BlueNote</view>
         <view class="brand-line">把今天写成一条好看的笔记</view>
@@ -83,43 +85,57 @@ async function submit() {
 .login-screen {
   display: flex;
   flex-direction: column;
-  gap: 36rpx;
+  gap: 28rpx;
+  background:
+    linear-gradient(180deg, rgba(39, 118, 223, 0.12), rgba(36, 181, 159, 0.06) 420rpx, rgba(247, 249, 246, 0) 620rpx),
+    var(--bn-bg);
 }
 
-.brand {
+.brand-panel {
   display: flex;
   align-items: center;
-  gap: 22rpx;
-  margin-top: 34rpx;
+  gap: 24rpx;
+  margin-top: 24rpx;
+  padding: 34rpx 28rpx;
+  border-radius: 16rpx;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.84), rgba(235, 249, 246, 0.82)),
+    #fff;
+  border: 1rpx solid rgba(255, 255, 255, 0.9);
+  box-shadow: var(--bn-shadow-soft);
 }
 
 .brand-mark {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 8rpx;
+  width: 108rpx;
+  height: 108rpx;
+  border-radius: 16rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--bn-blue), var(--bn-teal));
+  background:
+    linear-gradient(135deg, rgba(39, 118, 223, 0.94), rgba(36, 181, 159, 0.9)),
+    var(--bn-blue);
+  box-shadow: 0 18rpx 32rpx rgba(39, 118, 223, 0.18);
   color: #fff;
-  font-size: 32rpx;
+  font-size: 34rpx;
   font-weight: 780;
 }
 
 .brand-name {
-  font-size: 46rpx;
-  font-weight: 820;
+  font-size: 48rpx;
+  font-weight: 860;
   color: var(--bn-ink);
 }
 
 .brand-line {
-  margin-top: 8rpx;
+  margin-top: 10rpx;
   color: var(--bn-muted);
-  font-size: 24rpx;
+  font-size: 25rpx;
 }
 
 .login-card {
-  padding: 30rpx;
+  padding: 28rpx;
+  box-shadow: var(--bn-shadow);
 }
 
 .tabs {
@@ -127,15 +143,15 @@ async function submit() {
   grid-template-columns: 1fr 1fr;
   gap: 10rpx;
   padding: 8rpx;
-  border-radius: 8rpx;
-  background: #edf3f2;
+  border-radius: 16rpx;
+  background: #edf5f1;
 }
 
 .tab {
   height: 70rpx;
-  border-radius: 8rpx;
+  border-radius: 14rpx;
   color: var(--bn-muted);
-  font-weight: 650;
+  font-weight: 720;
 }
 
 .tab.active {
@@ -147,7 +163,7 @@ async function submit() {
 .form-title {
   margin-top: 38rpx;
   font-size: 42rpx;
-  font-weight: 800;
+  font-weight: 840;
 }
 
 .form-subtitle {
@@ -160,7 +176,6 @@ async function submit() {
   display: flex;
   flex-direction: column;
   gap: 22rpx;
-  margin-top: 36rpx;
+  margin-top: 34rpx;
 }
 </style>
-

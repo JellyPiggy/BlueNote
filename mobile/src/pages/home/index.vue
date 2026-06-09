@@ -69,18 +69,21 @@ function goPublish() {
     <view class="home-header">
       <view>
         <view class="eyebrow">BlueNote</view>
-        <view class="headline">你的生活笔记流</view>
+        <view class="headline">今天想记录什么？</view>
       </view>
-      <button class="new-button" @tap="goPublish">+</button>
+      <button class="new-button" @tap="goPublish">
+        <text>+</text>
+      </button>
     </view>
 
-    <view class="spotlight panel">
-      <view class="spotlight-copy">
-        <text class="spotlight-title">发布、查看、回到你的个人主页</text>
-        <text class="spotlight-subtitle">第一条主链路已接入真实网关、MySQL 和 MinIO。</text>
+    <view class="spotlight">
+      <view class="spotlight-main">
+        <view class="spotlight-badge">轻笔记</view>
+        <view class="spotlight-title">把生活里闪过的小片段，收进自己的主页。</view>
+        <view class="spotlight-subtitle">照片、标题、正文和话题会一起留在这里。</view>
       </view>
-      <button v-if="!auth.isAuthenticated" class="ghost-button compact" @tap="goLogin">登录</button>
-      <button v-else class="secondary-button compact" @tap="goPublish">写笔记</button>
+      <button v-if="!auth.isAuthenticated" class="spotlight-action" @tap="goLogin">登录</button>
+      <button v-else class="spotlight-action" @tap="goPublish">写笔记</button>
     </view>
 
     <view v-if="loading && !loaded" class="loading-copy">正在整理笔记</view>
@@ -121,28 +124,30 @@ function goPublish() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24rpx;
+  gap: 28rpx;
 }
 
 .eyebrow {
   color: var(--bn-teal);
-  font-size: 24rpx;
-  font-weight: 760;
-}
-
-.headline {
-  margin-top: 6rpx;
-  font-size: 42rpx;
+  font-size: 23rpx;
   font-weight: 820;
 }
 
+.headline {
+  margin-top: 8rpx;
+  font-size: 44rpx;
+  font-weight: 860;
+  line-height: 1.18;
+}
+
 .new-button {
-  width: 78rpx;
-  height: 78rpx;
+  width: 82rpx;
+  height: 82rpx;
   border-radius: 50%;
   color: #fff;
-  background: var(--bn-coral);
-  font-size: 44rpx;
+  background: linear-gradient(135deg, var(--bn-coral), #ff9b62);
+  box-shadow: 0 18rpx 34rpx rgba(243, 107, 90, 0.22);
+  font-size: 46rpx;
   font-weight: 520;
   display: flex;
   align-items: center;
@@ -150,40 +155,64 @@ function goPublish() {
 }
 
 .spotlight {
-  margin: 30rpx 0 24rpx;
-  padding: 24rpx;
+  position: relative;
+  overflow: hidden;
+  margin: 30rpx 0 26rpx;
+  padding: 28rpx;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 20rpx;
+  gap: 24rpx;
+  border-radius: 16rpx;
   background:
-    linear-gradient(120deg, rgba(246, 200, 76, 0.16), rgba(46, 183, 166, 0.08)),
-    #fff;
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(245, 251, 248, 0.88)),
+    linear-gradient(120deg, rgba(244, 191, 69, 0.22), rgba(36, 181, 159, 0.1));
+  border: 1rpx solid rgba(255, 255, 255, 0.82);
+  box-shadow: var(--bn-shadow);
 }
 
-.spotlight-copy {
+.spotlight-main {
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
+  gap: 10rpx;
   min-width: 0;
 }
 
-.spotlight-title {
-  font-size: 29rpx;
+.spotlight-badge {
+  align-self: flex-start;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  background: rgba(244, 191, 69, 0.22);
+  color: #9b6b00;
+  font-size: 21rpx;
   font-weight: 760;
+}
+
+.spotlight-title {
+  max-width: 430rpx;
+  color: var(--bn-ink);
+  font-size: 31rpx;
+  font-weight: 800;
+  line-height: 1.4;
 }
 
 .spotlight-subtitle {
   color: var(--bn-muted);
   font-size: 23rpx;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
-.compact {
-  width: 150rpx;
-  min-height: 66rpx;
+.spotlight-action {
+  width: 142rpx;
+  min-height: 70rpx;
+  flex: 0 0 auto;
+  border-radius: 16rpx;
+  background: #fff;
+  color: var(--bn-blue);
   flex: 0 0 auto;
   font-size: 24rpx;
+  font-weight: 760;
+  box-shadow: 0 10rpx 22rpx rgba(39, 118, 223, 0.1);
 }
 
 .empty-action {
@@ -194,7 +223,7 @@ function goPublish() {
 .masonry {
   display: flex;
   align-items: flex-start;
-  gap: 18rpx;
+  gap: 20rpx;
 }
 
 .column {
@@ -202,4 +231,3 @@ function goPublish() {
   min-width: 0;
 }
 </style>
-

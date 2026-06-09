@@ -16,15 +16,18 @@ const emit = defineEmits<{
     <view class="cover-wrap">
       <image v-if="note.coverUrl" class="cover" :src="note.coverUrl" mode="aspectFill" />
       <view v-else class="cover-fallback">
-        <text>BlueNote</text>
+        <text>BN</text>
       </view>
+      <view class="cover-shadow"></view>
     </view>
     <view class="note-body">
       <view class="note-title">{{ note.title }}</view>
       <view class="note-meta">
-        <text>{{ formatTime(note.publishedAt) }}</text>
-        <text>{{ formatCount(note.likeCount) }} 喜欢</text>
-        <text>{{ formatCount(note.collectCount) }} 收藏</text>
+        <text class="time">{{ formatTime(note.publishedAt) }}</text>
+        <view class="meta-actions">
+          <text>♡ {{ formatCount(note.likeCount) }}</text>
+          <text>☆ {{ formatCount(note.collectCount) }}</text>
+        </view>
       </view>
     </view>
   </view>
@@ -34,19 +37,32 @@ const emit = defineEmits<{
 .note-card {
   overflow: hidden;
   break-inside: avoid;
-  margin-bottom: 18rpx;
+  margin-bottom: 20rpx;
+  border-color: rgba(229, 236, 232, 0.72);
+  box-shadow: var(--bn-shadow-soft);
 }
 
 .cover-wrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1.18;
-  background: #e8f2f0;
+  aspect-ratio: 1 / 1.16;
+  overflow: hidden;
+  background: #eaf2ee;
 }
 
 .cover {
   width: 100%;
   height: 100%;
+}
+
+.cover-shadow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 84rpx;
+  background: linear-gradient(180deg, rgba(20, 27, 33, 0), rgba(20, 27, 33, 0.08));
+  pointer-events: none;
 }
 
 .cover-fallback {
@@ -56,22 +72,22 @@ const emit = defineEmits<{
   align-items: center;
   justify-content: center;
   background:
-    linear-gradient(135deg, rgba(47, 128, 237, 0.92), rgba(46, 183, 166, 0.82)),
+    linear-gradient(135deg, rgba(39, 118, 223, 0.9), rgba(36, 181, 159, 0.82)),
     #dcefeb;
   color: #fff;
-  font-size: 30rpx;
+  font-size: 38rpx;
   font-weight: 780;
 }
 
 .note-body {
-  padding: 18rpx;
+  padding: 18rpx 18rpx 20rpx;
 }
 
 .note-title {
   color: var(--bn-ink);
-  font-size: 27rpx;
-  font-weight: 680;
-  line-height: 1.35;
+  font-size: 28rpx;
+  font-weight: 760;
+  line-height: 1.38;
   display: -webkit-box;
   overflow: hidden;
   -webkit-line-clamp: 2;
@@ -80,11 +96,24 @@ const emit = defineEmits<{
 
 .note-meta {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10rpx 14rpx;
-  margin-top: 14rpx;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  margin-top: 16rpx;
   color: var(--bn-muted);
   font-size: 21rpx;
 }
-</style>
 
+.time {
+  min-width: 0;
+  color: var(--bn-faint);
+}
+
+.meta-actions {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex: 0 0 auto;
+  color: #56616b;
+}
+</style>

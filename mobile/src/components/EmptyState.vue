@@ -17,8 +17,8 @@ defineProps<{
 <style scoped lang="scss">
 .empty-title {
   color: var(--bn-ink);
-  font-size: 30rpx;
-  font-weight: 720;
+  font-size: 31rpx;
+  font-weight: 800;
 }
 
 .empty-subtitle {
@@ -28,4 +28,3 @@ defineProps<{
   line-height: 1.5;
 }
 </style>
-

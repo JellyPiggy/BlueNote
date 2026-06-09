@@ -157,20 +157,22 @@ function resetForm() {
       <button v-else class="picker-tile" @tap="chooseImages">
         <view class="picker-mark">+</view>
         <view class="picker-title">选择图片</view>
-        <view class="picker-subtitle">支持 jpg、png、webp</view>
+        <view class="picker-subtitle">第一张会成为笔记封面</view>
       </button>
     </view>
 
     <view class="form-panel panel">
-      <input v-model="title" class="title-input" placeholder="写一个具体的标题" maxlength="128" />
-      <textarea
-        v-model="content"
-        class="content-input"
-        placeholder="记录发生了什么、在哪里、有什么感受"
-        maxlength="5000"
-        auto-height
-      />
-      <input v-model="topicText" class="field" placeholder="话题，用空格或 # 分隔，例如 周末 咖啡" />
+      <view class="input-group">
+        <input v-model="title" class="title-input" placeholder="写一个具体的标题" maxlength="128" />
+        <textarea
+          v-model="content"
+          class="content-input"
+          placeholder="记录发生了什么、在哪里、有什么感受"
+          maxlength="5000"
+          auto-height
+        />
+      </view>
+      <input v-model="topicText" class="field topic-field" placeholder="话题，用空格或 # 分隔，例如 周末 咖啡" />
 
       <view class="option-row">
         <view>
@@ -205,7 +207,7 @@ function resetForm() {
 
 <style scoped lang="scss">
 .publish-screen {
-  padding-bottom: 42rpx;
+  padding-bottom: 280rpx;
 }
 
 .publish-header,
@@ -220,32 +222,33 @@ function resetForm() {
 
 .eyebrow {
   color: var(--bn-coral);
-  font-size: 24rpx;
-  font-weight: 760;
-}
-
-.headline {
-  margin-top: 6rpx;
-  font-size: 42rpx;
+  font-size: 23rpx;
   font-weight: 820;
 }
 
+.headline {
+  margin-top: 8rpx;
+  font-size: 44rpx;
+  font-weight: 860;
+  line-height: 1.18;
+}
+
 .clear-button {
-  width: 132rpx;
-  min-height: 64rpx;
+  width: 126rpx;
+  min-height: 66rpx;
   font-size: 24rpx;
 }
 
 .image-panel,
 .form-panel {
   margin-top: 28rpx;
-  padding: 24rpx;
+  padding: 26rpx;
 }
 
 .section-title,
 .option-title {
-  font-size: 29rpx;
-  font-weight: 740;
+  font-size: 30rpx;
+  font-weight: 800;
 }
 
 .section-hint,
@@ -269,11 +272,11 @@ function resetForm() {
 .picked-image,
 .add-tile {
   position: relative;
-  width: 190rpx;
-  height: 220rpx;
-  border-radius: 8rpx;
+  width: 192rpx;
+  height: 232rpx;
+  border-radius: 16rpx;
   overflow: hidden;
-  background: #e6f1ef;
+  background: #e6f1ed;
 }
 
 .preview {
@@ -312,24 +315,26 @@ function resetForm() {
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  border: 1rpx dashed #9bcac2;
+  border: 1rpx dashed rgba(36, 181, 159, 0.48);
   color: var(--bn-teal);
   font-size: 48rpx;
 }
 
 .picker-tile {
   width: 100%;
-  height: 360rpx;
+  height: 386rpx;
   margin-top: 24rpx;
-  border-radius: 8rpx;
-  background: #f4fbf9;
+  border-radius: 16rpx;
+  background:
+    linear-gradient(135deg, rgba(36, 181, 159, 0.08), rgba(39, 118, 223, 0.05)),
+    #f6fbf8;
 }
 
 .picker-mark {
   width: 92rpx;
   height: 92rpx;
-  border-radius: 50%;
-  background: rgba(46, 183, 166, 0.14);
+  border-radius: 16rpx;
+  background: rgba(36, 181, 159, 0.14);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -352,27 +357,35 @@ function resetForm() {
 .form-panel {
   display: flex;
   flex-direction: column;
-  gap: 22rpx;
+  gap: 24rpx;
+}
+
+.input-group {
+  padding: 4rpx 2rpx 2rpx;
 }
 
 .title-input {
   width: 100%;
-  min-height: 88rpx;
+  min-height: 90rpx;
   color: var(--bn-ink);
-  font-size: 36rpx;
-  font-weight: 760;
+  font-size: 38rpx;
+  font-weight: 820;
 }
 
 .content-input {
   width: 100%;
-  min-height: 250rpx;
+  min-height: 270rpx;
   color: var(--bn-ink);
   font-size: 28rpx;
-  line-height: 1.6;
+  line-height: 1.68;
+}
+
+.topic-field {
+  background: #f8fbfa;
 }
 
 .option-row {
-  padding-top: 20rpx;
+  padding-top: 22rpx;
   border-top: 1rpx solid var(--bn-line);
 }
 
@@ -380,14 +393,14 @@ function resetForm() {
   display: flex;
   gap: 8rpx;
   padding: 6rpx;
-  border-radius: 8rpx;
-  background: #edf3f2;
+  border-radius: 16rpx;
+  background: #edf5f1;
 }
 
 .segment {
   width: 100rpx;
   height: 58rpx;
-  border-radius: 8rpx;
+  border-radius: 14rpx;
   color: var(--bn-muted);
   font-size: 23rpx;
 }
@@ -399,7 +412,15 @@ function resetForm() {
 }
 
 .actions {
-  margin-top: 28rpx;
+  position: sticky;
+  bottom: 116rpx;
+  z-index: 4;
+  margin-top: 30rpx;
+  padding: 16rpx;
+  border-radius: 16rpx;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1rpx solid rgba(229, 236, 232, 0.9);
+  box-shadow: 0 18rpx 40rpx rgba(27, 43, 56, 0.12);
 }
 
 .action-button {
