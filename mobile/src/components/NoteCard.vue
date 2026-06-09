@@ -12,22 +12,20 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <view class="note-card panel" @tap="emit('open', note.noteId)">
+  <view class="note-card" @tap="emit('open', note.noteId)">
     <view class="cover-wrap">
       <image v-if="note.coverUrl" class="cover" :src="note.coverUrl" mode="aspectFill" />
       <view v-else class="cover-fallback">
         <text>BN</text>
       </view>
-      <view class="cover-shadow"></view>
+      <view class="date-badge">{{ formatTime(note.publishedAt) }}</view>
     </view>
     <view class="note-body">
       <view class="note-title">{{ note.title }}</view>
-      <view class="note-meta">
-        <text class="time">{{ formatTime(note.publishedAt) }}</text>
-        <view class="meta-actions">
-          <text>♡ {{ formatCount(note.likeCount) }}</text>
-          <text>☆ {{ formatCount(note.collectCount) }}</text>
-        </view>
+      <view class="author-row">
+        <view class="mini-avatar">BN</view>
+        <text class="author-name">BlueNote</text>
+        <text class="like-count">♡ {{ formatCount(note.likeCount) }}</text>
       </view>
     </view>
   </view>
@@ -38,16 +36,17 @@ const emit = defineEmits<{
   overflow: hidden;
   break-inside: avoid;
   margin-bottom: 20rpx;
-  border-color: rgba(229, 236, 232, 0.72);
+  border-radius: 16rpx;
+  background: #fff;
   box-shadow: var(--bn-shadow-soft);
 }
 
 .cover-wrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1.16;
+  aspect-ratio: 1 / 1.26;
   overflow: hidden;
-  background: #eaf2ee;
+  background: #f0f1f2;
 }
 
 .cover {
@@ -55,14 +54,19 @@ const emit = defineEmits<{
   height: 100%;
 }
 
-.cover-shadow {
+.date-badge {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 84rpx;
-  background: linear-gradient(180deg, rgba(20, 27, 33, 0), rgba(20, 27, 33, 0.08));
-  pointer-events: none;
+  right: 12rpx;
+  bottom: 12rpx;
+  min-height: 40rpx;
+  padding: 0 14rpx;
+  border-radius: 999rpx;
+  background: rgba(17, 19, 24, 0.46);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  font-size: 20rpx;
+  backdrop-filter: blur(10rpx);
 }
 
 .cover-fallback {
@@ -72,21 +76,21 @@ const emit = defineEmits<{
   align-items: center;
   justify-content: center;
   background:
-    linear-gradient(135deg, rgba(39, 118, 223, 0.9), rgba(36, 181, 159, 0.82)),
-    #dcefeb;
+    linear-gradient(135deg, rgba(255, 95, 87, 0.9), rgba(44, 116, 214, 0.82)),
+    #f3f4f5;
   color: #fff;
   font-size: 38rpx;
   font-weight: 780;
 }
 
 .note-body {
-  padding: 18rpx 18rpx 20rpx;
+  padding: 16rpx 16rpx 18rpx;
 }
 
 .note-title {
   color: var(--bn-ink);
   font-size: 28rpx;
-  font-weight: 760;
+  font-weight: 720;
   line-height: 1.38;
   display: -webkit-box;
   overflow: hidden;
@@ -94,26 +98,38 @@ const emit = defineEmits<{
   -webkit-box-orient: vertical;
 }
 
-.note-meta {
+.author-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12rpx;
-  margin-top: 16rpx;
+  gap: 10rpx;
+  margin-top: 18rpx;
   color: var(--bn-muted);
   font-size: 21rpx;
 }
 
-.time {
-  min-width: 0;
-  color: var(--bn-faint);
-}
-
-.meta-actions {
+.mini-avatar {
+  width: 34rpx;
+  height: 34rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--bn-coral), var(--bn-blue));
+  color: #fff;
   display: flex;
   align-items: center;
-  gap: 12rpx;
+  justify-content: center;
+  font-size: 14rpx;
+  font-weight: 800;
+}
+
+.author-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.like-count {
   flex: 0 0 auto;
-  color: #56616b;
+  color: #454951;
 }
 </style>

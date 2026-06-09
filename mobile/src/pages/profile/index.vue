@@ -76,8 +76,7 @@ async function logout() {
     <view v-else>
       <view class="profile-card panel">
         <view class="cover-band">
-          <view class="cover-label">个人主页</view>
-          <view class="cover-title">{{ profile?.nickname || 'BlueNote 用户' }}</view>
+          <view class="cover-label">BlueNote Profile</view>
         </view>
         <view class="profile-main">
           <AvatarCircle :src="profile?.avatarUrl" :name="profile?.nickname" size="large" />
@@ -106,6 +105,12 @@ async function logout() {
           <button class="ghost-button refresh-button" :disabled="loading" @tap="loadProfile">刷新</button>
           <button class="secondary-button logout-button" @tap="logout">退出</button>
         </view>
+      </view>
+
+      <view class="profile-tabs">
+        <button class="profile-tab active">笔记</button>
+        <button class="profile-tab">收藏</button>
+        <button class="profile-tab">赞过</button>
       </view>
 
       <view class="section-header">
@@ -146,26 +151,17 @@ async function logout() {
 }
 
 .cover-band {
-  height: 218rpx;
+  height: 188rpx;
   padding: 30rpx 30rpx 0;
   background:
-    linear-gradient(135deg, rgba(39, 118, 223, 0.94), rgba(36, 181, 159, 0.84) 68%, rgba(244, 191, 69, 0.72)),
-    var(--bn-blue);
+    linear-gradient(135deg, rgba(17, 19, 24, 0.92), rgba(255, 95, 87, 0.72) 58%, rgba(44, 116, 214, 0.72)),
+    var(--bn-ink);
 }
 
 .cover-label {
   color: rgba(255, 255, 255, 0.78);
   font-size: 22rpx;
   font-weight: 760;
-}
-
-.cover-title {
-  margin-top: 12rpx;
-  max-width: 480rpx;
-  color: #fff;
-  font-size: 42rpx;
-  font-weight: 860;
-  line-height: 1.2;
 }
 
 .profile-main {
@@ -209,7 +205,7 @@ async function logout() {
 .profile-stat {
   min-height: 86rpx;
   border-radius: 16rpx;
-  background: #f7fbf9;
+  background: #f7f7f7;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -240,8 +236,8 @@ async function logout() {
   min-height: 62rpx;
   padding: 0 18rpx;
   border-radius: 16rpx;
-  background: rgba(36, 181, 159, 0.12);
-  color: #16786d;
+  background: rgba(255, 95, 87, 0.1);
+  color: #d54b43;
   display: flex;
   align-items: center;
   font-size: 23rpx;
@@ -252,6 +248,31 @@ async function logout() {
   width: 116rpx;
   min-height: 62rpx;
   font-size: 23rpx;
+}
+
+.profile-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8rpx;
+  margin: 24rpx 0 14rpx;
+  padding: 8rpx;
+  border-radius: 16rpx;
+  background: #fff;
+}
+
+.profile-tab {
+  position: relative;
+  height: 62rpx;
+  border-radius: 14rpx;
+  color: var(--bn-muted);
+  font-size: 25rpx;
+  font-weight: 720;
+}
+
+.profile-tab.active {
+  color: var(--bn-ink);
+  background: #f4f4f5;
+  font-weight: 860;
 }
 
 .section-header {
@@ -276,7 +297,7 @@ async function logout() {
   width: 70rpx;
   height: 70rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--bn-coral), #ff9b62);
+  background: linear-gradient(135deg, var(--bn-coral), #ff8a63);
   color: #fff;
   font-size: 42rpx;
   display: flex;
@@ -288,7 +309,7 @@ async function logout() {
 .masonry {
   display: flex;
   align-items: flex-start;
-  gap: 20rpx;
+  gap: 16rpx;
 }
 
 .column {

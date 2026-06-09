@@ -112,6 +112,13 @@ function openAuthor() {
           </view>
         </view>
       </view>
+
+      <view class="detail-action-bar">
+        <view class="comment-entry">说点什么...</view>
+        <button class="action-item">♡ {{ formatCount(note.counts.likeCount) }}</button>
+        <button class="action-item">☆ {{ formatCount(note.counts.collectCount) }}</button>
+        <button class="action-item">↻</button>
+      </view>
     </view>
   </view>
 </template>
@@ -119,7 +126,7 @@ function openAuthor() {
 <style scoped lang="scss">
 .detail-screen {
   min-height: 100vh;
-  background: #111820;
+  background: #111318;
 }
 
 .floating-nav {
@@ -150,8 +157,9 @@ function openAuthor() {
 
 .detail-content {
   min-height: 100vh;
+  padding-bottom: 150rpx;
   background:
-    linear-gradient(180deg, #111820 0, #111820 520rpx, var(--bn-bg) 521rpx),
+    linear-gradient(180deg, #111318 0, #111318 520rpx, var(--bn-bg) 521rpx),
     var(--bn-bg);
 }
 
@@ -174,7 +182,7 @@ function openAuthor() {
   color: #fff;
   font-size: 50rpx;
   font-weight: 800;
-  background: linear-gradient(135deg, var(--bn-blue), var(--bn-teal), var(--bn-lemon));
+  background: linear-gradient(135deg, var(--bn-coral), var(--bn-blue), var(--bn-teal));
 }
 
 .detail-card {
@@ -274,6 +282,48 @@ function openAuthor() {
 .stat-label {
   color: var(--bn-muted);
   font-size: 21rpx;
+}
+
+.detail-action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  min-height: 112rpx;
+  padding: 16rpx 22rpx calc(16rpx + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1rpx solid var(--bn-line);
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.comment-entry {
+  flex: 1;
+  min-width: 0;
+  height: 70rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  background: #f3f4f5;
+  color: var(--bn-muted);
+  display: flex;
+  align-items: center;
+  font-size: 24rpx;
+}
+
+.action-item {
+  flex: 0 0 auto;
+  height: 70rpx;
+  min-width: 66rpx;
+  padding: 0 8rpx;
+  border-radius: 999rpx;
+  color: var(--bn-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  font-weight: 740;
 }
 
 .retry-button {

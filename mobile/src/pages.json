@@ -34,12 +34,12 @@
   "globalStyle": {
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "BlueNote",
-    "navigationBarBackgroundColor": "#f5f8f7",
-    "backgroundColor": "#f5f8f7"
+    "navigationBarBackgroundColor": "#f7f7f7",
+    "backgroundColor": "#f7f7f7"
   },
   "tabBar": {
-    "color": "#66727f",
-    "selectedColor": "#2f80ed",
+    "color": "#737982",
+    "selectedColor": "#ff5f57",
     "backgroundColor": "#ffffff",
     "borderStyle": "black",
     "list": [
@@ -58,4 +58,3 @@
     ]
   }
 }
-

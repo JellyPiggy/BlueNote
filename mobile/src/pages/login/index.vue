@@ -86,9 +86,7 @@ async function submit() {
   display: flex;
   flex-direction: column;
   gap: 28rpx;
-  background:
-    linear-gradient(180deg, rgba(39, 118, 223, 0.12), rgba(36, 181, 159, 0.06) 420rpx, rgba(247, 249, 246, 0) 620rpx),
-    var(--bn-bg);
+  background: var(--bn-bg);
 }
 
 .brand-panel {
@@ -99,7 +97,7 @@ async function submit() {
   padding: 34rpx 28rpx;
   border-radius: 16rpx;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.84), rgba(235, 249, 246, 0.82)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(255, 245, 244, 0.78)),
     #fff;
   border: 1rpx solid rgba(255, 255, 255, 0.9);
   box-shadow: var(--bn-shadow-soft);
@@ -113,9 +111,9 @@ async function submit() {
   align-items: center;
   justify-content: center;
   background:
-    linear-gradient(135deg, rgba(39, 118, 223, 0.94), rgba(36, 181, 159, 0.9)),
-    var(--bn-blue);
-  box-shadow: 0 18rpx 32rpx rgba(39, 118, 223, 0.18);
+    linear-gradient(135deg, rgba(255, 95, 87, 0.94), rgba(44, 116, 214, 0.86)),
+    var(--bn-coral);
+  box-shadow: 0 18rpx 32rpx rgba(255, 95, 87, 0.18);
   color: #fff;
   font-size: 34rpx;
   font-weight: 780;
@@ -144,7 +142,7 @@ async function submit() {
   gap: 10rpx;
   padding: 8rpx;
   border-radius: 16rpx;
-  background: #edf5f1;
+  background: #f3f4f5;
 }
 
 .tab {
@@ -156,7 +154,7 @@ async function submit() {
 
 .tab.active {
   background: #fff;
-  color: var(--bn-blue);
+  color: var(--bn-coral);
   box-shadow: 0 8rpx 18rpx rgba(24, 33, 42, 0.07);
 }
 

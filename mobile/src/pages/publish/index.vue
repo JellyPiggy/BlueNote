@@ -315,8 +315,8 @@ function resetForm() {
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  border: 1rpx dashed rgba(36, 181, 159, 0.48);
-  color: var(--bn-teal);
+  border: 1rpx dashed rgba(255, 95, 87, 0.38);
+  color: var(--bn-coral);
   font-size: 48rpx;
 }
 
@@ -326,15 +326,15 @@ function resetForm() {
   margin-top: 24rpx;
   border-radius: 16rpx;
   background:
-    linear-gradient(135deg, rgba(36, 181, 159, 0.08), rgba(39, 118, 223, 0.05)),
-    #f6fbf8;
+    linear-gradient(135deg, rgba(255, 95, 87, 0.08), rgba(44, 116, 214, 0.04)),
+    #fffafa;
 }
 
 .picker-mark {
   width: 92rpx;
   height: 92rpx;
   border-radius: 16rpx;
-  background: rgba(36, 181, 159, 0.14);
+  background: rgba(255, 95, 87, 0.13);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -394,7 +394,7 @@ function resetForm() {
   gap: 8rpx;
   padding: 6rpx;
   border-radius: 16rpx;
-  background: #edf5f1;
+  background: #f3f4f5;
 }
 
 .segment {
@@ -407,7 +407,7 @@ function resetForm() {
 
 .segment.active {
   background: #fff;
-  color: var(--bn-blue);
+  color: var(--bn-coral);
   font-weight: 720;
 }
 

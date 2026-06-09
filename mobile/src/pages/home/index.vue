@@ -65,25 +65,21 @@ function goPublish() {
 </script>
 
 <template>
-  <view class="screen top-safe">
-    <view class="home-header">
-      <view>
-        <view class="eyebrow">BlueNote</view>
-        <view class="headline">今天想记录什么？</view>
-      </view>
-      <button class="new-button" @tap="goPublish">
-        <text>+</text>
+  <view class="screen feed-screen top-safe">
+    <view class="feed-appbar">
+      <view class="brand-word">BlueNote</view>
+      <button class="search-pill" @tap="goPublish">
+        <text class="search-mark">⌕</text>
+        <text class="search-copy">搜索笔记、话题</text>
       </button>
+      <button class="new-button" @tap="goPublish">+</button>
     </view>
 
-    <view class="spotlight">
-      <view class="spotlight-main">
-        <view class="spotlight-badge">轻笔记</view>
-        <view class="spotlight-title">把生活里闪过的小片段，收进自己的主页。</view>
-        <view class="spotlight-subtitle">照片、标题、正文和话题会一起留在这里。</view>
-      </view>
-      <button v-if="!auth.isAuthenticated" class="spotlight-action" @tap="goLogin">登录</button>
-      <button v-else class="spotlight-action" @tap="goPublish">写笔记</button>
+    <view class="channel-tabs">
+      <button class="channel active">推荐</button>
+      <button class="channel">关注</button>
+      <button class="channel">最新</button>
+      <button class="channel">我的</button>
     </view>
 
     <view v-if="loading && !loaded" class="loading-copy">正在整理笔记</view>
@@ -120,99 +116,99 @@ function goPublish() {
 </template>
 
 <style scoped lang="scss">
-.home-header {
+.feed-screen {
+  padding-left: 18rpx;
+  padding-right: 18rpx;
+}
+
+.feed-appbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 28rpx;
+  gap: 16rpx;
+  min-height: 78rpx;
 }
 
-.eyebrow {
-  color: var(--bn-teal);
-  font-size: 23rpx;
-  font-weight: 820;
+.brand-word {
+  flex: 0 0 auto;
+  color: var(--bn-ink);
+  font-size: 31rpx;
+  font-weight: 900;
 }
 
-.headline {
-  margin-top: 8rpx;
-  font-size: 44rpx;
-  font-weight: 860;
-  line-height: 1.18;
+.search-pill {
+  flex: 1;
+  min-width: 0;
+  height: 64rpx;
+  padding: 0 22rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  color: var(--bn-muted);
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  font-size: 24rpx;
+  box-shadow: 0 6rpx 18rpx rgba(18, 22, 28, 0.05);
+}
+
+.search-mark {
+  color: var(--bn-coral);
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.search-copy {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .new-button {
-  width: 82rpx;
-  height: 82rpx;
+  flex: 0 0 auto;
+  width: 64rpx;
+  height: 64rpx;
   border-radius: 50%;
   color: #fff;
   background: linear-gradient(135deg, var(--bn-coral), #ff9b62);
-  box-shadow: 0 18rpx 34rpx rgba(243, 107, 90, 0.22);
-  font-size: 46rpx;
+  box-shadow: 0 12rpx 24rpx rgba(255, 95, 87, 0.22);
+  font-size: 38rpx;
   font-weight: 520;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.spotlight {
+.channel-tabs {
+  display: flex;
+  align-items: center;
+  gap: 34rpx;
+  margin: 18rpx 2rpx 22rpx;
+  padding: 0 8rpx;
+}
+
+.channel {
   position: relative;
-  overflow: hidden;
-  margin: 30rpx 0 26rpx;
-  padding: 28rpx;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24rpx;
-  border-radius: 16rpx;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(245, 251, 248, 0.88)),
-    linear-gradient(120deg, rgba(244, 191, 69, 0.22), rgba(36, 181, 159, 0.1));
-  border: 1rpx solid rgba(255, 255, 255, 0.82);
-  box-shadow: var(--bn-shadow);
+  height: 54rpx;
+  color: #6f747b;
+  font-size: 27rpx;
+  font-weight: 720;
 }
 
-.spotlight-main {
-  display: flex;
-  flex-direction: column;
-  gap: 10rpx;
-  min-width: 0;
-}
-
-.spotlight-badge {
-  align-self: flex-start;
-  padding: 8rpx 16rpx;
-  border-radius: 999rpx;
-  background: rgba(244, 191, 69, 0.22);
-  color: #9b6b00;
-  font-size: 21rpx;
-  font-weight: 760;
-}
-
-.spotlight-title {
-  max-width: 430rpx;
+.channel.active {
   color: var(--bn-ink);
   font-size: 31rpx;
-  font-weight: 800;
-  line-height: 1.4;
+  font-weight: 900;
 }
 
-.spotlight-subtitle {
-  color: var(--bn-muted);
-  font-size: 23rpx;
-  line-height: 1.5;
-}
-
-.spotlight-action {
-  width: 142rpx;
-  min-height: 70rpx;
-  flex: 0 0 auto;
-  border-radius: 16rpx;
-  background: #fff;
-  color: var(--bn-blue);
-  flex: 0 0 auto;
-  font-size: 24rpx;
-  font-weight: 760;
-  box-shadow: 0 10rpx 22rpx rgba(39, 118, 223, 0.1);
+.channel.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 34rpx;
+  height: 6rpx;
+  border-radius: 999rpx;
+  background: var(--bn-coral);
+  transform: translateX(-50%);
 }
 
 .empty-action {
@@ -223,7 +219,7 @@ function goPublish() {
 .masonry {
   display: flex;
   align-items: flex-start;
-  gap: 20rpx;
+  gap: 16rpx;
 }
 
 .column {
