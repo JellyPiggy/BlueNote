@@ -16,6 +16,15 @@ const loading = ref(false)
 const profile = computed(() => auth.profile)
 const leftNotes = computed(() => notes.value.filter((_, index) => index % 2 === 0))
 const rightNotes = computed(() => notes.value.filter((_, index) => index % 2 === 1))
+const coverStyle = computed(() => {
+  const coverUrl = profile.value?.homeCoverUrl
+  if (!coverUrl) {
+    return {}
+  }
+  return {
+    backgroundImage: `linear-gradient(180deg, rgba(10, 28, 45, 0.1), rgba(10, 28, 45, 0.62)), url("${coverUrl}")`
+  }
+})
 
 onShow(() => {
   if (auth.isAuthenticated) {
@@ -74,36 +83,45 @@ async function logout() {
     </EmptyState>
 
     <view v-else>
-      <view class="profile-card panel">
-        <view class="cover-band">
-          <view class="cover-label">BlueNote Profile</view>
-        </view>
-        <view class="profile-main">
-          <AvatarCircle :src="profile?.avatarUrl" :name="profile?.nickname" size="large" />
-          <view class="profile-copy">
-            <view class="nickname">{{ profile?.nickname || 'BlueNote 用户' }}</view>
-            <view class="bn-no">{{ profile?.bluenoteNo || 'BN' }}</view>
-            <view class="bio">{{ profile?.bio || '记录生活，慢慢变成自己的地图。' }}</view>
+      <view class="profile-card">
+        <view class="profile-hero" :style="coverStyle">
+          <view class="hero-overlay"></view>
+          <view class="hero-content">
+            <view class="avatar-wrap">
+              <AvatarCircle :src="profile?.avatarUrl" :name="profile?.nickname" size="large" />
+              <button class="avatar-add" @tap="goPublish">+</button>
+            </view>
+            <view class="profile-copy">
+              <view class="nickname">{{ profile?.nickname || 'BlueNote 用户' }}</view>
+              <view class="bn-no">BlueNote号 · {{ profile?.bluenoteNo || 'BN' }}</view>
+              <view class="bio">{{ profile?.bio || '记录生活，慢慢变成自己的地图。' }}</view>
+            </view>
           </view>
         </view>
-        <view class="profile-stats">
-          <view class="profile-stat">
-            <text class="stat-value">{{ notes.length }}</text>
-            <text class="stat-label">笔记</text>
+
+        <view class="profile-summary">
+          <view class="profile-stats">
+            <view class="profile-stat">
+              <text class="stat-value">{{ notes.length }}</text>
+              <text class="stat-label">笔记</text>
+            </view>
+            <view class="profile-stat">
+              <text class="stat-value">0</text>
+              <text class="stat-label">获赞</text>
+            </view>
+            <view class="profile-stat">
+              <text class="stat-value">0</text>
+              <text class="stat-label">关注</text>
+            </view>
+            <view class="profile-stat">
+              <text class="stat-value">0</text>
+              <text class="stat-label">粉丝</text>
+            </view>
           </view>
-          <view class="profile-stat">
-            <text class="stat-value">0</text>
-            <text class="stat-label">关注</text>
+          <view class="profile-actions">
+            <button class="edit-profile-button">编辑主页</button>
+            <button class="logout-link" @tap="logout">退出</button>
           </view>
-          <view class="profile-stat">
-            <text class="stat-value">0</text>
-            <text class="stat-label">粉丝</text>
-          </view>
-        </view>
-        <view class="status-row">
-          <view class="status-pill">{{ profile?.userStatus === 'NORMAL' ? '状态正常' : profile?.userStatus || '未知状态' }}</view>
-          <button class="ghost-button refresh-button" :disabled="loading" @tap="loadProfile">刷新</button>
-          <button class="secondary-button logout-button" @tap="logout">退出</button>
         </view>
       </view>
 
@@ -111,14 +129,6 @@ async function logout() {
         <button class="profile-tab active">笔记</button>
         <button class="profile-tab">收藏</button>
         <button class="profile-tab">赞过</button>
-      </view>
-
-      <view class="section-header">
-        <view>
-          <view class="section-title">我的笔记</view>
-          <view class="section-subtitle">已发布、草稿和私密内容都会在这里出现</view>
-        </view>
-        <button class="new-note-button" @tap="goPublish">+</button>
       </view>
 
       <view v-if="loading && !notes.length" class="loading-copy">正在读取个人资料</view>
@@ -147,65 +157,119 @@ async function logout() {
 
 .profile-card {
   overflow: hidden;
+  border-radius: 18rpx;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0), #fff 78%),
+    #fff;
   box-shadow: var(--bn-shadow);
 }
 
-.cover-band {
-  height: 188rpx;
-  padding: 30rpx 30rpx 0;
+.profile-hero {
+  position: relative;
+  min-height: 360rpx;
+  padding: 36rpx 30rpx 42rpx;
   background:
-    linear-gradient(135deg, rgba(17, 19, 24, 0.92), rgba(255, 95, 87, 0.72) 58%, rgba(44, 116, 214, 0.72)),
-    var(--bn-ink);
+    linear-gradient(180deg, rgba(9, 36, 54, 0.06), rgba(9, 36, 54, 0.66)),
+    radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.48), transparent 28%),
+    linear-gradient(135deg, #5eb9e8 0%, #1e7ba2 48%, #15526f 100%);
+  background-size: cover;
+  background-position: center;
 }
 
-.cover-label {
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 22rpx;
-  font-weight: 760;
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(5, 24, 38, 0.02), rgba(5, 24, 38, 0.72)),
+    linear-gradient(90deg, rgba(7, 32, 49, 0.55), rgba(7, 32, 49, 0.08));
+  pointer-events: none;
 }
 
-.profile-main {
+.hero-content {
+  position: relative;
+  z-index: 1;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 24rpx;
-  padding: 0 28rpx 22rpx;
-  margin-top: -68rpx;
+  min-height: 260rpx;
+}
+
+.avatar-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.avatar-add {
+  position: absolute;
+  right: -4rpx;
+  bottom: 0;
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  background: #39d353;
+  color: #fff;
+  border: 4rpx solid rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42rpx;
+  font-weight: 760;
+  line-height: 1;
+  box-shadow: 0 8rpx 18rpx rgba(0, 0, 0, 0.18);
 }
 
 .profile-copy {
   min-width: 0;
-  padding-bottom: 8rpx;
+  flex: 1;
+  color: #fff;
 }
 
 .nickname {
-  font-size: 38rpx;
-  font-weight: 860;
+  color: #fff;
+  font-size: 48rpx;
+  font-weight: 900;
+  line-height: 1.1;
+  text-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.25);
 }
 
 .bn-no {
-  margin-top: 8rpx;
-  color: var(--bn-muted);
-  font-size: 23rpx;
+  margin-top: 16rpx;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 25rpx;
+  line-height: 1.35;
 }
 
 .bio {
-  margin-top: 12rpx;
-  color: #3a4650;
+  margin-top: 14rpx;
+  max-width: 420rpx;
+  color: rgba(255, 255, 255, 0.92);
   font-size: 25rpx;
-  line-height: 1.5;
+  line-height: 1.48;
+}
+
+.profile-summary {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  min-height: 150rpx;
+  margin-top: -20rpx;
+  padding: 26rpx 26rpx 28rpx;
+  border-radius: 22rpx 22rpx 0 0;
+  background: #fff;
 }
 
 .profile-stats {
+  flex: 1;
+  min-width: 0;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12rpx;
-  padding: 0 28rpx 24rpx;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8rpx;
 }
 
 .profile-stat {
-  min-height: 86rpx;
-  border-radius: 16rpx;
-  background: #f7f7f7;
+  min-height: 96rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -215,46 +279,48 @@ async function logout() {
 
 .stat-value {
   color: var(--bn-ink);
-  font-size: 30rpx;
-  font-weight: 820;
+  font-size: 36rpx;
+  font-weight: 900;
 }
 
 .stat-label {
   color: var(--bn-muted);
-  font-size: 21rpx;
+  font-size: 23rpx;
 }
 
-.status-row {
+.profile-actions {
+  flex: 0 0 178rpx;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 12rpx;
-  padding: 0 28rpx 28rpx;
 }
 
-.status-pill {
-  flex: 1;
-  min-height: 62rpx;
-  padding: 0 18rpx;
-  border-radius: 16rpx;
-  background: rgba(255, 95, 87, 0.1);
-  color: #d54b43;
+.edit-profile-button {
+  min-height: 72rpx;
+  border-radius: 14rpx;
+  background: #f3f3f4;
+  color: var(--bn-ink);
   display: flex;
   align-items: center;
-  font-size: 23rpx;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 820;
 }
 
-.refresh-button,
-.logout-button {
-  width: 116rpx;
-  min-height: 62rpx;
-  font-size: 23rpx;
+.logout-link {
+  min-height: 42rpx;
+  color: var(--bn-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
 }
 
 .profile-tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8rpx;
-  margin: 24rpx 0 14rpx;
+  margin: 18rpx 0 16rpx;
   padding: 8rpx;
   border-radius: 16rpx;
   background: #fff;
@@ -273,37 +339,6 @@ async function logout() {
   color: var(--bn-ink);
   background: #f4f4f5;
   font-weight: 860;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 36rpx 0 22rpx;
-}
-
-.section-title {
-  font-size: 36rpx;
-  font-weight: 860;
-}
-
-.section-subtitle {
-  margin-top: 6rpx;
-  color: var(--bn-muted);
-  font-size: 22rpx;
-}
-
-.new-note-button {
-  width: 70rpx;
-  height: 70rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--bn-coral), #ff8a63);
-  color: #fff;
-  font-size: 42rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 16rpx 30rpx rgba(243, 107, 90, 0.2);
 }
 
 .masonry {
