@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/auth'
 const auth = useAuthStore()
 const notes = ref<NoteCard[]>([])
 const loading = ref(false)
+const accountMenuOpen = ref(false)
 
 const profile = computed(() => auth.profile)
 const leftNotes = computed(() => notes.value.filter((_, index) => index % 2 === 0))
@@ -65,7 +66,28 @@ function openNote(noteId: string) {
   uni.navigateTo({ url: `/pages/note/detail?noteId=${noteId}` })
 }
 
+function openAccountMenu() {
+  accountMenuOpen.value = true
+}
+
+function closeAccountMenu() {
+  accountMenuOpen.value = false
+}
+
+async function refreshFromMenu() {
+  accountMenuOpen.value = false
+  await loadProfile()
+}
+
 async function logout() {
+  accountMenuOpen.value = false
+  await auth.logoutCurrentDevice()
+  notes.value = []
+  uni.navigateTo({ url: '/pages/login/index' })
+}
+
+async function switchAccount() {
+  accountMenuOpen.value = false
   await auth.logoutCurrentDevice()
   notes.value = []
   uni.navigateTo({ url: '/pages/login/index' })
@@ -86,10 +108,14 @@ async function logout() {
       <view class="profile-card">
         <view class="profile-hero" :style="coverStyle">
           <view class="hero-overlay"></view>
+          <button class="account-menu-button" @tap="openAccountMenu">
+            <view class="menu-line"></view>
+            <view class="menu-line"></view>
+            <view class="menu-line"></view>
+          </button>
           <view class="hero-content">
             <view class="avatar-wrap">
               <AvatarCircle :src="profile?.avatarUrl" :name="profile?.nickname" size="large" />
-              <button class="avatar-add" @tap="goPublish">+</button>
             </view>
             <view class="profile-copy">
               <view class="nickname">{{ profile?.nickname || 'BlueNote 用户' }}</view>
@@ -120,15 +146,14 @@ async function logout() {
           </view>
           <view class="profile-actions">
             <button class="edit-profile-button">编辑主页</button>
-            <button class="logout-link" @tap="logout">退出</button>
           </view>
         </view>
-      </view>
 
-      <view class="profile-tabs">
-        <button class="profile-tab active">笔记</button>
-        <button class="profile-tab">收藏</button>
-        <button class="profile-tab">赞过</button>
+        <view class="profile-tabs">
+          <button class="profile-tab active">笔记</button>
+          <button class="profile-tab">收藏</button>
+          <button class="profile-tab">赞过</button>
+        </view>
       </view>
 
       <view v-if="loading && !notes.length" class="loading-copy">正在读取个人资料</view>
@@ -143,6 +168,26 @@ async function logout() {
         </view>
         <view class="column">
           <NoteCardView v-for="note in rightNotes" :key="note.noteId" :note="note" @open="openNote" />
+        </view>
+      </view>
+
+      <view v-if="accountMenuOpen" class="account-menu-mask" @tap="closeAccountMenu">
+        <view class="account-drawer" @tap.stop>
+          <view class="drawer-handle"></view>
+          <view class="drawer-title">账号管理</view>
+          <button class="drawer-item" @tap="refreshFromMenu">
+            <text>刷新资料</text>
+            <text class="drawer-arrow">›</text>
+          </button>
+          <button class="drawer-item" @tap="switchAccount">
+            <text>切换账号</text>
+            <text class="drawer-arrow">›</text>
+          </button>
+          <button class="drawer-item danger" @tap="logout">
+            <text>退出当前账号</text>
+            <text class="drawer-arrow">›</text>
+          </button>
+          <button class="drawer-cancel" @tap="closeAccountMenu">取消</button>
         </view>
       </view>
     </view>
@@ -167,7 +212,7 @@ async function logout() {
 .profile-hero {
   position: relative;
   min-height: 360rpx;
-  padding: 36rpx 30rpx 42rpx;
+  padding: 56rpx 30rpx 42rpx;
   background:
     linear-gradient(180deg, rgba(9, 36, 54, 0.06), rgba(9, 36, 54, 0.66)),
     radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.48), transparent 28%),
@@ -199,23 +244,30 @@ async function logout() {
   flex: 0 0 auto;
 }
 
-.avatar-add {
+.account-menu-button {
   position: absolute;
-  right: -4rpx;
-  bottom: 0;
-  width: 52rpx;
-  height: 52rpx;
+  top: 24rpx;
+  right: 24rpx;
+  z-index: 2;
+  width: 64rpx;
+  height: 64rpx;
   border-radius: 50%;
-  background: #39d353;
-  color: #fff;
-  border: 4rpx solid rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1rpx solid rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(12rpx);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 42rpx;
-  font-weight: 760;
-  line-height: 1;
-  box-shadow: 0 8rpx 18rpx rgba(0, 0, 0, 0.18);
+  gap: 7rpx;
+}
+
+.menu-line {
+  width: 28rpx;
+  height: 4rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.18);
 }
 
 .profile-copy {
@@ -307,22 +359,14 @@ async function logout() {
   font-weight: 820;
 }
 
-.logout-link {
-  min-height: 42rpx;
-  color: var(--bn-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 22rpx;
-}
-
 .profile-tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8rpx;
-  margin: 18rpx 0 16rpx;
-  padding: 8rpx;
-  border-radius: 16rpx;
+  margin: 0;
+  padding: 10rpx 18rpx 12rpx;
+  border-top: 1rpx solid rgba(236, 238, 240, 0.96);
+  border-radius: 0 0 18rpx 18rpx;
   background: #fff;
 }
 
@@ -345,10 +389,79 @@ async function logout() {
   display: flex;
   align-items: flex-start;
   gap: 16rpx;
+  margin-top: 16rpx;
 }
 
 .column {
   flex: 1;
   min-width: 0;
+}
+
+.account-menu-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(17, 19, 24, 0.28);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.account-drawer {
+  width: 520rpx;
+  min-height: 100vh;
+  padding: 34rpx 26rpx calc(34rpx + env(safe-area-inset-bottom));
+  background: #fff;
+  box-shadow: -18rpx 0 40rpx rgba(18, 22, 28, 0.14);
+}
+
+.drawer-handle {
+  width: 72rpx;
+  height: 8rpx;
+  margin: 0 0 28rpx auto;
+  border-radius: 999rpx;
+  background: #d9dde1;
+}
+
+.drawer-title {
+  color: var(--bn-ink);
+  font-size: 36rpx;
+  font-weight: 900;
+  margin-bottom: 24rpx;
+}
+
+.drawer-item {
+  width: 100%;
+  min-height: 88rpx;
+  border-bottom: 1rpx solid var(--bn-line);
+  color: #20242a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 29rpx;
+  font-weight: 720;
+}
+
+.drawer-item.danger {
+  color: var(--bn-coral);
+}
+
+.drawer-arrow {
+  color: var(--bn-faint);
+  font-size: 42rpx;
+  font-weight: 500;
+}
+
+.drawer-cancel {
+  width: 100%;
+  min-height: 78rpx;
+  margin-top: 28rpx;
+  border-radius: 14rpx;
+  background: #f3f4f5;
+  color: var(--bn-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 27rpx;
+  font-weight: 760;
 }
 </style>
