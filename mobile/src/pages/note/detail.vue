@@ -10,7 +10,13 @@ import {
   replyToComment,
   unlikeComment
 } from '@/api/comment'
-import { getNoteDetail } from '@/api/note'
+import {
+  collectNote as collectNoteApi,
+  getNoteDetail,
+  likeNote as likeNoteApi,
+  uncollectNote,
+  unlikeNote
+} from '@/api/note'
 import { BlueNoteApiError, showApiError } from '@/api/request'
 import type { CommentItem, NoteDetail } from '@/api/types'
 import AvatarCircle from '@/components/AvatarCircle.vue'
@@ -54,6 +60,10 @@ const inputFocus = ref(false)
 const replyTarget = ref<ReplyTarget | null>(null)
 const replyStates = ref<Record<string, ReplyState>>({})
 const expandedRootIds = ref<string[]>([])
+const noteActionSubmitting = ref({
+  like: false,
+  collect: false
+})
 
 const coverMedia = computed(() => note.value?.mediaFiles ?? [])
 const mediaTotal = computed(() => coverMedia.value.length)
@@ -349,12 +359,40 @@ function shareNote() {
   uni.showToast({ title: '分享功能后续接入', icon: 'none' })
 }
 
-function likeNote() {
-  uni.showToast({ title: '笔记点赞后续接入', icon: 'none' })
+async function toggleNoteLike() {
+  if (!note.value || noteActionSubmitting.value.like || !ensureAuthenticated()) {
+    return
+  }
+  const wasLiked = note.value.viewerAction.liked
+  noteActionSubmitting.value.like = true
+  patchNoteInteraction('liked', !wasLiked, wasLiked ? -1 : 1)
+  try {
+    const response = wasLiked ? await unlikeNote(note.value.noteId) : await likeNoteApi(note.value.noteId)
+    patchNoteInteraction('liked', response.liked, 0)
+  } catch (error) {
+    patchNoteInteraction('liked', wasLiked, wasLiked ? 1 : -1)
+    showApiError(error, '操作失败')
+  } finally {
+    noteActionSubmitting.value.like = false
+  }
 }
 
-function collectNote() {
-  uni.showToast({ title: '收藏功能后续接入', icon: 'none' })
+async function toggleNoteCollect() {
+  if (!note.value || noteActionSubmitting.value.collect || !ensureAuthenticated()) {
+    return
+  }
+  const wasCollected = note.value.viewerAction.collected
+  noteActionSubmitting.value.collect = true
+  patchNoteInteraction('collected', !wasCollected, wasCollected ? -1 : 1)
+  try {
+    const response = wasCollected ? await uncollectNote(note.value.noteId) : await collectNoteApi(note.value.noteId)
+    patchNoteInteraction('collected', response.collected, 0)
+  } catch (error) {
+    patchNoteInteraction('collected', wasCollected, wasCollected ? 1 : -1)
+    showApiError(error, '操作失败')
+  } finally {
+    noteActionSubmitting.value.collect = false
+  }
 }
 
 function scrollToComments() {
@@ -417,6 +455,18 @@ function patchComment(commentId: string, updater: (comment: CommentItem) => void
         updater(item)
       }
     }
+  }
+}
+
+function patchNoteInteraction(field: 'liked' | 'collected', value: boolean, countDelta: number) {
+  if (!note.value) {
+    return
+  }
+  note.value.viewerAction[field] = value
+  if (field === 'liked') {
+    note.value.counts.likeCount = Math.max(0, note.value.counts.likeCount + countDelta)
+  } else {
+    note.value.counts.collectCount = Math.max(0, note.value.counts.collectCount + countDelta)
   }
 }
 
@@ -625,14 +675,24 @@ function isCommentBlocked(error: unknown) {
             {{ commentSubmitting ? '发送中' : '发送' }}
           </button>
           <view v-else class="action-group">
-            <button class="action-item" @tap="likeNote">
-            <text class="action-icon">♡</text>
-            <text>{{ formatCount(note.counts.likeCount) }}</text>
-          </button>
-            <button class="action-item" @tap="collectNote">
-            <text class="action-icon">☆</text>
-            <text>{{ formatCount(note.counts.collectCount) }}</text>
-          </button>
+            <button
+              class="action-item"
+              :class="{ active: note.viewerAction.liked }"
+              :disabled="noteActionSubmitting.like"
+              @tap="toggleNoteLike"
+            >
+              <text class="action-icon">{{ note.viewerAction.liked ? '♥' : '♡' }}</text>
+              <text>{{ formatCount(note.counts.likeCount) }}</text>
+            </button>
+            <button
+              class="action-item"
+              :class="{ active: note.viewerAction.collected }"
+              :disabled="noteActionSubmitting.collect"
+              @tap="toggleNoteCollect"
+            >
+              <text class="action-icon">{{ note.viewerAction.collected ? '★' : '☆' }}</text>
+              <text>{{ formatCount(note.counts.collectCount) }}</text>
+            </button>
             <button class="action-item" @tap="scrollToComments">
             <text class="action-icon">◌</text>
               <text>{{ formatCount(commentCount) }}</text>
@@ -1202,6 +1262,14 @@ function isCommentBlocked(error: unknown) {
   gap: 8rpx;
   font-size: 24rpx;
   font-weight: 760;
+}
+
+.action-item.active {
+  color: var(--bn-coral);
+}
+
+.action-item[disabled] {
+  opacity: 0.58;
 }
 
 .action-icon {

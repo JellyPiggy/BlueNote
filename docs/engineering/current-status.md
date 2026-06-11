@@ -1,8 +1,8 @@
 # BlueNote 当前工程状态
 
-版本：v0.2
+版本：v0.3
 状态：第一条主链路完成，第二条社交链路起步
-更新时间：2026-06-11
+更新时间：2026-06-12
 当前分支：`codex/social-chain-foundation`
 当前基线提交：以本分支最新提交为准
 
@@ -213,10 +213,12 @@ note 已完成：
 5. 笔记详情：`GET /api/notes/{noteId}`
 6. 用户笔记列表：`GET /api/notes/users/{userId}`
 7. 我的笔记列表：`GET /api/notes/me`
-8. 内部批量笔记摘要：`POST /internal/notes/batch-summary`
-9. 内部评论前校验：`POST /internal/notes/comment-check`
-10. 笔记、媒体、版本、话题、幂等请求、互动查询等表结构已接入。
-11. 发布和删除写 note outbox，例如 `NotePublished`、`NoteDeleted`。
+8. 笔记点赞/取消点赞：`POST /api/notes/{noteId}/like`、`DELETE /api/notes/{noteId}/like`
+9. 笔记收藏/取消收藏：`POST /api/notes/{noteId}/collect`、`DELETE /api/notes/{noteId}/collect`
+10. 内部批量笔记摘要：`POST /internal/notes/batch-summary`
+11. 内部评论前校验：`POST /internal/notes/comment-check`
+12. 笔记、媒体、版本、话题、幂等请求、互动明细等表结构已接入。
+13. 发布、删除、点赞、取消点赞、收藏、取消收藏写 note outbox。
 
 comment 已完成：
 
@@ -232,7 +234,7 @@ comment 已完成：
 10. 内部评论计数来源：`POST /internal/comments/counter-source`
 11. 评论事实、个人评论读模型、评论正文、评论点赞、幂等、操作日志、outbox 已落 MySQL。
 
-限制：笔记点赞、收藏写接口和完整计数链路还没有落地；当前详情页可以展示计数字段和 viewerAction 结构，但笔记互动行为仍是下一阶段任务。
+限制：笔记详情页点赞数、收藏数当前直接从互动明细聚合；完整 counter/feed/notification 链路还没有落地。
 
 ### 3.7 移动端
 
@@ -273,7 +275,8 @@ mobile/src/
 8. 笔记详情：图片轮播、作者、正文、计数展示、底部操作区。
 9. 我的页面：封面背景、头像、账号信息、关注/粉丝/获赞、笔记/收藏/赞过 tab、账号侧边菜单。
 10. 笔记详情页评论区：评论列表、回复列表、发布评论、回复、评论点赞、删除自己的评论。
-11. H5 真实浏览器验收已做过多轮视觉检查。
+11. 笔记详情页点赞、取消点赞、收藏、取消收藏已接真实 API。
+12. H5 真实浏览器验收已做过多轮视觉检查。
 
 当前 UI 风格已经从早期工程占位调整为移动端社区产品风格，但不使用小红书品牌元素。
 
@@ -352,10 +355,9 @@ npm run dev:h5
 
 1. 编辑主页真实页面和 `PUT /api/users/me/profile` 联调。
 2. 我的页“收藏”和“赞过”tab 接真实数据。
-3. 继续补笔记点赞、收藏写操作。
-4. 首页从“我的笔记”过渡到更真实的推荐/发现数据源。
-5. 图片上传失败重试、上传进度、重复发布保护再打磨。
-6. 空态、错误态、弱网态和 token 过期后的提示继续统一。
+3. 首页从“我的笔记”过渡到更真实的推荐/发现数据源。
+4. 图片上传失败重试、上传进度、重复发布保护再打磨。
+5. 空态、错误态、弱网态和 token 过期后的提示继续统一。
 
 ### 6.3 第二条社交链路
 
@@ -369,7 +371,7 @@ npm run dev:h5
 
 1. 把用户主页头部计数接到 relation/counter。
 2. counter 服务：关注数、粉丝数、获赞数、点赞数、收藏数、评论数。
-3. note 点赞/取消点赞、收藏/取消收藏接口。
+3. 我的收藏列表和赞过列表。
 4. feed 服务：关注页 Feed 拉取和发布事件投递。
 5. notification 服务：互动通知和未读数。
 6. RocketMQ outbox dispatcher 和消费幂等记录。
@@ -395,7 +397,7 @@ npm run dev:h5
 
 1. Outbox 当前主要是写库记录，还没有完整 MQ dispatcher、重试、死信和消费幂等闭环。
 2. 用户主页计数目前未接真实 counter/relation 数据。
-3. 笔记点赞、收藏仍是占位交互，移动端评论已经接入本轮新增的评论后端接口。
+3. 笔记点赞、收藏已落库并写 outbox，但 counter、feed、notification 仍未消费这些事件。
 4. 自动化测试基本还没建立，后续改动风险会越来越高。
 5. social-app 当前只完成 relation 最小纵切面，counter/feed/notification 仍未接入。
 6. MySQL 初始化依赖 Docker 首次建卷行为，重建本地环境时要注意数据卷状态。

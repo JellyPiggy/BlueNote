@@ -118,6 +118,16 @@ export interface DraftNoteResponse {
   updatedAt: string
 }
 
+export interface NoteLikeResponse {
+  noteId: string
+  liked: boolean
+}
+
+export interface NoteCollectResponse {
+  noteId: string
+  collected: boolean
+}
+
 export interface NoteCard {
   noteId: string
   title: string

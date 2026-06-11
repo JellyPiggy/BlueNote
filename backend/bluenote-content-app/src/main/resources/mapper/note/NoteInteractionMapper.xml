@@ -3,6 +3,104 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.bluenote.content.note.infrastructure.mapper.NoteInteractionMapper">
 
+    <resultMap id="NoteLikeResultMap" type="com.bluenote.content.note.infrastructure.entity.NoteLikeEntity">
+        <id column="id" property="id"/>
+        <result column="note_id" property="noteId"/>
+        <result column="author_id" property="authorId"/>
+        <result column="user_id" property="userId"/>
+        <result column="like_status" property="likeStatus"/>
+        <result column="liked_at" property="likedAt"/>
+        <result column="canceled_at" property="canceledAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <resultMap id="NoteCollectionResultMap" type="com.bluenote.content.note.infrastructure.entity.NoteCollectionEntity">
+        <id column="id" property="id"/>
+        <result column="note_id" property="noteId"/>
+        <result column="author_id" property="authorId"/>
+        <result column="user_id" property="userId"/>
+        <result column="collection_status" property="collectionStatus"/>
+        <result column="collected_at" property="collectedAt"/>
+        <result column="canceled_at" property="canceledAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insertLike" parameterType="com.bluenote.content.note.infrastructure.entity.NoteLikeEntity">
+        INSERT INTO bluenote_note.note_like (
+            id, note_id, author_id, user_id, like_status,
+            liked_at, canceled_at, created_at, updated_at
+        ) VALUES (
+            #{id}, #{noteId}, #{authorId}, #{userId}, #{likeStatus},
+            #{likedAt}, #{canceledAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectLikeByPair" resultMap="NoteLikeResultMap">
+        SELECT id, note_id, author_id, user_id, like_status,
+               liked_at, canceled_at, created_at, updated_at
+        FROM bluenote_note.note_like
+        WHERE note_id = #{noteId}
+          AND user_id = #{userId}
+    </select>
+
+    <update id="activateLike">
+        UPDATE bluenote_note.note_like
+        SET like_status = 'ACTIVE',
+            liked_at = #{likedAt},
+            canceled_at = NULL,
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+          AND like_status = 'CANCELED'
+    </update>
+
+    <update id="cancelLike">
+        UPDATE bluenote_note.note_like
+        SET like_status = 'CANCELED',
+            canceled_at = #{canceledAt},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+          AND like_status = 'ACTIVE'
+    </update>
+
+    <insert id="insertCollection" parameterType="com.bluenote.content.note.infrastructure.entity.NoteCollectionEntity">
+        INSERT INTO bluenote_note.note_collection (
+            id, note_id, author_id, user_id, collection_status,
+            collected_at, canceled_at, created_at, updated_at
+        ) VALUES (
+            #{id}, #{noteId}, #{authorId}, #{userId}, #{collectionStatus},
+            #{collectedAt}, #{canceledAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectCollectionByPair" resultMap="NoteCollectionResultMap">
+        SELECT id, note_id, author_id, user_id, collection_status,
+               collected_at, canceled_at, created_at, updated_at
+        FROM bluenote_note.note_collection
+        WHERE note_id = #{noteId}
+          AND user_id = #{userId}
+    </select>
+
+    <update id="activateCollection">
+        UPDATE bluenote_note.note_collection
+        SET collection_status = 'ACTIVE',
+            collected_at = #{collectedAt},
+            canceled_at = NULL,
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+          AND collection_status = 'CANCELED'
+    </update>
+
+    <update id="cancelCollection">
+        UPDATE bluenote_note.note_collection
+        SET collection_status = 'CANCELED',
+            canceled_at = #{canceledAt},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+          AND collection_status = 'ACTIVE'
+    </update>
+
     <select id="countLikes" resultType="long">
         SELECT COUNT(*)
         FROM bluenote_note.note_like
@@ -33,4 +131,3 @@
           AND collection_status = 'ACTIVE'
     </select>
 </mapper>
-

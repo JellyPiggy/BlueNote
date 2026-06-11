@@ -3,7 +3,9 @@ import type {
   CursorPage,
   DraftNoteResponse,
   NoteCard,
+  NoteCollectResponse,
   NoteDetail,
+  NoteLikeResponse,
   PublishNoteResponse,
   UpsertNoteRequest
 } from './types'
@@ -37,6 +39,34 @@ export function getNoteDetail(noteId: string, auth = true) {
   })
 }
 
+export function likeNote(noteId: string) {
+  return apiRequest<NoteLikeResponse>({
+    method: 'POST',
+    path: `/api/notes/${noteId}/like`
+  })
+}
+
+export function unlikeNote(noteId: string) {
+  return apiRequest<NoteLikeResponse>({
+    method: 'DELETE',
+    path: `/api/notes/${noteId}/like`
+  })
+}
+
+export function collectNote(noteId: string) {
+  return apiRequest<NoteCollectResponse>({
+    method: 'POST',
+    path: `/api/notes/${noteId}/collect`
+  })
+}
+
+export function uncollectNote(noteId: string) {
+  return apiRequest<NoteCollectResponse>({
+    method: 'DELETE',
+    path: `/api/notes/${noteId}/collect`
+  })
+}
+
 export function getAuthorNotes(userId: string, cursor?: string | null, size = 20) {
   const query = new URLSearchParams()
   query.set('size', String(size))
@@ -62,4 +92,3 @@ export function getMyNotes(status?: string, cursor?: string | null, size = 20) {
     path: `/api/notes/me?${query.toString()}`
   })
 }
-

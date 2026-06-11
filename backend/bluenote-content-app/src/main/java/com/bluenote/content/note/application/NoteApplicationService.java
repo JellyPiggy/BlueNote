@@ -15,10 +15,12 @@ import com.bluenote.content.note.api.dto.CommentCheckRequest;
 import com.bluenote.content.note.api.dto.CommentCheckResponse;
 import com.bluenote.content.note.api.dto.DeleteNoteResponse;
 import com.bluenote.content.note.api.dto.DraftNoteResponse;
+import com.bluenote.content.note.api.dto.NoteCollectResponse;
 import com.bluenote.content.note.api.dto.NoteAuthorResponse;
 import com.bluenote.content.note.api.dto.NoteCardResponse;
 import com.bluenote.content.note.api.dto.NoteCountsResponse;
 import com.bluenote.content.note.api.dto.NoteDetailResponse;
+import com.bluenote.content.note.api.dto.NoteLikeResponse;
 import com.bluenote.content.note.api.dto.NoteMediaInput;
 import com.bluenote.content.note.api.dto.NoteMediaResponse;
 import com.bluenote.content.note.api.dto.NoteSummaryItem;
@@ -27,8 +29,10 @@ import com.bluenote.content.note.api.dto.PublishNoteResponse;
 import com.bluenote.content.note.api.dto.UpsertNoteRequest;
 import com.bluenote.content.note.api.dto.ViewerActionResponse;
 import com.bluenote.content.note.infrastructure.client.MemberInternalClient;
+import com.bluenote.content.note.infrastructure.entity.NoteCollectionEntity;
 import com.bluenote.content.note.infrastructure.entity.NoteEntity;
 import com.bluenote.content.note.infrastructure.entity.NoteIdempotentRequestEntity;
+import com.bluenote.content.note.infrastructure.entity.NoteLikeEntity;
 import com.bluenote.content.note.infrastructure.entity.NoteMediaEntity;
 import com.bluenote.content.note.infrastructure.entity.NoteOutboxEventEntity;
 import com.bluenote.content.note.infrastructure.entity.NoteTopicEntity;
@@ -68,6 +72,9 @@ public class NoteApplicationService {
     private static final String OP_SAVE_DRAFT = "NOTE_SAVE_DRAFT";
     private static final String OP_PUBLISH_NOTE = "NOTE_PUBLISH";
     private static final String OP_PUBLISH_DRAFT = "NOTE_PUBLISH_DRAFT";
+    private static final String SCENE_NOTE_INTERACTION = "NOTE_INTERACTION";
+    private static final String INTERACTION_ACTIVE = "ACTIVE";
+    private static final String INTERACTION_CANCELED = "CANCELED";
     private static final String STATUS_DRAFT = "DRAFT";
     private static final String STATUS_PUBLISHED = "PUBLISHED";
     private static final String STATUS_PRIVATE = "PRIVATE";
@@ -288,6 +295,118 @@ public class NoteApplicationService {
                 toOffsetString(note.getPublishedAt()),
                 degraded
         );
+    }
+
+    @Transactional
+    public NoteLikeResponse likeNote(String userId, String noteId) {
+        Long parsedUserId = parseId(userId, ApiErrorCode.ACCESS_TOKEN_INVALID);
+        Long parsedNoteId = parseId(noteId, ApiErrorCode.NOTE_NOT_FOUND);
+        memberInternalClient.ensureUserAllowed(userId, SCENE_NOTE_INTERACTION);
+        NoteEntity note = requireVisibleNoteForInteraction(parsedNoteId, parsedUserId);
+        NoteLikeEntity existing = noteInteractionMapper.selectLikeByPair(parsedNoteId, parsedUserId);
+        if (existing != null && INTERACTION_ACTIVE.equals(existing.getLikeStatus())) {
+            return new NoteLikeResponse(noteId, true);
+        }
+        LocalDateTime now = now();
+        boolean changed = false;
+        if (existing == null) {
+            NoteLikeEntity entity = new NoteLikeEntity();
+            entity.setId(idGenerator.nextId());
+            entity.setNoteId(parsedNoteId);
+            entity.setAuthorId(note.getAuthorId());
+            entity.setUserId(parsedUserId);
+            entity.setLikeStatus(INTERACTION_ACTIVE);
+            entity.setLikedAt(now);
+            entity.setCreatedAt(now);
+            entity.setUpdatedAt(now);
+            try {
+                noteInteractionMapper.insertLike(entity);
+                changed = true;
+            } catch (DuplicateKeyException exception) {
+                existing = noteInteractionMapper.selectLikeByPair(parsedNoteId, parsedUserId);
+            }
+        }
+        if (!changed && existing != null && INTERACTION_CANCELED.equals(existing.getLikeStatus())) {
+            changed = noteInteractionMapper.activateLike(existing.getId(), now, now) > 0;
+        }
+        if (changed) {
+            insertNoteInteractionOutbox("NoteLiked", note, parsedUserId, now);
+        }
+        return new NoteLikeResponse(noteId, true);
+    }
+
+    @Transactional
+    public NoteLikeResponse unlikeNote(String userId, String noteId) {
+        Long parsedUserId = parseId(userId, ApiErrorCode.ACCESS_TOKEN_INVALID);
+        Long parsedNoteId = parseId(noteId, ApiErrorCode.NOTE_NOT_FOUND);
+        memberInternalClient.ensureUserAllowed(userId, SCENE_NOTE_INTERACTION);
+        NoteEntity note = requireVisibleNoteForInteraction(parsedNoteId, parsedUserId);
+        NoteLikeEntity existing = noteInteractionMapper.selectLikeByPair(parsedNoteId, parsedUserId);
+        if (existing == null || INTERACTION_CANCELED.equals(existing.getLikeStatus())) {
+            return new NoteLikeResponse(noteId, false);
+        }
+        LocalDateTime now = now();
+        boolean changed = noteInteractionMapper.cancelLike(existing.getId(), now, now) > 0;
+        if (changed) {
+            insertNoteInteractionOutbox("NoteUnliked", note, parsedUserId, now);
+        }
+        return new NoteLikeResponse(noteId, false);
+    }
+
+    @Transactional
+    public NoteCollectResponse collectNote(String userId, String noteId) {
+        Long parsedUserId = parseId(userId, ApiErrorCode.ACCESS_TOKEN_INVALID);
+        Long parsedNoteId = parseId(noteId, ApiErrorCode.NOTE_NOT_FOUND);
+        memberInternalClient.ensureUserAllowed(userId, SCENE_NOTE_INTERACTION);
+        NoteEntity note = requireVisibleNoteForInteraction(parsedNoteId, parsedUserId);
+        NoteCollectionEntity existing = noteInteractionMapper.selectCollectionByPair(parsedNoteId, parsedUserId);
+        if (existing != null && INTERACTION_ACTIVE.equals(existing.getCollectionStatus())) {
+            return new NoteCollectResponse(noteId, true);
+        }
+        LocalDateTime now = now();
+        boolean changed = false;
+        if (existing == null) {
+            NoteCollectionEntity entity = new NoteCollectionEntity();
+            entity.setId(idGenerator.nextId());
+            entity.setNoteId(parsedNoteId);
+            entity.setAuthorId(note.getAuthorId());
+            entity.setUserId(parsedUserId);
+            entity.setCollectionStatus(INTERACTION_ACTIVE);
+            entity.setCollectedAt(now);
+            entity.setCreatedAt(now);
+            entity.setUpdatedAt(now);
+            try {
+                noteInteractionMapper.insertCollection(entity);
+                changed = true;
+            } catch (DuplicateKeyException exception) {
+                existing = noteInteractionMapper.selectCollectionByPair(parsedNoteId, parsedUserId);
+            }
+        }
+        if (!changed && existing != null && INTERACTION_CANCELED.equals(existing.getCollectionStatus())) {
+            changed = noteInteractionMapper.activateCollection(existing.getId(), now, now) > 0;
+        }
+        if (changed) {
+            insertNoteInteractionOutbox("NoteCollected", note, parsedUserId, now);
+        }
+        return new NoteCollectResponse(noteId, true);
+    }
+
+    @Transactional
+    public NoteCollectResponse uncollectNote(String userId, String noteId) {
+        Long parsedUserId = parseId(userId, ApiErrorCode.ACCESS_TOKEN_INVALID);
+        Long parsedNoteId = parseId(noteId, ApiErrorCode.NOTE_NOT_FOUND);
+        memberInternalClient.ensureUserAllowed(userId, SCENE_NOTE_INTERACTION);
+        NoteEntity note = requireVisibleNoteForInteraction(parsedNoteId, parsedUserId);
+        NoteCollectionEntity existing = noteInteractionMapper.selectCollectionByPair(parsedNoteId, parsedUserId);
+        if (existing == null || INTERACTION_CANCELED.equals(existing.getCollectionStatus())) {
+            return new NoteCollectResponse(noteId, false);
+        }
+        LocalDateTime now = now();
+        boolean changed = noteInteractionMapper.cancelCollection(existing.getId(), now, now) > 0;
+        if (changed) {
+            insertNoteInteractionOutbox("NoteUncollected", note, parsedUserId, now);
+        }
+        return new NoteCollectResponse(noteId, false);
     }
 
     @Transactional(readOnly = true)
@@ -677,6 +796,14 @@ public class NoteApplicationService {
         return STATUS_PUBLISHED.equals(note.getNoteStatus()) && VISIBILITY_PUBLIC.equals(note.getVisibility());
     }
 
+    private NoteEntity requireVisibleNoteForInteraction(Long noteId, Long userId) {
+        NoteEntity note = requireNote(noteId);
+        if (!canView(note, userId)) {
+            throw new BusinessException(ApiErrorCode.NOTE_NOT_FOUND);
+        }
+        return note;
+    }
+
     private NoteEntity requireNote(Long noteId) {
         NoteEntity note = noteMapper.selectByNoteId(noteId);
         if (note == null) {
@@ -719,6 +846,15 @@ public class NoteApplicationService {
         payload.put("authorId", String.valueOf(note.getAuthorId()));
         payload.put("deletedAt", toOffsetString(now));
         insertOutbox("NoteDeleted", note.getNoteId(), payload, now);
+    }
+
+    private void insertNoteInteractionOutbox(String eventType, NoteEntity note, Long userId, LocalDateTime now) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("noteId", String.valueOf(note.getNoteId()));
+        payload.put("authorId", String.valueOf(note.getAuthorId()));
+        payload.put("userId", String.valueOf(userId));
+        payload.put("occurredAt", toOffsetString(now));
+        insertOutbox(eventType, note.getNoteId(), payload, now);
     }
 
     private void insertOutbox(String eventType, Long noteId, Map<String, Object> payload, LocalDateTime now) {

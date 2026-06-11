@@ -135,6 +135,10 @@ note 外部接口：
 | `GET /api/notes/{noteId}` | 笔记详情 |
 | `GET /api/notes/users/{userId}` | 用户笔记列表 |
 | `GET /api/notes/me` | 我的笔记列表 |
+| `POST /api/notes/{noteId}/like` | 笔记点赞 |
+| `DELETE /api/notes/{noteId}/like` | 取消笔记点赞 |
+| `POST /api/notes/{noteId}/collect` | 笔记收藏 |
+| `DELETE /api/notes/{noteId}/collect` | 取消笔记收藏 |
 
 note 内部接口：
 
@@ -168,13 +172,13 @@ comment 内部接口：
 1. MinIO 预签名 PUT 上传。
 2. 文件元数据、上传会话、绑定关系落库。
 3. 笔记、媒体、版本、话题、幂等请求落库。
-4. 发布、删除写 note outbox。
+4. 发布、删除、点赞、取消点赞、收藏、取消收藏写 note outbox。
 5. 笔记详情聚合作者、媒体、计数结构和 viewerAction。
 6. 评论、回复、删除、评论点赞落 MySQL。
 7. 评论发布/删除/点赞写 comment outbox。
 8. 评论列表聚合作者、正文、计数快照和 viewerAction。
 
-限制：笔记点赞、收藏写接口和完整 counter/feed/notification 链路尚未实现；comment outbox 目前只写库，尚未投递 MQ。
+限制：完整 counter/feed/notification 链路尚未实现；note/comment outbox 目前只写库，尚未投递 MQ。
 
 ### 2.4 Social App
 
@@ -301,5 +305,4 @@ http://127.0.0.1:{port}/swagger-ui.html
 2. 补 outbox dispatcher、RocketMQ 投递、消费幂等和重试闭环。
 3. 把用户主页头部计数接到 relation/counter。
 4. 补 counter/feed/notification 第二条社交链路。
-5. 补笔记点赞、收藏写接口。
-6. 补生产部署、备份恢复、监控告警配置。
+5. 补生产部署、备份恢复、监控告警配置。

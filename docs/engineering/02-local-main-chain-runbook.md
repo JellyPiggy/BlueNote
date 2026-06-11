@@ -160,17 +160,19 @@ npm run dev:h5
 3. `/api/notes/me` 能在我的页面展示已发布笔记。
 4. `/api/users/{userId}/home` 能返回主页头部结构。
 
-### 7.4 验证关注和评论接口
+### 7.4 验证关注、笔记互动和评论接口
 
 在已登录状态下，可以继续验证当前第二条主链路的最小接口：
 
 1. `POST /api/relations/following/{followeeId}` 能关注用户。
 2. `DELETE /api/relations/following/{followeeId}` 能取消关注。
-3. `POST /api/comments/notes/{noteId}` 能发布一级评论。
-4. `POST /api/comments/{commentId}/replies` 能回复评论。
-5. `GET /api/comments/notes/{noteId}` 能查询一级评论。
-6. `GET /api/comments/{rootCommentId}/replies` 能查询回复。
-7. `POST /api/comments/{commentId}/like` 和 `DELETE /api/comments/{commentId}/like` 能切换评论点赞状态。
+3. `POST /api/notes/{noteId}/like` 和 `DELETE /api/notes/{noteId}/like` 能切换笔记点赞状态。
+4. `POST /api/notes/{noteId}/collect` 和 `DELETE /api/notes/{noteId}/collect` 能切换笔记收藏状态。
+5. `POST /api/comments/notes/{noteId}` 能发布一级评论。
+6. `POST /api/comments/{commentId}/replies` 能回复评论。
+7. `GET /api/comments/notes/{noteId}` 能查询一级评论。
+8. `GET /api/comments/{rootCommentId}/replies` 能查询回复。
+9. `POST /api/comments/{commentId}/like` 和 `DELETE /api/comments/{commentId}/like` 能切换评论点赞状态。
 
 如果 MySQL 是旧数据卷，新增的 `V005__relation.sql`、`V006__comment.sql` 可能不会自动执行，需要手动执行 SQL 或重建本地数据卷。
 
@@ -213,7 +215,7 @@ npm run dev:h5
 
 以下能力不属于第一条主链路当前验收范围：
 
-1. 笔记点赞、收藏写操作。
+1. 我的收藏列表和赞过列表。
 2. Feed 投递。
 3. 通知。
 4. IM。
