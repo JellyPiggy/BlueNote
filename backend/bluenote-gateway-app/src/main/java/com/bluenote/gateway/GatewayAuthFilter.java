@@ -32,6 +32,8 @@ public class GatewayAuthFilter implements GlobalFilter, Ordered {
     private static final Pattern FILE_ACCESS_URL_PATH = Pattern.compile("^/api/files/[^/]+/access-url$");
     private static final Pattern NOTE_DETAIL_PATH = Pattern.compile("^/api/notes/(?!(me|drafts)$|users/)[^/]+$");
     private static final Pattern NOTE_USER_LIST_PATH = Pattern.compile("^/api/notes/users/[^/]+$");
+    private static final Pattern COMMENT_NOTE_LIST_PATH = Pattern.compile("^/api/comments/notes/[^/]+$");
+    private static final Pattern COMMENT_REPLY_LIST_PATH = Pattern.compile("^/api/comments/[^/]+/replies$");
     private static final Pattern RELATION_PUBLIC_LIST_PATH = Pattern.compile("^/api/relations/users/[^/]+/(following|followers)$");
 
     private final JwtAccessTokenService accessTokenService;
@@ -110,6 +112,8 @@ public class GatewayAuthFilter implements GlobalFilter, Ordered {
                 || FILE_ACCESS_URL_PATH.matcher(path).matches()
                 || NOTE_DETAIL_PATH.matcher(path).matches()
                 || NOTE_USER_LIST_PATH.matcher(path).matches()
+                || COMMENT_NOTE_LIST_PATH.matcher(path).matches()
+                || COMMENT_REPLY_LIST_PATH.matcher(path).matches()
                 || RELATION_PUBLIC_LIST_PATH.matcher(path).matches();
     }
 

@@ -1,12 +1,12 @@
 # BlueNote 本地主链路联调手册
 
 版本：v0.1  
-状态：第一条主链路最小联调清单  
+状态：第一条主链路与已落地社交接口最小联调清单
 更新时间：2026-06-11
 
 ## 1. 目标
 
-本文用于在本地跑通第一条主链路：
+本文用于在本地跑通第一条主链路，并顺手验证当前已经落地的 relation/comment 社交接口：
 
 ```text
 注册/登录 -> 获取用户资料 -> 上传图片 -> 发布笔记 -> 查看笔记详情
@@ -160,6 +160,20 @@ npm run dev:h5
 3. `/api/notes/me` 能在我的页面展示已发布笔记。
 4. `/api/users/{userId}/home` 能返回主页头部结构。
 
+### 7.4 验证关注和评论接口
+
+在已登录状态下，可以继续验证当前第二条主链路的最小接口：
+
+1. `POST /api/relations/following/{followeeId}` 能关注用户。
+2. `DELETE /api/relations/following/{followeeId}` 能取消关注。
+3. `POST /api/comments/notes/{noteId}` 能发布一级评论。
+4. `POST /api/comments/{commentId}/replies` 能回复评论。
+5. `GET /api/comments/notes/{noteId}` 能查询一级评论。
+6. `GET /api/comments/{rootCommentId}/replies` 能查询回复。
+7. `POST /api/comments/{commentId}/like` 和 `DELETE /api/comments/{commentId}/like` 能切换评论点赞状态。
+
+如果 MySQL 是旧数据卷，新增的 `V005__relation.sql`、`V006__comment.sql` 可能不会自动执行，需要手动执行 SQL 或重建本地数据卷。
+
 ## 8. 常见问题
 
 ### 8.1 MySQL 表不存在
@@ -193,16 +207,15 @@ npm run dev:h5
 
 ### 8.4 主页计数一直是 0
 
-这是当前阶段已知限制。关注数、粉丝数、获赞数需要第二条社交链路中的 relation/counter 服务补齐。
+这是当前阶段已知限制。关注关系已落库，但用户主页头部还没有接入 counter 聚合。
 
 ## 9. 当前未覆盖
 
 以下能力不属于第一条主链路当前验收范围：
 
-1. 点赞、收藏、评论写操作。
-2. 关注关系。
-3. Feed 投递。
-4. 通知。
-5. IM。
-6. 订单。
-7. RocketMQ outbox dispatcher 和消费者幂等闭环。
+1. 笔记点赞、收藏写操作。
+2. Feed 投递。
+3. 通知。
+4. IM。
+5. 订单。
+6. RocketMQ outbox dispatcher 和消费者幂等闭环。

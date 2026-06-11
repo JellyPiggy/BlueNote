@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.content.comment.infrastructure.mapper.UserCommentMapper">
+
+    <resultMap id="UserCommentResultMap" type="com.bluenote.content.comment.infrastructure.entity.UserCommentEntity">
+        <id column="id" property="id"/>
+        <result column="comment_id" property="commentId"/>
+        <result column="user_id" property="userId"/>
+        <result column="note_id" property="noteId"/>
+        <result column="root_id" property="rootId"/>
+        <result column="parent_comment_id" property="parentCommentId"/>
+        <result column="comment_status" property="commentStatus"/>
+        <result column="content_preview" property="contentPreview"/>
+        <result column="note_title_snapshot" property="noteTitleSnapshot"/>
+        <result column="note_cover_url_snapshot" property="noteCoverUrlSnapshot"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.bluenote.content.comment.infrastructure.entity.UserCommentEntity">
+        INSERT INTO bluenote_comment.user_comment (
+            id, comment_id, user_id, note_id, root_id, parent_comment_id,
+            comment_status, content_preview, note_title_snapshot, note_cover_url_snapshot,
+            created_at, updated_at
+        ) VALUES (
+            #{id}, #{commentId}, #{userId}, #{noteId}, #{rootId}, #{parentCommentId},
+            #{commentStatus}, #{contentPreview}, #{noteTitleSnapshot}, #{noteCoverUrlSnapshot},
+            #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <update id="markDeleted">
+        UPDATE bluenote_comment.user_comment
+        SET comment_status = 'DELETED',
+            updated_at = #{updatedAt}
+        WHERE comment_id = #{commentId}
+          AND comment_status = 'VISIBLE'
+    </update>
+
+    <update id="markDeletedByRoot">
+        UPDATE bluenote_comment.user_comment
+        SET comment_status = 'DELETED',
+            updated_at = #{updatedAt}
+        WHERE root_id = #{rootId}
+          AND comment_status = 'VISIBLE'
+    </update>
+
+    <select id="selectByUserPage" resultMap="UserCommentResultMap">
+        SELECT id, comment_id, user_id, note_id, root_id, parent_comment_id,
+               comment_status, content_preview, note_title_snapshot, note_cover_url_snapshot,
+               created_at, updated_at
+        FROM bluenote_comment.user_comment
+        WHERE user_id = #{userId}
+        <if test="cursorCreatedAt != null and cursorCommentId != null">
+          AND (
+            created_at &lt; #{cursorCreatedAt}
+            OR (created_at = #{cursorCreatedAt} AND comment_id &lt; #{cursorCommentId})
+          )
+        </if>
+        ORDER BY created_at DESC, comment_id DESC
+        LIMIT #{size}
+    </select>
+</mapper>

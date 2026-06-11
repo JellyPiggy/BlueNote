@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.content.comment.infrastructure.mapper.CommentContentMapper">
+
+    <resultMap id="CommentContentResultMap" type="com.bluenote.content.comment.infrastructure.entity.CommentContentEntity">
+        <id column="comment_id" property="commentId"/>
+        <result column="content" property="content"/>
+        <result column="content_preview" property="contentPreview"/>
+        <result column="audit_status" property="auditStatus"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.bluenote.content.comment.infrastructure.entity.CommentContentEntity">
+        INSERT INTO bluenote_comment.comment_content (
+            comment_id, content, content_preview, audit_status, created_at, updated_at
+        ) VALUES (
+            #{commentId}, #{content}, #{contentPreview}, #{auditStatus}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectByCommentId" resultMap="CommentContentResultMap">
+        SELECT comment_id, content, content_preview, audit_status, created_at, updated_at
+        FROM bluenote_comment.comment_content
+        WHERE comment_id = #{commentId}
+    </select>
+
+    <select id="selectByCommentIds" resultMap="CommentContentResultMap">
+        SELECT comment_id, content, content_preview, audit_status, created_at, updated_at
+        FROM bluenote_comment.comment_content
+        WHERE comment_id IN
+        <foreach collection="commentIds" item="commentId" open="(" separator="," close=")">
+            #{commentId}
+        </foreach>
+    </select>
+</mapper>

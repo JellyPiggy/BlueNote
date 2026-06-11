@@ -8,10 +8,11 @@ BlueNote 后端采用 Java 21、Spring Boot 3.5.x、Spring Cloud 2025.0.x 和 Ma
 注册/登录 -> 获取用户资料 -> 上传图片 -> 发布笔记 -> 查看笔记详情
 ```
 
-第二条主链路已开始落地，当前完成 relation 服务最小纵切面：
+第二条主链路已开始落地，当前完成 relation 和 comment 的最小纵切面：
 
 ```text
 关注用户 -> 关系事实落库 -> relation-event outbox
+评论/回复 -> 评论事实落库 -> comment-event outbox
 ```
 
 ## 1. 模块
@@ -40,7 +41,7 @@ backend/
 |---|---:|---|
 | `bluenote-gateway-app` | 8080 | 网关、JWT 校验、路由、用户上下文 Header 注入 |
 | `bluenote-member-app` | 8081 | auth、user |
-| `bluenote-content-app` | 8082 | file、note |
+| `bluenote-content-app` | 8082 | file、note、comment |
 | `bluenote-social-app` | 8083 | relation，后续承载 counter、feed、rank、notification |
 
 ## 2. 当前实现状态
@@ -104,7 +105,7 @@ user 内部接口：
 
 ### 2.3 Content App
 
-`bluenote-content-app` 已从占位接口接入 MySQL 和 MinIO。
+`bluenote-content-app` 已从占位接口接入 MySQL 和 MinIO，并补齐 comment 最小可用链路。
 
 file 外部接口：
 
@@ -142,6 +143,26 @@ note 内部接口：
 | `POST /internal/notes/batch-summary` | 批量笔记摘要 |
 | `POST /internal/notes/comment-check` | 评论前校验 |
 
+comment 外部接口：
+
+| 接口 | 说明 |
+|---|---|
+| `POST /api/comments/notes/{noteId}` | 发布一级评论 |
+| `POST /api/comments/{commentId}/replies` | 回复评论 |
+| `DELETE /api/comments/{commentId}` | 删除评论 |
+| `GET /api/comments/notes/{noteId}` | 查询笔记一级评论 |
+| `GET /api/comments/{rootCommentId}/replies` | 查询回复列表 |
+| `POST /api/comments/{commentId}/like` | 评论点赞 |
+| `DELETE /api/comments/{commentId}/like` | 取消评论点赞 |
+| `GET /api/comments/me` | 我的评论 |
+
+comment 内部接口：
+
+| 接口 | 说明 |
+|---|---|
+| `POST /internal/comments/batch-summary` | 批量评论摘要 |
+| `POST /internal/comments/counter-source` | 评论计数来源 |
+
 已接入能力：
 
 1. MinIO 预签名 PUT 上传。
@@ -149,8 +170,11 @@ note 内部接口：
 3. 笔记、媒体、版本、话题、幂等请求落库。
 4. 发布、删除写 note outbox。
 5. 笔记详情聚合作者、媒体、计数结构和 viewerAction。
+6. 评论、回复、删除、评论点赞落 MySQL。
+7. 评论发布/删除/点赞写 comment outbox。
+8. 评论列表聚合作者、正文、计数快照和 viewerAction。
 
-限制：点赞、收藏、评论的写接口和完整计数链路尚未实现。
+限制：笔记点赞、收藏写接口和完整 counter/feed/notification 链路尚未实现；comment outbox 目前只写库，尚未投递 MQ。
 
 ### 2.4 Social App
 
@@ -246,7 +270,7 @@ mvn -pl bluenote-gateway-app spring-boot:run
 | Gateway content URI | `http://127.0.0.1:8082` |
 | Gateway social URI | `http://127.0.0.1:8083` |
 
-注意：member/content/social 当前各自只配置一个 datasource URL，但 DDL 中按逻辑 schema 拆分为 `bluenote_auth`、`bluenote_user`、`bluenote_file`、`bluenote_note`、`bluenote_relation`。应用内 SQL 使用显式 schema 名访问本应用拥有的逻辑 schema。
+注意：member/content/social 当前各自只配置一个 datasource URL，但 DDL 中按逻辑 schema 拆分为 `bluenote_auth`、`bluenote_user`、`bluenote_file`、`bluenote_note`、`bluenote_comment`、`bluenote_relation`。应用内 SQL 使用显式 schema 名访问本应用拥有的逻辑 schema。
 
 ## 6. 检查入口
 
@@ -276,6 +300,6 @@ http://127.0.0.1:{port}/swagger-ui.html
 1. 补后端自动化测试和接口集成测试。
 2. 补 outbox dispatcher、RocketMQ 投递、消费幂等和重试闭环。
 3. 把用户主页头部计数接到 relation/counter。
-4. 补 comment/counter/feed/notification 第二条社交链路。
-5. 补点赞、收藏、评论写接口。
+4. 补 counter/feed/notification 第二条社交链路。
+5. 补笔记点赞、收藏写接口。
 6. 补生产部署、备份恢复、监控告警配置。

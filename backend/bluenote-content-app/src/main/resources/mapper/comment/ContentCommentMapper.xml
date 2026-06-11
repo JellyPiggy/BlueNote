@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.content.comment.infrastructure.mapper.ContentCommentMapper">
+
+    <resultMap id="ContentCommentResultMap" type="com.bluenote.content.comment.infrastructure.entity.ContentCommentEntity">
+        <id column="comment_id" property="commentId"/>
+        <result column="note_id" property="noteId"/>
+        <result column="note_author_id" property="noteAuthorId"/>
+        <result column="user_id" property="userId"/>
+        <result column="root_id" property="rootId"/>
+        <result column="parent_comment_id" property="parentCommentId"/>
+        <result column="reply_to_user_id" property="replyToUserId"/>
+        <result column="level" property="level"/>
+        <result column="comment_status" property="commentStatus"/>
+        <result column="like_count_snapshot" property="likeCountSnapshot"/>
+        <result column="reply_count_snapshot" property="replyCountSnapshot"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="ContentCommentColumns">
+        comment_id, note_id, note_author_id, user_id, root_id, parent_comment_id,
+        reply_to_user_id, level, comment_status, like_count_snapshot,
+        reply_count_snapshot, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.bluenote.content.comment.infrastructure.entity.ContentCommentEntity">
+        INSERT INTO bluenote_comment.content_comment (
+            comment_id, note_id, note_author_id, user_id, root_id, parent_comment_id,
+            reply_to_user_id, level, comment_status, like_count_snapshot,
+            reply_count_snapshot, created_at, updated_at
+        ) VALUES (
+            #{commentId}, #{noteId}, #{noteAuthorId}, #{userId}, #{rootId}, #{parentCommentId},
+            #{replyToUserId}, #{level}, #{commentStatus}, #{likeCountSnapshot},
+            #{replyCountSnapshot}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectByCommentId" resultMap="ContentCommentResultMap">
+        SELECT <include refid="ContentCommentColumns"/>
+        FROM bluenote_comment.content_comment
+        WHERE comment_id = #{commentId}
+    </select>
+
+    <select id="selectByCommentIds" resultMap="ContentCommentResultMap">
+        SELECT <include refid="ContentCommentColumns"/>
+        FROM bluenote_comment.content_comment
+        WHERE comment_id IN
+        <foreach collection="commentIds" item="commentId" open="(" separator="," close=")">
+            #{commentId}
+        </foreach>
+    </select>
+
+    <select id="selectRootPage" resultMap="ContentCommentResultMap">
+        SELECT <include refid="ContentCommentColumns"/>
+        FROM bluenote_comment.content_comment
+        WHERE note_id = #{noteId}
+          AND level = 1
+          AND comment_status = 'VISIBLE'
+        <if test="cursorCreatedAt != null and cursorCommentId != null">
+          <choose>
+            <when test="sort == 'TIME_ASC'">
+              AND (
+                created_at &gt; #{cursorCreatedAt}
+                OR (created_at = #{cursorCreatedAt} AND comment_id &gt; #{cursorCommentId})
+              )
+            </when>
+            <otherwise>
+              AND (
+                created_at &lt; #{cursorCreatedAt}
+                OR (created_at = #{cursorCreatedAt} AND comment_id &lt; #{cursorCommentId})
+              )
+            </otherwise>
+          </choose>
+        </if>
+        <choose>
+          <when test="sort == 'TIME_ASC'">
+            ORDER BY created_at ASC, comment_id ASC
+          </when>
+          <otherwise>
+            ORDER BY created_at DESC, comment_id DESC
+          </otherwise>
+        </choose>
+        LIMIT #{size}
+    </select>
+
+    <select id="selectReplyPage" resultMap="ContentCommentResultMap">
+        SELECT <include refid="ContentCommentColumns"/>
+        FROM bluenote_comment.content_comment
+        WHERE root_id = #{rootId}
+          AND level = 2
+          AND comment_status = 'VISIBLE'
+        <if test="cursorCreatedAt != null and cursorCommentId != null">
+          AND (
+            created_at &gt; #{cursorCreatedAt}
+            OR (created_at = #{cursorCreatedAt} AND comment_id &gt; #{cursorCommentId})
+          )
+        </if>
+        ORDER BY created_at ASC, comment_id ASC
+        LIMIT #{size}
+    </select>
+
+    <update id="markDeleted">
+        UPDATE bluenote_comment.content_comment
+        SET comment_status = 'DELETED',
+            updated_at = #{updatedAt}
+        WHERE comment_id = #{commentId}
+          AND comment_status = 'VISIBLE'
+    </update>
+
+    <update id="markDeletedByRoot">
+        UPDATE bluenote_comment.content_comment
+        SET comment_status = 'DELETED',
+            updated_at = #{updatedAt}
+        WHERE root_id = #{rootId}
+          AND comment_status = 'VISIBLE'
+    </update>
+
+    <update id="incrementReplySnapshot">
+        UPDATE bluenote_comment.content_comment
+        SET reply_count_snapshot = GREATEST(reply_count_snapshot + #{delta}, 0),
+            updated_at = #{updatedAt}
+        WHERE comment_id = #{rootId}
+    </update>
+
+    <update id="incrementLikeSnapshot">
+        UPDATE bluenote_comment.content_comment
+        SET like_count_snapshot = GREATEST(like_count_snapshot + #{delta}, 0),
+            updated_at = #{updatedAt}
+        WHERE comment_id = #{commentId}
+    </update>
+
+    <select id="countVisibleByNote" resultType="long">
+        SELECT COUNT(*)
+        FROM bluenote_comment.content_comment
+        WHERE note_id = #{noteId}
+          AND comment_status = 'VISIBLE'
+    </select>
+
+    <select id="countVisibleByRoot" resultType="long">
+        SELECT COUNT(*)
+        FROM bluenote_comment.content_comment
+        WHERE root_id = #{rootId}
+          AND comment_status = 'VISIBLE'
+    </select>
+
+    <select id="countVisibleReplies" resultType="long">
+        SELECT COUNT(*)
+        FROM bluenote_comment.content_comment
+        WHERE root_id = #{rootId}
+          AND level = 2
+          AND comment_status = 'VISIBLE'
+    </select>
+</mapper>

@@ -21,6 +21,7 @@ public class GatewayRouteConfiguration {
                 .route("member-user", route -> route.path("/api/users/**").uri(memberUri))
                 .route("content-file", route -> route.path("/api/files/**").uri(contentUri))
                 .route("content-note", route -> route.path("/api/notes/**").uri(contentUri))
+                .route("content-comment", route -> route.path("/api/comments/**").uri(contentUri))
                 .route("social-relation", route -> route.path("/api/relations/**").uri(socialUri))
                 .build();
     }
