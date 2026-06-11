@@ -1,7 +1,7 @@
 # 笔记 API 契约
 
-版本：v0.1  
-状态：第一条主链路开发基线
+版本：v0.2
+状态：第一、第二条主链路开发基线
 
 移动端通过网关访问 `/api/notes/**`。
 
@@ -527,7 +527,127 @@ POST /internal/notes/comment-check
 }
 ```
 
-## 16. 后端实现要求
+## 16. 内部接口：查询作者近期公开笔记
+
+```text
+POST /internal/notes/authors/recent
+```
+
+调用方：Feed 服务。
+
+用途：用户新关注作者、Feed 重建或大 V 拉模式时补充作者近期公开笔记。
+
+请求：
+
+```json
+{
+  "authorIds": ["10001", "10002"],
+  "limitPerAuthor": 20,
+  "publishedAfter": "2026-03-13T00:00:00+08:00"
+}
+```
+
+成功响应：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "authors": [
+      {
+        "authorId": "10001",
+        "notes": [
+          {
+            "noteId": "800001",
+            "title": "杭州周末咖啡店记录",
+            "contentPreview": "这家店的拿铁不错...",
+            "coverFileId": "900001",
+            "coverUrl": "https://oss.bluenote.example.com/...",
+            "noteStatus": "PUBLISHED",
+            "visibility": "PUBLIC",
+            "publishedAt": "2026-06-05T10:01:00+08:00"
+          }
+        ]
+      }
+    ]
+  },
+  "traceId": "trace-id"
+}
+```
+
+约束：
+
+1. 单次最多 50 个作者。
+2. `limitPerAuthor` 最大 50。
+3. 只返回 `visibility=PUBLIC` 且 `noteStatus=PUBLISHED` 的笔记。
+4. 返回顺序按 `publishedAt DESC, noteId DESC`。
+
+## 17. 内部接口：计数来源
+
+```text
+POST /internal/notes/counter-source
+```
+
+调用方：计数服务。
+
+请求：
+
+```json
+{
+  "targets": [
+    {
+      "targetType": "NOTE",
+      "targetId": "800001",
+      "fields": ["like_count", "collect_count"]
+    },
+    {
+      "targetType": "USER",
+      "targetId": "10001",
+      "fields": ["note_count", "liked_count"]
+    }
+  ]
+}
+```
+
+成功响应：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "items": [
+      {
+        "targetType": "NOTE",
+        "targetId": "800001",
+        "counts": {
+          "like_count": 12,
+          "collect_count": 3
+        }
+      },
+      {
+        "targetType": "USER",
+        "targetId": "10001",
+        "counts": {
+          "note_count": 18,
+          "liked_count": 1002
+        }
+      }
+    ]
+  },
+  "traceId": "trace-id"
+}
+```
+
+约束：
+
+1. 单次最多 100 个 target。
+2. `NOTE.like_count` 和 `NOTE.collect_count` 从点赞、收藏明细聚合。
+3. `USER.note_count` 只统计公开已发布笔记。
+4. `USER.liked_count` 统计用户公开作品累计获赞数。
+
+## 18. 后端实现要求
 
 1. 笔记发布、编辑、删除必须写 outbox 事件。
 2. 文件必须通过文件服务校验和绑定。
@@ -535,10 +655,9 @@ POST /internal/notes/comment-check
 4. Redis 只做缓存和限流，MySQL 是事实来源。
 5. 私密、删除、下架笔记不能通过列表或详情泄露给无权限用户。
 
-## 17. 移动端实现要求
+## 19. 移动端实现要求
 
 1. 发布、编辑、点赞、收藏按钮必须防重复点击。
 2. 发布失败要保留用户输入。
 3. 详情页处理笔记不可见、已删除、加载失败和降级状态。
 4. 列表统一使用游标分页。
-

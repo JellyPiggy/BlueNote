@@ -1,7 +1,7 @@
 # 第一条主链路数据库契约
 
-版本：v0.1  
-状态：第一条主链路开发基线
+版本：v0.2
+状态：第一、第二条主链路开发基线
 
 本文定义 auth、user、file、note 四个逻辑服务第一阶段必须落地的 schema、核心表、唯一约束和索引。本文不是最终可执行 SQL，后续 `backend/sql/` 的 DDL 必须以本文为基线生成。
 
@@ -488,10 +488,12 @@
 1. `NotePublished`
 2. `NoteUpdated`
 3. `NoteDeleted`
-4. `NoteLiked`
-5. `NoteUnliked`
-6. `NoteCollected`
-7. `NoteUncollected`
+4. `NoteVisibilityChanged`
+5. `NoteStatusChanged`
+6. `NoteLiked`
+7. `NoteUnliked`
+8. `NoteCollected`
+9. `NoteUncollected`
 
 索引：
 
@@ -510,4 +512,3 @@
 3. DDL 必须包含主键、唯一约束、必要索引。
 4. 不创建跨 schema 外键。
 5. 写接口幂等依赖的唯一约束必须在第一版 DDL 中落地。
-
