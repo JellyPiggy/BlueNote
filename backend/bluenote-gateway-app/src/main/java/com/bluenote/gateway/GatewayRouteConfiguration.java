@@ -13,13 +13,15 @@ public class GatewayRouteConfiguration {
     public RouteLocator bluenoteRoutes(
             RouteLocatorBuilder builder,
             @Value("${bluenote.routes.member-uri}") String memberUri,
-            @Value("${bluenote.routes.content-uri}") String contentUri
+            @Value("${bluenote.routes.content-uri}") String contentUri,
+            @Value("${bluenote.routes.social-uri}") String socialUri
     ) {
         return builder.routes()
                 .route("member-auth", route -> route.path("/api/auth/**").uri(memberUri))
                 .route("member-user", route -> route.path("/api/users/**").uri(memberUri))
                 .route("content-file", route -> route.path("/api/files/**").uri(contentUri))
                 .route("content-note", route -> route.path("/api/notes/**").uri(contentUri))
+                .route("social-relation", route -> route.path("/api/relations/**").uri(socialUri))
                 .build();
     }
 }

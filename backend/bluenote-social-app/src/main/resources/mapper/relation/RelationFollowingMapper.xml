@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.relation.infrastructure.mapper.RelationFollowingMapper">
+
+    <resultMap id="RelationFollowingResultMap" type="com.bluenote.social.relation.infrastructure.entity.RelationFollowingEntity">
+        <id column="id" property="id"/>
+        <result column="follower_id" property="followerId"/>
+        <result column="followee_id" property="followeeId"/>
+        <result column="relation_status" property="relationStatus"/>
+        <result column="followed_at" property="followedAt"/>
+        <result column="canceled_at" property="canceledAt"/>
+        <result column="relation_version" property="relationVersion"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="RelationFollowingColumns">
+        id, follower_id, followee_id, relation_status, followed_at, canceled_at,
+        relation_version, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.bluenote.social.relation.infrastructure.entity.RelationFollowingEntity">
+        INSERT INTO bluenote_relation.relation_following (
+            id, follower_id, followee_id, relation_status, followed_at, canceled_at,
+            relation_version, created_at, updated_at
+        ) VALUES (
+            #{id}, #{followerId}, #{followeeId}, #{relationStatus}, #{followedAt}, #{canceledAt},
+            #{relationVersion}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectByPair" resultMap="RelationFollowingResultMap">
+        SELECT <include refid="RelationFollowingColumns"/>
+        FROM bluenote_relation.relation_following
+        WHERE follower_id = #{followerId}
+          AND followee_id = #{followeeId}
+    </select>
+
+    <update id="activate">
+        UPDATE bluenote_relation.relation_following
+        SET relation_status = 'ACTIVE',
+            followed_at = #{followedAt},
+            canceled_at = NULL,
+            relation_version = #{relationVersion},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <update id="cancel">
+        UPDATE bluenote_relation.relation_following
+        SET relation_status = 'CANCELED',
+            canceled_at = #{canceledAt},
+            relation_version = #{relationVersion},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectFollowingPage" resultMap="RelationFollowingResultMap">
+        SELECT <include refid="RelationFollowingColumns"/>
+        FROM bluenote_relation.relation_following
+        WHERE follower_id = #{followerId}
+          AND relation_status = 'ACTIVE'
+        <if test="cursorFollowedAt != null and cursorFolloweeId != null">
+          AND (
+            followed_at &lt; #{cursorFollowedAt}
+            OR (followed_at = #{cursorFollowedAt} AND followee_id &lt; #{cursorFolloweeId})
+          )
+        </if>
+        ORDER BY followed_at DESC, followee_id DESC
+        LIMIT #{size}
+    </select>
+
+    <select id="selectActiveByTargets" resultMap="RelationFollowingResultMap">
+        SELECT <include refid="RelationFollowingColumns"/>
+        FROM bluenote_relation.relation_following
+        WHERE follower_id = #{followerId}
+          AND relation_status = 'ACTIVE'
+          AND followee_id IN
+        <foreach collection="targetUserIds" item="targetUserId" open="(" separator="," close=")">
+            #{targetUserId}
+        </foreach>
+    </select>
+
+    <select id="countActiveByFollower" resultType="long">
+        SELECT COUNT(*)
+        FROM bluenote_relation.relation_following
+        WHERE follower_id = #{followerId}
+          AND relation_status = 'ACTIVE'
+    </select>
+</mapper>

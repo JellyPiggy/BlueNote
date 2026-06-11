@@ -55,7 +55,7 @@ mvn -q -DskipTests compile
 
 ## 5. 启动后端应用
 
-建议开三个终端，按顺序启动：
+建议开四个终端，按顺序启动：
 
 ```bash
 cd backend
@@ -69,6 +69,11 @@ mvn -pl bluenote-content-app spring-boot:run
 
 ```bash
 cd backend
+mvn -pl bluenote-social-app spring-boot:run
+```
+
+```bash
+cd backend
 mvn -pl bluenote-gateway-app spring-boot:run
 ```
 
@@ -78,6 +83,7 @@ mvn -pl bluenote-gateway-app spring-boot:run
 |---|---:|
 | `bluenote-member-app` | 8081 |
 | `bluenote-content-app` | 8082 |
+| `bluenote-social-app` | 8083 |
 | `bluenote-gateway-app` | 8080 |
 
 健康检查：
@@ -85,6 +91,7 @@ mvn -pl bluenote-gateway-app spring-boot:run
 ```text
 http://127.0.0.1:8081/internal/member/probe
 http://127.0.0.1:8082/internal/content/probe
+http://127.0.0.1:8083/api/social/probe
 http://127.0.0.1:8080/internal/gateway/probe
 ```
 

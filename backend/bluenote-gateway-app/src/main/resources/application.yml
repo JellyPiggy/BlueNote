@@ -30,6 +30,7 @@ bluenote:
   routes:
     member-uri: ${BLUENOTE_MEMBER_URI:http://127.0.0.1:8081}
     content-uri: ${BLUENOTE_CONTENT_URI:http://127.0.0.1:8082}
+    social-uri: ${BLUENOTE_SOCIAL_URI:http://127.0.0.1:8083}
   security:
     access-token:
       secret: ${BLUENOTE_ACCESS_TOKEN_SECRET:bluenote-local-access-token-secret-change-me-32chars}

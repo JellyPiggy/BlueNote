@@ -18,6 +18,7 @@
         <module>bluenote-gateway-app</module>
         <module>bluenote-member-app</module>
         <module>bluenote-content-app</module>
+        <module>bluenote-social-app</module>
     </modules>
 
     <properties>
