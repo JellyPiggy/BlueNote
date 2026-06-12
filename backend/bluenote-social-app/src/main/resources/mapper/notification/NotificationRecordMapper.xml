@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.notification.infrastructure.mapper.NotificationRecordMapper">
+
+    <resultMap id="NotificationRecordResultMap" type="com.bluenote.social.notification.infrastructure.entity.NotificationRecordEntity">
+        <id column="notification_id" property="notificationId"/>
+        <result column="receiver_id" property="receiverId"/>
+        <result column="actor_id" property="actorId"/>
+        <result column="category" property="category"/>
+        <result column="notification_type" property="notificationType"/>
+        <result column="target_type" property="targetType"/>
+        <result column="target_id" property="targetId"/>
+        <result column="source_type" property="sourceType"/>
+        <result column="source_id" property="sourceId"/>
+        <result column="aggregate" property="aggregate"/>
+        <result column="aggregate_key" property="aggregateKey"/>
+        <result column="aggregate_unread_key" property="aggregateUnreadKey"/>
+        <result column="actor_count" property="actorCount"/>
+        <result column="title" property="title"/>
+        <result column="content" property="content"/>
+        <result column="snapshot_json" property="snapshotJson"/>
+        <result column="jump_json" property="jumpJson"/>
+        <result column="read_status" property="readStatus"/>
+        <result column="visible_status" property="visibleStatus"/>
+        <result column="last_event_at" property="lastEventAt"/>
+        <result column="read_at" property="readAt"/>
+        <result column="expire_at" property="expireAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="NotificationRecordColumns">
+        notification_id, receiver_id, actor_id, category, notification_type, target_type, target_id,
+        source_type, source_id, aggregate, aggregate_key, aggregate_unread_key, actor_count, title,
+        content, snapshot_json, jump_json, read_status, visible_status, last_event_at, read_at,
+        expire_at, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.bluenote.social.notification.infrastructure.entity.NotificationRecordEntity">
+        INSERT INTO bluenote_notification.notification_record (
+            notification_id, receiver_id, actor_id, category, notification_type, target_type, target_id,
+            source_type, source_id, aggregate, aggregate_key, aggregate_unread_key, actor_count, title,
+            content, snapshot_json, jump_json, read_status, visible_status, last_event_at, read_at,
+            expire_at, created_at, updated_at
+        ) VALUES (
+            #{notificationId}, #{receiverId}, #{actorId}, #{category}, #{notificationType}, #{targetType}, #{targetId},
+            #{sourceType}, #{sourceId}, #{aggregate}, #{aggregateKey}, #{aggregateUnreadKey}, #{actorCount}, #{title},
+            #{content}, #{snapshotJson}, #{jumpJson}, #{readStatus}, #{visibleStatus}, #{lastEventAt}, #{readAt},
+            #{expireAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="NotificationRecordResultMap">
+        SELECT <include refid="NotificationRecordColumns"/>
+        FROM bluenote_notification.notification_record
+        WHERE notification_id = #{notificationId}
+    </select>
+
+    <select id="selectUnreadAggregate" resultMap="NotificationRecordResultMap">
+        SELECT <include refid="NotificationRecordColumns"/>
+        FROM bluenote_notification.notification_record
+        WHERE receiver_id = #{receiverId}
+          AND aggregate_unread_key = #{aggregateUnreadKey}
+          AND read_status = 0
+          AND visible_status = 1
+        LIMIT 1
+    </select>
+
+    <select id="selectByReceiverSource" resultMap="NotificationRecordResultMap">
+        SELECT <include refid="NotificationRecordColumns"/>
+        FROM bluenote_notification.notification_record
+        WHERE receiver_id = #{receiverId}
+          AND source_type = #{sourceType}
+          AND source_id = #{sourceId}
+          AND notification_type = #{notificationType}
+        ORDER BY created_at DESC, notification_id DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectPage" resultMap="NotificationRecordResultMap">
+        SELECT <include refid="NotificationRecordColumns"/>
+        FROM bluenote_notification.notification_record
+        WHERE receiver_id = #{receiverId}
+          AND visible_status = 1
+        <if test="category != null and category != ''">
+          AND category = #{category}
+        </if>
+        <if test="cursorLastEventAt != null and cursorNotificationId != null">
+          AND (
+            last_event_at &lt; #{cursorLastEventAt}
+            OR (last_event_at = #{cursorLastEventAt} AND notification_id &lt; #{cursorNotificationId})
+          )
+        </if>
+        ORDER BY last_event_at DESC, notification_id DESC
+        LIMIT #{size}
+    </select>
+
+    <select id="selectByIds" resultMap="NotificationRecordResultMap">
+        SELECT <include refid="NotificationRecordColumns"/>
+        FROM bluenote_notification.notification_record
+        WHERE receiver_id = #{receiverId}
+          AND notification_id IN
+        <foreach collection="notificationIds" item="notificationId" open="(" separator="," close=")">
+            #{notificationId}
+        </foreach>
+    </select>
+
+    <update id="markRead">
+        UPDATE bluenote_notification.notification_record
+        SET read_status = 1,
+            aggregate_unread_key = NULL,
+            read_at = #{readAt},
+            updated_at = #{readAt}
+        WHERE notification_id = #{notificationId}
+          AND receiver_id = #{receiverId}
+          AND read_status = 0
+          AND visible_status = 1
+    </update>
+
+    <update id="markReadAll">
+        UPDATE bluenote_notification.notification_record
+        SET read_status = 1,
+            aggregate_unread_key = NULL,
+            read_at = #{readAt},
+            updated_at = #{readAt}
+        WHERE receiver_id = #{receiverId}
+          AND read_status = 0
+          AND visible_status = 1
+        <if test="category != null and category != ''">
+          AND category = #{category}
+        </if>
+    </update>
+
+    <update id="markDeleted">
+        UPDATE bluenote_notification.notification_record
+        SET visible_status = 2,
+            aggregate_unread_key = NULL,
+            updated_at = #{updatedAt}
+        WHERE notification_id = #{notificationId}
+          AND receiver_id = #{receiverId}
+          AND visible_status = 1
+    </update>
+
+    <update id="markDeletedBatch">
+        UPDATE bluenote_notification.notification_record
+        SET visible_status = 2,
+            aggregate_unread_key = NULL,
+            updated_at = #{updatedAt}
+        WHERE receiver_id = #{receiverId}
+          AND visible_status = 1
+          AND notification_id IN
+        <foreach collection="notificationIds" item="notificationId" open="(" separator="," close=")">
+            #{notificationId}
+        </foreach>
+    </update>
+
+    <update id="updateAggregate" parameterType="com.bluenote.social.notification.infrastructure.entity.NotificationRecordEntity">
+        UPDATE bluenote_notification.notification_record
+        SET actor_id = #{actorId},
+            actor_count = #{actorCount},
+            title = #{title},
+            content = #{content},
+            snapshot_json = #{snapshotJson},
+            jump_json = #{jumpJson},
+            last_event_at = #{lastEventAt},
+            updated_at = #{updatedAt}
+        WHERE notification_id = #{notificationId}
+          AND receiver_id = #{receiverId}
+          AND read_status = 0
+          AND visible_status = 1
+    </update>
+
+    <select id="countUnreadByCategory" resultType="long">
+        SELECT COUNT(1)
+        FROM bluenote_notification.notification_record
+        WHERE receiver_id = #{receiverId}
+          AND category = #{category}
+          AND read_status = 0
+          AND visible_status = 1
+    </select>
+</mapper>

@@ -365,6 +365,7 @@ Feed 服务的笔记轻量索引。
 | `PRIMARY KEY(notification_id)` | 主键 |
 | `idx_notify_receiver_category_time(receiver_id, category, visible_status, last_event_at, notification_id)` | 通知列表 |
 | `uk_notify_aggregate_unread(receiver_id, aggregate_unread_key)` | 未读聚合通知唯一，`aggregate_unread_key` 为空时不冲突 |
+| `idx_notify_receiver_source(receiver_id, source_type, source_id, notification_type)` | 系统通知和业务来源幂等查询 |
 | `idx_notify_expire(expire_at, visible_status)` | 归档清理 |
 
 ### 7.2 notification_aggregate_actor
@@ -393,6 +394,8 @@ Feed 服务的笔记轻量索引。
 4. `NotificationReadBatch`
 5. `NotificationDeleted`
 6. `PushSendRequested`
+
+`notification_consume_record` 除通用消费幂等字段外，允许保存 `envelope_json` 原始事件快照，用于内部事件重放和排障。
 
 索引同通用 outbox 和消费记录要求。
 
