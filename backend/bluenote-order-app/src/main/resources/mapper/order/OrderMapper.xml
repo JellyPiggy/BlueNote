@@ -1,0 +1,466 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.order.infrastructure.mapper.OrderMapper">
+
+    <resultMap id="TemplateMap" type="com.bluenote.order.infrastructure.entity.OrderEntities$CouponTemplate">
+        <id column="template_id" property="templateId"/>
+        <result column="template_name" property="templateName"/>
+        <result column="face_value" property="faceValue"/>
+        <result column="threshold_amount" property="thresholdAmount"/>
+        <result column="valid_days" property="validDays"/>
+        <result column="cover_url" property="coverUrl"/>
+        <result column="description" property="description"/>
+        <result column="template_status" property="templateStatus"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <resultMap id="ActivityMap" type="com.bluenote.order.infrastructure.entity.OrderEntities$CouponActivity">
+        <id column="activity_id" property="activityId"/>
+        <result column="template_id" property="templateId"/>
+        <result column="activity_name" property="activityName"/>
+        <result column="total_stock" property="totalStock"/>
+        <result column="available_stock" property="availableStock"/>
+        <result column="locked_stock" property="lockedStock"/>
+        <result column="sold_stock" property="soldStock"/>
+        <result column="per_user_limit" property="perUserLimit"/>
+        <result column="pay_amount" property="payAmount"/>
+        <result column="activity_status" property="activityStatus"/>
+        <result column="start_at" property="startAt"/>
+        <result column="end_at" property="endAt"/>
+        <result column="pay_timeout_minutes" property="payTimeoutMinutes"/>
+        <result column="preheated_at" property="preheatedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="version" property="version"/>
+    </resultMap>
+
+    <resultMap id="RequestMap" type="com.bluenote.order.infrastructure.entity.OrderEntities$SeckillRequest">
+        <id column="request_id" property="requestId"/>
+        <result column="client_request_id" property="clientRequestId"/>
+        <result column="user_id" property="userId"/>
+        <result column="activity_id" property="activityId"/>
+        <result column="order_id" property="orderId"/>
+        <result column="user_coupon_id" property="userCouponId"/>
+        <result column="request_status" property="requestStatus"/>
+        <result column="result_message" property="resultMessage"/>
+        <result column="pay_required" property="payRequired"/>
+        <result column="pay_amount" property="payAmount"/>
+        <result column="expire_at" property="expireAt"/>
+        <result column="requested_at" property="requestedAt"/>
+        <result column="completed_at" property="completedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <resultMap id="OrderMap" type="com.bluenote.order.infrastructure.entity.OrderEntities$VoucherOrder">
+        <id column="order_id" property="orderId"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="request_id" property="requestId"/>
+        <result column="user_id" property="userId"/>
+        <result column="activity_id" property="activityId"/>
+        <result column="template_id" property="templateId"/>
+        <result column="pay_amount" property="payAmount"/>
+        <result column="order_status" property="orderStatus"/>
+        <result column="expire_at" property="expireAt"/>
+        <result column="paid_at" property="paidAt"/>
+        <result column="success_at" property="successAt"/>
+        <result column="closed_at" property="closedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="version" property="version"/>
+    </resultMap>
+
+    <resultMap id="CouponMap" type="com.bluenote.order.infrastructure.entity.OrderEntities$UserCoupon">
+        <id column="user_coupon_id" property="userCouponId"/>
+        <result column="user_id" property="userId"/>
+        <result column="template_id" property="templateId"/>
+        <result column="activity_id" property="activityId"/>
+        <result column="source_order_id" property="sourceOrderId"/>
+        <result column="coupon_status" property="couponStatus"/>
+        <result column="face_value" property="faceValue"/>
+        <result column="threshold_amount" property="thresholdAmount"/>
+        <result column="valid_start_at" property="validStartAt"/>
+        <result column="valid_end_at" property="validEndAt"/>
+        <result column="issued_at" property="issuedAt"/>
+        <result column="used_at" property="usedAt"/>
+        <result column="expired_at" property="expiredAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="template_name" property="templateName"/>
+        <result column="activity_name" property="activityName"/>
+    </resultMap>
+
+    <resultMap id="TimeoutTaskMap" type="com.bluenote.order.infrastructure.entity.OrderEntities$OrderTimeoutTask">
+        <id column="task_id" property="taskId"/>
+        <result column="order_id" property="orderId"/>
+        <result column="activity_id" property="activityId"/>
+        <result column="user_id" property="userId"/>
+        <result column="expire_at" property="expireAt"/>
+        <result column="task_status" property="taskStatus"/>
+        <result column="executed_at" property="executedAt"/>
+        <result column="error_message" property="errorMessage"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <resultMap id="ConsumeMap" type="com.bluenote.order.infrastructure.entity.OrderEntities$OrderConsumeRecord">
+        <id column="id" property="id"/>
+        <result column="consumer_group" property="consumerGroup"/>
+        <result column="event_id" property="eventId"/>
+        <result column="topic" property="topic"/>
+        <result column="event_type" property="eventType"/>
+        <result column="biz_key" property="bizKey"/>
+        <result column="envelope_json" property="envelopeJson"/>
+        <result column="consume_status" property="consumeStatus"/>
+        <result column="retry_count" property="retryCount"/>
+        <result column="error_message" property="errorMessage"/>
+        <result column="consumed_at" property="consumedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="TemplateColumns">
+        template_id, template_name, face_value, threshold_amount, valid_days, cover_url,
+        description, template_status, created_at, updated_at
+    </sql>
+
+    <sql id="ActivityColumns">
+        activity_id, template_id, activity_name, total_stock, available_stock, locked_stock,
+        sold_stock, per_user_limit, pay_amount, activity_status, start_at, end_at,
+        pay_timeout_minutes, preheated_at, created_at, updated_at, version
+    </sql>
+
+    <sql id="RequestColumns">
+        request_id, client_request_id, user_id, activity_id, order_id, user_coupon_id,
+        request_status, result_message, pay_required, pay_amount, expire_at, requested_at,
+        completed_at, created_at, updated_at
+    </sql>
+
+    <sql id="OrderColumns">
+        order_id, order_no, request_id, user_id, activity_id, template_id, pay_amount,
+        order_status, expire_at, paid_at, success_at, closed_at, created_at, updated_at, version
+    </sql>
+
+    <insert id="insertTemplate" parameterType="com.bluenote.order.infrastructure.entity.OrderEntities$CouponTemplate">
+        INSERT INTO bluenote_order.coupon_template (
+            template_id, template_name, face_value, threshold_amount, valid_days, cover_url,
+            description, template_status, created_at, updated_at
+        ) VALUES (
+            #{templateId}, #{templateName}, #{faceValue}, #{thresholdAmount}, #{validDays}, #{coverUrl},
+            #{description}, #{templateStatus}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <insert id="insertActivity" parameterType="com.bluenote.order.infrastructure.entity.OrderEntities$CouponActivity">
+        INSERT INTO bluenote_order.coupon_activity (
+            activity_id, template_id, activity_name, total_stock, available_stock, locked_stock,
+            sold_stock, per_user_limit, pay_amount, activity_status, start_at, end_at,
+            pay_timeout_minutes, preheated_at, created_at, updated_at, version
+        ) VALUES (
+            #{activityId}, #{templateId}, #{activityName}, #{totalStock}, #{availableStock}, #{lockedStock},
+            #{soldStock}, #{perUserLimit}, #{payAmount}, #{activityStatus}, #{startAt}, #{endAt},
+            #{payTimeoutMinutes}, #{preheatedAt}, #{createdAt}, #{updatedAt}, #{version}
+        )
+    </insert>
+
+    <select id="selectTemplateById" resultMap="TemplateMap">
+        SELECT <include refid="TemplateColumns"/>
+        FROM bluenote_order.coupon_template
+        WHERE template_id = #{templateId}
+    </select>
+
+    <select id="selectCurrentActivity" resultMap="ActivityMap">
+        SELECT <include refid="ActivityColumns"/>
+        FROM bluenote_order.coupon_activity
+        WHERE activity_status IN ('PREHEATED', 'ONLINE', 'SOLD_OUT', 'PAUSED')
+          AND end_at >= #{now}
+        ORDER BY start_at ASC, activity_id ASC
+        LIMIT 1
+    </select>
+
+    <select id="selectActivityById" resultMap="ActivityMap">
+        SELECT <include refid="ActivityColumns"/>
+        FROM bluenote_order.coupon_activity
+        WHERE activity_id = #{activityId}
+    </select>
+
+    <select id="selectActivityByIdForUpdate" resultMap="ActivityMap">
+        SELECT <include refid="ActivityColumns"/>
+        FROM bluenote_order.coupon_activity
+        WHERE activity_id = #{activityId}
+        FOR UPDATE
+    </select>
+
+    <update id="updateActivityStatus">
+        UPDATE bluenote_order.coupon_activity
+        SET activity_status = #{status},
+            updated_at = #{updatedAt},
+            version = version + 1
+        WHERE activity_id = #{activityId}
+    </update>
+
+    <update id="markActivityPreheated">
+        UPDATE bluenote_order.coupon_activity
+        SET activity_status = 'PREHEATED',
+            preheated_at = #{preheatedAt},
+            updated_at = #{preheatedAt},
+            version = version + 1
+        WHERE activity_id = #{activityId}
+          AND activity_status IN ('READY', 'PREHEATED', 'ONLINE')
+    </update>
+
+    <update id="deductActivityStock">
+        UPDATE bluenote_order.coupon_activity
+        SET available_stock = available_stock - 1,
+            sold_stock = sold_stock + 1,
+            updated_at = #{updatedAt},
+            version = version + 1
+        WHERE activity_id = #{activityId}
+          AND available_stock > 0
+    </update>
+
+    <update id="replenishActivityStock">
+        UPDATE bluenote_order.coupon_activity
+        SET available_stock = available_stock + 1,
+            sold_stock = CASE WHEN sold_stock > 0 THEN sold_stock - 1 ELSE 0 END,
+            activity_status = CASE WHEN activity_status = 'SOLD_OUT' THEN 'PREHEATED' ELSE activity_status END,
+            updated_at = #{updatedAt},
+            version = version + 1
+        WHERE activity_id = #{activityId}
+    </update>
+
+    <update id="markActivitySoldOut">
+        UPDATE bluenote_order.coupon_activity
+        SET activity_status = 'SOLD_OUT',
+            updated_at = #{updatedAt},
+            version = version + 1
+        WHERE activity_id = #{activityId}
+    </update>
+
+    <insert id="insertSeckillRequest" parameterType="com.bluenote.order.infrastructure.entity.OrderEntities$SeckillRequest">
+        INSERT INTO bluenote_order.coupon_seckill_request (
+            request_id, client_request_id, user_id, activity_id, order_id, user_coupon_id,
+            request_status, result_message, pay_required, pay_amount, expire_at, requested_at,
+            completed_at, created_at, updated_at
+        ) VALUES (
+            #{requestId}, #{clientRequestId}, #{userId}, #{activityId}, #{orderId}, #{userCouponId},
+            #{requestStatus}, #{resultMessage}, #{payRequired}, #{payAmount}, #{expireAt}, #{requestedAt},
+            #{completedAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectRequestByUserClient" resultMap="RequestMap">
+        SELECT <include refid="RequestColumns"/>
+        FROM bluenote_order.coupon_seckill_request
+        WHERE user_id = #{userId}
+          AND client_request_id = #{clientRequestId}
+    </select>
+
+    <select id="selectRequestByUserActivity" resultMap="RequestMap">
+        SELECT <include refid="RequestColumns"/>
+        FROM bluenote_order.coupon_seckill_request
+        WHERE user_id = #{userId}
+          AND activity_id = #{activityId}
+    </select>
+
+    <select id="selectRequestById" resultMap="RequestMap">
+        SELECT <include refid="RequestColumns"/>
+        FROM bluenote_order.coupon_seckill_request
+        WHERE request_id = #{requestId}
+    </select>
+
+    <select id="selectRequestByIdForUpdate" resultMap="RequestMap">
+        SELECT <include refid="RequestColumns"/>
+        FROM bluenote_order.coupon_seckill_request
+        WHERE request_id = #{requestId}
+        FOR UPDATE
+    </select>
+
+    <update id="updateRequestResult">
+        UPDATE bluenote_order.coupon_seckill_request
+        SET request_status = #{status},
+            order_id = #{orderId},
+            user_coupon_id = #{userCouponId},
+            pay_required = #{payRequired},
+            pay_amount = #{payAmount},
+            expire_at = #{expireAt},
+            result_message = #{message},
+            completed_at = #{completedAt},
+            updated_at = #{updatedAt}
+        WHERE request_id = #{requestId}
+    </update>
+
+    <insert id="insertOrder" parameterType="com.bluenote.order.infrastructure.entity.OrderEntities$VoucherOrder">
+        INSERT INTO bluenote_order.voucher_order (
+            order_id, order_no, request_id, user_id, activity_id, template_id, pay_amount,
+            order_status, expire_at, paid_at, success_at, closed_at, created_at, updated_at, version
+        ) VALUES (
+            #{orderId}, #{orderNo}, #{requestId}, #{userId}, #{activityId}, #{templateId}, #{payAmount},
+            #{orderStatus}, #{expireAt}, #{paidAt}, #{successAt}, #{closedAt}, #{createdAt}, #{updatedAt}, #{version}
+        )
+    </insert>
+
+    <select id="selectOrderById" resultMap="OrderMap">
+        SELECT <include refid="OrderColumns"/>
+        FROM bluenote_order.voucher_order
+        WHERE order_id = #{orderId}
+    </select>
+
+    <select id="selectOrderByIdForUpdate" resultMap="OrderMap">
+        SELECT <include refid="OrderColumns"/>
+        FROM bluenote_order.voucher_order
+        WHERE order_id = #{orderId}
+        FOR UPDATE
+    </select>
+
+    <select id="selectOrderByUserActivity" resultMap="OrderMap">
+        SELECT <include refid="OrderColumns"/>
+        FROM bluenote_order.voucher_order
+        WHERE user_id = #{userId}
+          AND activity_id = #{activityId}
+    </select>
+
+    <update id="updateOrderStatusCas">
+        UPDATE bluenote_order.voucher_order
+        SET order_status = #{toStatus},
+            paid_at = #{paidAt},
+            success_at = #{successAt},
+            closed_at = #{closedAt},
+            updated_at = #{updatedAt},
+            version = version + 1
+        WHERE order_id = #{orderId}
+          AND order_status = #{fromStatus}
+    </update>
+
+    <insert id="insertPayment" parameterType="com.bluenote.order.infrastructure.entity.OrderEntities$PaymentRecord">
+        INSERT INTO bluenote_order.payment_record (
+            payment_id, order_id, order_no, channel, channel_trade_no, pay_amount,
+            payment_status, paid_at, raw_payload_json, created_at, updated_at
+        ) VALUES (
+            #{paymentId}, #{orderId}, #{orderNo}, #{channel}, #{channelTradeNo}, #{payAmount},
+            #{paymentStatus}, #{paidAt}, #{rawPayloadJson}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <insert id="insertUserCoupon" parameterType="com.bluenote.order.infrastructure.entity.OrderEntities$UserCoupon">
+        INSERT INTO bluenote_order.user_coupon (
+            user_coupon_id, user_id, template_id, activity_id, source_order_id, coupon_status,
+            face_value, threshold_amount, valid_start_at, valid_end_at, issued_at,
+            used_at, expired_at, created_at, updated_at
+        ) VALUES (
+            #{userCouponId}, #{userId}, #{templateId}, #{activityId}, #{sourceOrderId}, #{couponStatus},
+            #{faceValue}, #{thresholdAmount}, #{validStartAt}, #{validEndAt}, #{issuedAt},
+            #{usedAt}, #{expiredAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectCouponBySourceOrder" resultMap="CouponMap">
+        SELECT uc.*, ct.template_name, ca.activity_name
+        FROM bluenote_order.user_coupon uc
+        JOIN bluenote_order.coupon_template ct ON ct.template_id = uc.template_id
+        JOIN bluenote_order.coupon_activity ca ON ca.activity_id = uc.activity_id
+        WHERE uc.source_order_id = #{sourceOrderId}
+    </select>
+
+    <select id="selectUserCoupons" resultMap="CouponMap">
+        SELECT uc.*, ct.template_name, ca.activity_name
+        FROM bluenote_order.user_coupon uc
+        JOIN bluenote_order.coupon_template ct ON ct.template_id = uc.template_id
+        JOIN bluenote_order.coupon_activity ca ON ca.activity_id = uc.activity_id
+        WHERE uc.user_id = #{userId}
+        <if test="status != null and status != ''">
+          AND uc.coupon_status = #{status}
+        </if>
+        <if test="cursorIssuedAt != null and cursorId != null">
+          AND (uc.issued_at &lt; #{cursorIssuedAt}
+               OR (uc.issued_at = #{cursorIssuedAt} AND uc.user_coupon_id &lt; #{cursorId}))
+        </if>
+        ORDER BY uc.issued_at DESC, uc.user_coupon_id DESC
+        LIMIT #{limit}
+    </select>
+
+    <insert id="insertStockLog">
+        INSERT INTO bluenote_order.coupon_stock_log (
+            id, activity_id, order_id, request_id, change_type, change_amount,
+            before_stock, after_stock, created_at
+        ) VALUES (
+            #{id}, #{activityId}, #{orderId}, #{requestId}, #{changeType}, #{changeAmount},
+            NULL, NULL, #{createdAt}
+        )
+    </insert>
+
+    <insert id="insertStatusLog">
+        INSERT INTO bluenote_order.order_status_log (
+            id, order_id, from_status, to_status, reason, operator_type, operator_id, created_at
+        ) VALUES (
+            #{id}, #{orderId}, #{fromStatus}, #{toStatus}, #{reason}, #{operatorType}, #{operatorId}, #{createdAt}
+        )
+    </insert>
+
+    <insert id="insertTimeoutTask" parameterType="com.bluenote.order.infrastructure.entity.OrderEntities$OrderTimeoutTask">
+        INSERT INTO bluenote_order.order_timeout_task (
+            task_id, order_id, activity_id, user_id, expire_at, task_status,
+            executed_at, error_message, created_at, updated_at
+        ) VALUES (
+            #{taskId}, #{orderId}, #{activityId}, #{userId}, #{expireAt}, #{taskStatus},
+            #{executedAt}, #{errorMessage}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectDueTimeoutTasks" resultMap="TimeoutTaskMap">
+        SELECT task_id, order_id, activity_id, user_id, expire_at, task_status,
+               executed_at, error_message, created_at, updated_at
+        FROM bluenote_order.order_timeout_task
+        WHERE task_status = 'PENDING'
+          AND expire_at &lt;= #{now}
+        ORDER BY expire_at ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="updateTimeoutTaskStatus">
+        UPDATE bluenote_order.order_timeout_task
+        SET task_status = #{status},
+            executed_at = #{executedAt},
+            error_message = #{errorMessage},
+            updated_at = #{updatedAt}
+        WHERE order_id = #{orderId}
+    </update>
+
+    <select id="selectConsumeRecord" resultMap="ConsumeMap">
+        SELECT id, consumer_group, event_id, topic, event_type, biz_key, envelope_json,
+               consume_status, retry_count, error_message, consumed_at, created_at, updated_at
+        FROM bluenote_order.order_consume_record
+        WHERE consumer_group = #{consumerGroup}
+          AND event_id = #{eventId}
+    </select>
+
+    <insert id="insertConsumeRecord" parameterType="com.bluenote.order.infrastructure.entity.OrderEntities$OrderConsumeRecord">
+        INSERT INTO bluenote_order.order_consume_record (
+            id, consumer_group, event_id, topic, event_type, biz_key, envelope_json,
+            consume_status, retry_count, error_message, consumed_at, created_at, updated_at
+        ) VALUES (
+            #{id}, #{consumerGroup}, #{eventId}, #{topic}, #{eventType}, #{bizKey}, #{envelopeJson},
+            #{consumeStatus}, #{retryCount}, #{errorMessage}, #{consumedAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <update id="updateConsumeRecordSuccess">
+        UPDATE bluenote_order.order_consume_record
+        SET consume_status = 'SUCCESS',
+            consumed_at = #{consumedAt},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <insert id="insertOutbox" parameterType="com.bluenote.order.infrastructure.entity.OrderEntities$OrderOutboxEvent">
+        INSERT INTO bluenote_order.order_outbox_event (
+            event_id, event_type, aggregate_id, payload, send_status, retry_count,
+            next_retry_at, created_at, updated_at
+        ) VALUES (
+            #{eventId}, #{eventType}, #{aggregateId}, #{payload}, #{sendStatus}, #{retryCount},
+            #{nextRetryAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+</mapper>

@@ -15,7 +15,8 @@ public class GatewayRouteConfiguration {
             @Value("${bluenote.routes.member-uri}") String memberUri,
             @Value("${bluenote.routes.content-uri}") String contentUri,
             @Value("${bluenote.routes.social-uri}") String socialUri,
-            @Value("${bluenote.routes.social-ws-uri}") String socialWsUri
+            @Value("${bluenote.routes.social-ws-uri}") String socialWsUri,
+            @Value("${bluenote.routes.order-uri}") String orderUri
     ) {
         return builder.routes()
                 .route("member-auth", route -> route.path("/api/auth/**").uri(memberUri))
@@ -29,6 +30,7 @@ public class GatewayRouteConfiguration {
                 .route("social-push", route -> route.path("/api/push/**").uri(socialUri))
                 .route("social-im", route -> route.path("/api/im/**").uri(socialUri))
                 .route("social-realtime", route -> route.path("/ws/realtime").uri(socialWsUri))
+                .route("order-api", route -> route.path("/api/order/**").uri(orderUri))
                 .build();
     }
 }

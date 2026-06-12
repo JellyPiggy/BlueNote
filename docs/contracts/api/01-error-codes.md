@@ -19,7 +19,7 @@
 | `27xxx` | Feed / 排行错误 |
 | `28xxx` | 推送 / 通知错误 |
 | `29xxx` | IM 错误 |
-| `30xxx` | 订单错误，后续补充 |
+| `30xxx` | 订单错误 |
 
 ## 2. 通用错误码
 
@@ -189,7 +189,27 @@
 | `29009` | `IM_RATE_LIMITED` | 发送太频繁，请稍后再试 | toast，发送按钮短暂禁用 |
 | `29010` | `IM_SEND_FORBIDDEN` | 暂时无法发送私信 | toast |
 
-## 13. 新增错误码规则
+## 13. 订单服务错误码
+
+| code | reason | message | 移动端处理 |
+|---|---|---|---|
+| `30001` | `ORDER_ACTIVITY_NOT_FOUND` | 活动不存在 | 刷新神券页或空态 |
+| `30002` | `ORDER_ACTIVITY_STATUS_INVALID` | 活动状态暂不可参与 | 刷新活动状态 |
+| `30003` | `ORDER_SECKILL_TOKEN_INVALID` | 抢券凭证已失效，请刷新后重试 | 重新获取 token 后重试 |
+| `30004` | `ORDER_STOCK_NOT_ENOUGH` | 神券已抢光 | 展示售罄状态 |
+| `30005` | `ORDER_DUPLICATE_REQUEST` | 你已参与本次活动 | 查询已有抢券结果 |
+| `30006` | `ORDER_REQUEST_NOT_FOUND` | 抢券请求不存在 | 停止轮询并提示刷新 |
+| `30007` | `ORDER_NOT_FOUND` | 订单不存在 | 刷新订单状态 |
+| `30008` | `ORDER_OWNER_FORBIDDEN` | 无权操作该订单 | toast 并返回 |
+| `30009` | `ORDER_STATUS_INVALID` | 订单状态不允许当前操作 | 刷新订单详情 |
+| `30010` | `ORDER_PAYMENT_INVALID` | 支付请求不正确 | 停止支付并提示 |
+| `30011` | `ORDER_COUPON_NOT_FOUND` | 神券不存在 | 刷新卡包 |
+| `30012` | `ORDER_CURSOR_INVALID` | 分页游标不正确 | 重新刷新卡包 |
+| `30013` | `ORDER_RATE_LIMITED` | 操作太频繁，请稍后再试 | toast，按钮短暂禁用 |
+| `30014` | `ORDER_ACTIVITY_REBUILDING` | 活动库存正在恢复，请稍后再试 | 稍后重试 |
+| `30015` | `ORDER_ACTIVITY_NOT_PREHEATED` | 活动准备中，请稍后再试 | 稍后刷新活动 |
+
+## 14. 新增错误码规则
 
 新增错误码必须：
 

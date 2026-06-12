@@ -32,6 +32,7 @@ bluenote:
     content-uri: ${BLUENOTE_CONTENT_URI:http://127.0.0.1:8082}
     social-uri: ${BLUENOTE_SOCIAL_URI:http://127.0.0.1:8083}
     social-ws-uri: ${BLUENOTE_SOCIAL_WS_URI:ws://127.0.0.1:8083}
+    order-uri: ${BLUENOTE_ORDER_URI:http://127.0.0.1:8084}
   security:
     access-token:
       secret: ${BLUENOTE_ACCESS_TOKEN_SECRET:bluenote-local-access-token-secret-change-me-32chars}

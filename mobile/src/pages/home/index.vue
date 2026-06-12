@@ -72,6 +72,14 @@ function openNotifications() {
   }
   uni.navigateTo({ url: '/pages/notifications/index' })
 }
+
+function openOrderActivity() {
+  if (!auth.isAuthenticated) {
+    goLogin()
+    return
+  }
+  uni.navigateTo({ url: '/pages/order/activity' })
+}
 </script>
 
 <template>
@@ -86,6 +94,7 @@ function openNotifications() {
         <text class="message-icon">◌</text>
         <text v-if="notifications.badgeText" class="message-badge">{{ notifications.badgeText }}</text>
       </button>
+      <button class="coupon-button" @tap="openOrderActivity">券</button>
       <button class="new-button" @tap="goPublish">+</button>
     </view>
 
@@ -200,6 +209,21 @@ function openNotifications() {
   color: var(--bn-ink);
   background: #fff;
   box-shadow: 0 6rpx 18rpx rgba(18, 22, 28, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coupon-button {
+  flex: 0 0 auto;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  color: #7a4d00;
+  background: #fff4cf;
+  box-shadow: 0 6rpx 18rpx rgba(243, 190, 62, 0.18);
+  font-size: 27rpx;
+  font-weight: 860;
   display: flex;
   align-items: center;
   justify-content: center;
