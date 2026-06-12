@@ -33,7 +33,8 @@ interface NotificationListState {
 const tabs: NotificationTab[] = [
   { label: '互动', category: 'INTERACTION' },
   { label: '关注', category: 'FOLLOW' },
-  { label: '系统', category: 'SYSTEM' }
+  { label: '系统', category: 'SYSTEM' },
+  { label: '订单', category: 'ORDER' }
 ]
 
 const auth = useAuthStore()
@@ -59,7 +60,7 @@ const hasUnreadInCurrentTab = computed(() => activeUnreadCount.value > 0)
 
 onLoad((options) => {
   const category = String(options?.category ?? '').toUpperCase()
-  if (isNotificationCategory(category) && category !== 'ORDER') {
+  if (isNotificationCategory(category)) {
     activeCategory.value = category
   }
 })
@@ -258,6 +259,10 @@ function jumpByNotification(item: NotificationItem) {
     uni.showToast({ title: item.content || item.title, icon: 'none' })
     return
   }
+  if (page === 'ORDER_ACTIVITY') {
+    uni.navigateTo({ url: '/pages/order/activity' })
+    return
+  }
   uni.showToast({ title: '暂时无法打开目标内容', icon: 'none' })
 }
 
@@ -292,6 +297,9 @@ function notificationIcon(type: string) {
   }
   if (type.includes('FOLLOW')) {
     return '+'
+  }
+  if (type.includes('ORDER')) {
+    return '券'
   }
   return 'BN'
 }
@@ -545,7 +553,7 @@ function formatNotificationTime(value: string) {
 
 .notification-tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 14rpx;
   margin: 22rpx 0;
 }

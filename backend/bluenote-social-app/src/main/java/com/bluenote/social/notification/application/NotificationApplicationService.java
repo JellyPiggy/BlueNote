@@ -311,6 +311,11 @@ public class NotificationApplicationService {
             case "CommentCreated" -> consumeCommentCreated(request, now);
             case "UserFollowed" -> consumeUserFollowed(request, now);
             case "NoteStatusChanged" -> consumeNoteStatusChanged(request, now);
+            case "OrderCreated" -> consumeOrderCreated(request, now);
+            case "OrderPaid" -> NotificationResult.skipped("coupon issued event handles paid notification");
+            case "CouponIssued" -> consumeCouponIssued(request, now);
+            case "OrderClosed" -> consumeOrderClosed(request, now);
+            case "OrderCancelled" -> consumeOrderCancelled(request, now);
             default -> NotificationResult.skipped("unsupported event type");
         };
     }
@@ -584,6 +589,121 @@ public class NotificationApplicationService {
         return NotificationResult.success(entity.getNotificationId());
     }
 
+    private NotificationResult consumeOrderCreated(NotificationConsumeEventRequest request, LocalDateTime now) {
+        Map<String, Object> payload = request.payload();
+        String status = stringValue(payload.get("status"));
+        if ("WAIT_PAY".equals(status)) {
+            Long userId = requiredId(payload, "userId");
+            Long orderId = requiredId(payload, "orderId");
+            return createOrderStatusNotification(
+                    request,
+                    now,
+                    userId,
+                    orderId,
+                    "WAIT_PAY",
+                    "神券待支付",
+                    orderContent(payload, "你抢到的神券需要完成支付"),
+                    null
+            );
+        }
+        if ("SUCCESS".equals(status)) {
+            return NotificationResult.skipped("coupon issued event handles success notification");
+        }
+        return NotificationResult.skipped("order created status no notification");
+    }
+
+    private NotificationResult consumeCouponIssued(NotificationConsumeEventRequest request, LocalDateTime now) {
+        Map<String, Object> payload = request.payload();
+        Long userId = requiredId(payload, "userId");
+        Long orderId = requiredId(payload, "orderId");
+        Long userCouponId = requiredId(payload, "userCouponId");
+        return createOrderStatusNotification(
+                request,
+                now,
+                userId,
+                orderId,
+                "SUCCESS",
+                "神券已到账",
+                orderContent(payload, "你抢到的 BlueNote 神券已放入卡包"),
+                userCouponId
+        );
+    }
+
+    private NotificationResult consumeOrderClosed(NotificationConsumeEventRequest request, LocalDateTime now) {
+        Map<String, Object> payload = request.payload();
+        Long userId = requiredId(payload, "userId");
+        Long orderId = requiredId(payload, "orderId");
+        return createOrderStatusNotification(
+                request,
+                now,
+                userId,
+                orderId,
+                "CLOSED",
+                "订单已关闭",
+                orderContent(payload, "待支付订单已超时关闭"),
+                null
+        );
+    }
+
+    private NotificationResult consumeOrderCancelled(NotificationConsumeEventRequest request, LocalDateTime now) {
+        Map<String, Object> payload = request.payload();
+        Long userId = requiredId(payload, "userId");
+        Long orderId = requiredId(payload, "orderId");
+        return createOrderStatusNotification(
+                request,
+                now,
+                userId,
+                orderId,
+                "CANCELLED",
+                "订单已取消",
+                orderContent(payload, "你的神券订单已取消"),
+                null
+        );
+    }
+
+    private NotificationResult createOrderStatusNotification(
+            NotificationConsumeEventRequest request,
+            LocalDateTime now,
+            Long receiverId,
+            Long orderId,
+            String status,
+            String title,
+            String content,
+            Long userCouponId
+    ) {
+        String sourceId = orderId + ":" + status;
+        NotificationRecordEntity existing = recordMapper.selectByReceiverSource(
+                receiverId,
+                "ORDER",
+                sourceId,
+                "ORDER_STATUS_CHANGED"
+        );
+        if (existing != null) {
+            return NotificationResult.success(existing.getNotificationId());
+        }
+        NotificationBuild build = new NotificationBuild(
+                receiverId,
+                null,
+                "ORDER",
+                "ORDER_STATUS_CHANGED",
+                "ORDER",
+                String.valueOf(orderId),
+                "ORDER",
+                sourceId,
+                false,
+                null,
+                title,
+                content,
+                orderSnapshot(request.payload(), orderId, status, title, content, userCouponId),
+                orderJump(request.payload(), orderId, userCouponId),
+                parseEventTime(request.occurredAt(), now),
+                null,
+                false
+        );
+        NotificationRecordEntity entity = createDetailNotification(build, now);
+        return NotificationResult.success(entity.getNotificationId());
+    }
+
     private NotificationRecordEntity createOrUpdateAggregate(NotificationBuild build, LocalDateTime now) {
         NotificationRecordEntity existing = recordMapper.selectUnreadAggregate(build.receiverId(), build.aggregateKey());
         if (existing == null) {
@@ -683,7 +803,7 @@ public class NotificationApplicationService {
     private NotificationUnreadCountResponse rebuildUnreadCounts(Long userId, LocalDateTime now) {
         Map<String, Long> values = new LinkedHashMap<>();
         for (String category : CATEGORIES) {
-            long count = "ORDER".equals(category) ? 0L : recordMapper.countUnreadByCategory(userId, category);
+            long count = recordMapper.countUnreadByCategory(userId, category);
             unreadCounterMapper.upsertValue(userId, category, count, now);
             values.put(category, count);
         }
@@ -998,6 +1118,7 @@ public class NotificationApplicationService {
             case "comment-event" -> "bluenote-notification-comment-consumer";
             case "relation-event" -> "bluenote-notification-relation-consumer";
             case "note-event" -> "bluenote-notification-note-consumer";
+            case "order-event" -> "bluenote-notification-order-consumer";
             default -> topic;
         };
     }
@@ -1029,6 +1150,56 @@ public class NotificationApplicationService {
         return jump;
     }
 
+    private Map<String, Object> orderSnapshot(
+            Map<String, Object> payload,
+            Long orderId,
+            String status,
+            String title,
+            String content,
+            Long userCouponId
+    ) {
+        Map<String, Object> target = new LinkedHashMap<>();
+        target.put("targetType", "ORDER");
+        target.put("targetId", String.valueOf(orderId));
+        target.put("title", title);
+        target.put("summary", content);
+        target.put("status", status);
+        putText(target, "orderNo", payload.get("orderNo"));
+        putText(target, "activityId", payload.get("activityId"));
+        putText(target, "payAmount", payload.get("payAmount"));
+        putText(target, "validEndAt", payload.get("validEndAt"));
+        if (userCouponId != null) {
+            target.put("userCouponId", String.valueOf(userCouponId));
+        }
+        return Map.of("target", target);
+    }
+
+    private Map<String, Object> orderJump(Map<String, Object> payload, Long orderId, Long userCouponId) {
+        Map<String, Object> jump = new LinkedHashMap<>();
+        jump.put("page", "ORDER_ACTIVITY");
+        jump.put("orderId", String.valueOf(orderId));
+        putText(jump, "activityId", payload.get("activityId"));
+        if (userCouponId != null) {
+            jump.put("userCouponId", String.valueOf(userCouponId));
+        }
+        return jump;
+    }
+
+    private String orderContent(Map<String, Object> payload, String fallback) {
+        String orderNo = stringValue(payload.get("orderNo"));
+        if (isBlank(orderNo)) {
+            return fallback;
+        }
+        return safeText("订单 " + orderNo + "，" + fallback, 512);
+    }
+
+    private void putText(Map<String, Object> map, String key, Object value) {
+        String text = stringValue(value);
+        if (!isBlank(text)) {
+            map.put(key, text);
+        }
+    }
+
     private String actorName(UserSummary actor, Long actorId) {
         return actor == null || isBlank(actor.nickname()) ? "用户" + actorId : actor.nickname();
     }
@@ -1058,11 +1229,15 @@ public class NotificationApplicationService {
             case "NOTE_COMMENTED" -> "COMMENT_NOTIFICATION";
             case "COMMENT_REPLIED" -> "REPLY_NOTIFICATION";
             case "USER_FOLLOWED" -> "FOLLOW_NOTIFICATION";
+            case "ORDER_STATUS_CHANGED" -> "ORDER_STATUS";
             default -> "SYSTEM_NOTIFICATION";
         };
     }
 
     private int pushPriority(String notificationType) {
+        if ("ORDER_STATUS_CHANGED".equals(notificationType)) {
+            return 7;
+        }
         return notificationType != null && notificationType.startsWith("NOTE_") && !"NOTE_LIKED".equals(notificationType)
                 && !"NOTE_COLLECTED".equals(notificationType)
                 ? 7
