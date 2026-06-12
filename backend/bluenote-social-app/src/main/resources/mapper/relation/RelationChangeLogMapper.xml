@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.relation.infrastructure.mapper.RelationChangeLogMapper">
+
+    <insert id="insert" parameterType="com.bluenote.social.relation.infrastructure.entity.RelationChangeLogEntity">
+        INSERT INTO bluenote_relation.relation_change_log (
+            change_id, follower_id, followee_id, action_type, before_status, after_status,
+            relation_version, trace_id, created_at
+        ) VALUES (
+            #{changeId}, #{followerId}, #{followeeId}, #{actionType}, #{beforeStatus}, #{afterStatus},
+            #{relationVersion}, #{traceId}, #{createdAt}
+        )
+    </insert>
+</mapper>

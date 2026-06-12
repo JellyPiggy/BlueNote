@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.content.comment.infrastructure.mapper.CommentLikeMapper">
+
+    <resultMap id="CommentLikeResultMap" type="com.bluenote.content.comment.infrastructure.entity.CommentLikeEntity">
+        <id column="id" property="id"/>
+        <result column="comment_id" property="commentId"/>
+        <result column="comment_user_id" property="commentUserId"/>
+        <result column="user_id" property="userId"/>
+        <result column="like_status" property="likeStatus"/>
+        <result column="liked_at" property="likedAt"/>
+        <result column="canceled_at" property="canceledAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.bluenote.content.comment.infrastructure.entity.CommentLikeEntity">
+        INSERT INTO bluenote_comment.comment_like (
+            id, comment_id, comment_user_id, user_id, like_status,
+            liked_at, canceled_at, created_at, updated_at
+        ) VALUES (
+            #{id}, #{commentId}, #{commentUserId}, #{userId}, #{likeStatus},
+            #{likedAt}, #{canceledAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectByPair" resultMap="CommentLikeResultMap">
+        SELECT id, comment_id, comment_user_id, user_id, like_status,
+               liked_at, canceled_at, created_at, updated_at
+        FROM bluenote_comment.comment_like
+        WHERE comment_id = #{commentId}
+          AND user_id = #{userId}
+    </select>
+
+    <update id="activate">
+        UPDATE bluenote_comment.comment_like
+        SET like_status = 'ACTIVE',
+            liked_at = #{likedAt},
+            canceled_at = NULL,
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+          AND like_status = 'CANCELED'
+    </update>
+
+    <update id="cancel">
+        UPDATE bluenote_comment.comment_like
+        SET like_status = 'CANCELED',
+            canceled_at = #{canceledAt},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+          AND like_status = 'ACTIVE'
+    </update>
+
+    <select id="selectActiveByComments" resultMap="CommentLikeResultMap">
+        SELECT id, comment_id, comment_user_id, user_id, like_status,
+               liked_at, canceled_at, created_at, updated_at
+        FROM bluenote_comment.comment_like
+        WHERE user_id = #{userId}
+          AND like_status = 'ACTIVE'
+          AND comment_id IN
+        <foreach collection="commentIds" item="commentId" open="(" separator="," close=")">
+            #{commentId}
+        </foreach>
+    </select>
+
+    <select id="countActiveByComment" resultType="long">
+        SELECT COUNT(*)
+        FROM bluenote_comment.comment_like
+        WHERE comment_id = #{commentId}
+          AND like_status = 'ACTIVE'
+    </select>
+</mapper>

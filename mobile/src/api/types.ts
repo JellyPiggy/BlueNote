@@ -11,6 +11,10 @@ export interface CursorPage<T> {
   hasMore: boolean
 }
 
+export interface CommentCursorPage<T> extends CursorPage<T> {
+  degraded: boolean
+}
+
 export interface TokenPair {
   userId: string
   accessToken: string
@@ -114,6 +118,16 @@ export interface DraftNoteResponse {
   updatedAt: string
 }
 
+export interface NoteLikeResponse {
+  noteId: string
+  liked: boolean
+}
+
+export interface NoteCollectResponse {
+  noteId: string
+  collected: boolean
+}
+
 export interface NoteCard {
   noteId: string
   title: string
@@ -159,3 +173,54 @@ export interface NoteDetail {
   degraded: boolean
 }
 
+export interface CommentAuthor {
+  userId: string
+  nickname: string
+  avatarUrl: string | null
+  userStatus: string
+}
+
+export interface CommentItem {
+  commentId: string
+  noteId: string
+  rootId: string
+  parentCommentId: string | null
+  replyToUser: CommentAuthor | null
+  author: CommentAuthor
+  content: string
+  level: 1 | 2
+  commentStatus: 'VISIBLE' | 'DELETED' | 'HIDDEN'
+  likeCount: number
+  replyCount: number
+  viewerAction: {
+    liked: boolean
+  }
+  createdAt: string
+  degraded: boolean
+}
+
+export interface CreateCommentRequest {
+  clientRequestId: string
+  content: string
+}
+
+export interface CreateCommentResponse {
+  commentId: string
+  noteId: string
+  rootId: string
+  parentCommentId: string | null
+  level: 1 | 2
+  commentStatus: 'VISIBLE' | 'DELETED' | 'HIDDEN'
+  createdAt: string
+}
+
+export interface DeleteCommentResponse {
+  commentId: string
+  commentStatus: 'DELETED'
+  deletedAt: string
+}
+
+export interface CommentLikeResponse {
+  commentId: string
+  liked: boolean
+}

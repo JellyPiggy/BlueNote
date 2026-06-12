@@ -1,12 +1,12 @@
 # BlueNote 本地主链路联调手册
 
 版本：v0.1  
-状态：第一条主链路最小联调清单  
+状态：第一条主链路与已落地社交接口最小联调清单
 更新时间：2026-06-11
 
 ## 1. 目标
 
-本文用于在本地跑通第一条主链路：
+本文用于在本地跑通第一条主链路，并顺手验证当前已经落地的 relation/comment 社交接口：
 
 ```text
 注册/登录 -> 获取用户资料 -> 上传图片 -> 发布笔记 -> 查看笔记详情
@@ -55,7 +55,7 @@ mvn -q -DskipTests compile
 
 ## 5. 启动后端应用
 
-建议开三个终端，按顺序启动：
+建议开四个终端，按顺序启动：
 
 ```bash
 cd backend
@@ -69,6 +69,11 @@ mvn -pl bluenote-content-app spring-boot:run
 
 ```bash
 cd backend
+mvn -pl bluenote-social-app spring-boot:run
+```
+
+```bash
+cd backend
 mvn -pl bluenote-gateway-app spring-boot:run
 ```
 
@@ -78,6 +83,7 @@ mvn -pl bluenote-gateway-app spring-boot:run
 |---|---:|
 | `bluenote-member-app` | 8081 |
 | `bluenote-content-app` | 8082 |
+| `bluenote-social-app` | 8083 |
 | `bluenote-gateway-app` | 8080 |
 
 健康检查：
@@ -85,6 +91,7 @@ mvn -pl bluenote-gateway-app spring-boot:run
 ```text
 http://127.0.0.1:8081/internal/member/probe
 http://127.0.0.1:8082/internal/content/probe
+http://127.0.0.1:8083/api/social/probe
 http://127.0.0.1:8080/internal/gateway/probe
 ```
 
@@ -151,7 +158,24 @@ npm run dev:h5
 1. `/api/notes/{noteId}` 返回作者、媒体、标题、正文、计数结构。
 2. 笔记详情页图片、作者和底部操作区显示正常。
 3. `/api/notes/me` 能在我的页面展示已发布笔记。
-4. `/api/users/{userId}/home` 能返回主页头部结构。
+4. `/api/users/{userId}/home` 能返回主页头部结构，并通过 counter 聚合返回关注数、粉丝数、作品数和获赞数。
+
+### 7.4 验证关注、笔记互动和评论接口
+
+在已登录状态下，可以继续验证当前第二条主链路的最小接口：
+
+1. `POST /api/relations/following/{followeeId}` 能关注用户。
+2. `DELETE /api/relations/following/{followeeId}` 能取消关注。
+3. `POST /api/notes/{noteId}/like` 和 `DELETE /api/notes/{noteId}/like` 能切换笔记点赞状态。
+4. `POST /api/notes/{noteId}/collect` 和 `DELETE /api/notes/{noteId}/collect` 能切换笔记收藏状态。
+5. `POST /api/comments/notes/{noteId}` 能发布一级评论。
+6. `POST /api/comments/{commentId}/replies` 能回复评论。
+7. `GET /api/comments/notes/{noteId}` 能查询一级评论。
+8. `GET /api/comments/{rootCommentId}/replies` 能查询回复。
+9. `POST /api/comments/{commentId}/like` 和 `DELETE /api/comments/{commentId}/like` 能切换评论点赞状态。
+10. `POST /internal/counters/batch` 能批量返回 NOTE / USER / COMMENT 计数。
+
+如果 MySQL 是旧数据卷，新增的 `V005__relation.sql`、`V006__comment.sql` 可能不会自动执行，需要手动执行 SQL 或重建本地数据卷。
 
 ## 8. 常见问题
 
@@ -184,18 +208,22 @@ npm run dev:h5
 3. member 和 gateway 的 `BLUENOTE_ACCESS_TOKEN_SECRET` 是否一致。
 4. 请求是否携带 `Authorization: Bearer ...`。
 
-### 8.4 主页计数一直是 0
+### 8.4 主页计数一直是 0 或降级
 
-这是当前阶段已知限制。关注数、粉丝数、获赞数需要第二条社交链路中的 relation/counter 服务补齐。
+优先检查：
+
+1. social-app 是否启动在 `8083`。
+2. member-app 的 `BLUENOTE_COUNTER_INTERNAL_URI` 是否指向 social-app。
+3. content-app 是否启动在 `8082`，因为作品数、获赞数和评论数会从 content 来源接口聚合。
+4. MySQL 是否可连接；来源接口失败时用户主页会返回 `degraded=true` 并降级为 0。
 
 ## 9. 当前未覆盖
 
 以下能力不属于第一条主链路当前验收范围：
 
-1. 点赞、收藏、评论写操作。
-2. 关注关系。
-3. Feed 投递。
-4. 通知。
-5. IM。
-6. 订单。
-7. RocketMQ outbox dispatcher 和消费者幂等闭环。
+1. 我的收藏列表和赞过列表。
+2. Feed 投递。
+3. 通知。
+4. IM。
+5. 订单。
+6. RocketMQ outbox dispatcher 和消费者幂等闭环。

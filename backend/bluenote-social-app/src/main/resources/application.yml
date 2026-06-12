@@ -1,0 +1,45 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: bluenote-social-app
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${BLUENOTE_SOCIAL_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/bluenote_relation?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${BLUENOTE_SOCIAL_DATASOURCE_USERNAME:root}
+    password: ${BLUENOTE_SOCIAL_DATASOURCE_PASSWORD:bluenote_root_local}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+  data:
+    redis:
+      host: ${BLUENOTE_REDIS_HOST:127.0.0.1}
+      port: ${BLUENOTE_REDIS_PORT:6379}
+      password: ${BLUENOTE_REDIS_PASSWORD:bluenote_redis_local}
+      timeout: 2s
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+bluenote:
+  env: ${BLUENOTE_ENV:local}
+  internal:
+    member-uri: ${BLUENOTE_MEMBER_INTERNAL_URI:http://127.0.0.1:8081}
+    content-uri: ${BLUENOTE_CONTENT_INTERNAL_URI:http://127.0.0.1:8082}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

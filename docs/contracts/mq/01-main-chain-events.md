@@ -1,7 +1,7 @@
 # 第一条主链路 MQ 事件契约
 
-版本：v0.1  
-状态：第一条主链路开发基线
+版本：v0.2
+状态：第一、第二条主链路开发基线
 
 第一阶段主链路可以先通过 outbox 表可靠记录事件，RocketMQ 发送器和消费者可按开发阶段逐步开启。但事件 envelope、topic 和 payload 从第一版开始固定，避免后续返工。
 
@@ -12,7 +12,7 @@
 | `auth-event` | `bluenote-auth` | `UserRegistered` / `UserLoggedIn` / `UserLoggedOut` | 用户创建、审计、后续通知 |
 | `user-event` | `bluenote-user` | `UserProfileUpdated` / `UserStatusChanged` | 资料快照更新 |
 | `file-event` | `bluenote-file` | `FileUploaded` / `FileBound` / `FileDeleted` | 文件审计、后续审核和清理 |
-| `note-event` | `bluenote-note` | `NotePublished` / `NoteUpdated` / `NoteDeleted` | Feed、排行、通知、计数 |
+| `note-event` | `bluenote-note` | `NotePublished` / `NoteUpdated` / `NoteDeleted` / `NoteVisibilityChanged` / `NoteStatusChanged` | Feed、排行、通知、计数 |
 | `interaction-event` | `bluenote-note` | `NoteLiked` / `NoteUnliked` / `NoteCollected` / `NoteUncollected` | 计数、通知、排行 |
 
 ## 2. Event Envelope
@@ -207,11 +207,17 @@ payload：
 {
   "noteId": "800001",
   "authorId": "10001",
+  "visibility": "PUBLIC",
+  "noteStatus": "PUBLISHED",
   "deletedAt": "2026-06-05T10:12:00+08:00"
 }
 ```
 
-## 9. 互动事件
+## 9. NoteVisibilityChanged 和 NoteStatusChanged
+
+第二条主链路需要的可见性和状态变化事件定义见 `02-social-chain-events.md`。笔记服务 outbox 必须支持这两个事件，但第一条主链路接口不强制触发复杂审核流程。
+
+## 10. 互动事件
 
 Topic：`interaction-event`
 
@@ -250,7 +256,7 @@ Topic：`interaction-event`
 
 消费者仍必须优先使用 `eventId + consumerGroup` 去重。
 
-## 10. Outbox 要求
+## 11. Outbox 要求
 
 核心写操作必须同事务写业务表和 outbox：
 
@@ -270,7 +276,7 @@ Outbox 发送流程：
   -> 失败增加 retry_count 和 next_retry_at
 ```
 
-## 11. 消费幂等
+## 12. 消费幂等
 
 消费者统一使用：
 
@@ -287,13 +293,13 @@ event_id + consumer_group
 | `consumer_group` | 消费组 |
 | `event_type` | 事件类型 |
 | `biz_key` | 业务键 |
-| `consume_status` | `SUCCESS` / `FAIL` |
+| `consume_status` | `PROCESSING` / `SUCCESS` / `FAIL` |
 | `retry_count` | 重试次数 |
 | `error_message` | 失败原因 |
 | `consumed_at` | 消费成功时间 |
 | `created_at` | 创建时间 |
 
-## 12. 变更规则
+## 13. 变更规则
 
 事件变更必须：
 
@@ -301,4 +307,3 @@ event_id + consumer_group
 2. 新增字段必须可选或有默认值。
 3. 删除字段、改字段类型、改语义必须升级 `eventVersion`。
 4. 大对象、文件二进制、完整正文不能放入 MQ。
-

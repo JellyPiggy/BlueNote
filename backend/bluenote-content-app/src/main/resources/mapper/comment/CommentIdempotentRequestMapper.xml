@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.content.comment.infrastructure.mapper.CommentIdempotentRequestMapper">
+
+    <resultMap id="CommentIdempotentRequestResultMap" type="com.bluenote.content.comment.infrastructure.entity.CommentIdempotentRequestEntity">
+        <id column="idempotent_key" property="idempotentKey"/>
+        <result column="user_id" property="userId"/>
+        <result column="operation" property="operation"/>
+        <result column="biz_id" property="bizId"/>
+        <result column="request_hash" property="requestHash"/>
+        <result column="request_status" property="requestStatus"/>
+        <result column="response_payload" property="responsePayload"/>
+        <result column="expire_at" property="expireAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.bluenote.content.comment.infrastructure.entity.CommentIdempotentRequestEntity">
+        INSERT INTO bluenote_comment.comment_idempotent_request (
+            idempotent_key, user_id, operation, biz_id, request_hash, request_status,
+            response_payload, expire_at, created_at, updated_at
+        ) VALUES (
+            #{idempotentKey}, #{userId}, #{operation}, #{bizId}, #{requestHash}, #{requestStatus},
+            #{responsePayload}, #{expireAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectByKey" resultMap="CommentIdempotentRequestResultMap">
+        SELECT idempotent_key, user_id, operation, biz_id, request_hash, request_status,
+               response_payload, expire_at, created_at, updated_at
+        FROM bluenote_comment.comment_idempotent_request
+        WHERE idempotent_key = #{idempotentKey}
+    </select>
+
+    <update id="markSuccess">
+        UPDATE bluenote_comment.comment_idempotent_request
+        SET biz_id = #{bizId},
+            request_status = 'SUCCESS',
+            response_payload = #{responsePayload},
+            updated_at = #{updatedAt}
+        WHERE idempotent_key = #{idempotentKey}
+          AND request_status = 'PROCESSING'
+    </update>
+</mapper>

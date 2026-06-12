@@ -9,8 +9,10 @@ import com.bluenote.common.security.UserContext;
 import com.bluenote.common.security.UserContextHolder;
 import com.bluenote.content.note.api.dto.DeleteNoteResponse;
 import com.bluenote.content.note.api.dto.DraftNoteResponse;
+import com.bluenote.content.note.api.dto.NoteCollectResponse;
 import com.bluenote.content.note.api.dto.NoteCardResponse;
 import com.bluenote.content.note.api.dto.NoteDetailResponse;
+import com.bluenote.content.note.api.dto.NoteLikeResponse;
 import com.bluenote.content.note.api.dto.PublishNoteRequest;
 import com.bluenote.content.note.api.dto.PublishNoteResponse;
 import com.bluenote.content.note.api.dto.UpsertNoteRequest;
@@ -86,6 +88,38 @@ public class NoteController {
         );
     }
 
+    @PostMapping("/{noteId}/like")
+    public ApiResponse<NoteLikeResponse> like(@PathVariable("noteId") String noteId) {
+        return ApiResponse.success(
+                noteApplicationService.likeNote(requireUserId(), noteId),
+                TraceIdHolder.currentOrNew()
+        );
+    }
+
+    @DeleteMapping("/{noteId}/like")
+    public ApiResponse<NoteLikeResponse> unlike(@PathVariable("noteId") String noteId) {
+        return ApiResponse.success(
+                noteApplicationService.unlikeNote(requireUserId(), noteId),
+                TraceIdHolder.currentOrNew()
+        );
+    }
+
+    @PostMapping("/{noteId}/collect")
+    public ApiResponse<NoteCollectResponse> collect(@PathVariable("noteId") String noteId) {
+        return ApiResponse.success(
+                noteApplicationService.collectNote(requireUserId(), noteId),
+                TraceIdHolder.currentOrNew()
+        );
+    }
+
+    @DeleteMapping("/{noteId}/collect")
+    public ApiResponse<NoteCollectResponse> uncollect(@PathVariable("noteId") String noteId) {
+        return ApiResponse.success(
+                noteApplicationService.uncollectNote(requireUserId(), noteId),
+                TraceIdHolder.currentOrNew()
+        );
+    }
+
     @GetMapping("/users/{userId}")
     public ApiResponse<CursorPage<NoteCardResponse>> authorNotes(
             @PathVariable("userId") String userId,
@@ -123,4 +157,3 @@ public class NoteController {
         return userContext == null ? null : userContext.userId();
     }
 }
-

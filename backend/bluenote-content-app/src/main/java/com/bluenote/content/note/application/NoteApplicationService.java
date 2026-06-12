@@ -9,16 +9,24 @@ import com.bluenote.content.common.JsonPayloads;
 import com.bluenote.content.file.api.dto.InternalBatchBindFileRequest;
 import com.bluenote.content.file.api.dto.InternalBatchValidateFileRequest;
 import com.bluenote.content.file.application.FileApplicationService;
+import com.bluenote.content.note.api.dto.AuthorRecentNotesItem;
+import com.bluenote.content.note.api.dto.AuthorRecentNotesRequest;
+import com.bluenote.content.note.api.dto.AuthorRecentNotesResponse;
 import com.bluenote.content.note.api.dto.BatchNoteSummaryRequest;
 import com.bluenote.content.note.api.dto.BatchNoteSummaryResponse;
 import com.bluenote.content.note.api.dto.CommentCheckRequest;
 import com.bluenote.content.note.api.dto.CommentCheckResponse;
 import com.bluenote.content.note.api.dto.DeleteNoteResponse;
 import com.bluenote.content.note.api.dto.DraftNoteResponse;
+import com.bluenote.content.note.api.dto.NoteCollectResponse;
 import com.bluenote.content.note.api.dto.NoteAuthorResponse;
 import com.bluenote.content.note.api.dto.NoteCardResponse;
 import com.bluenote.content.note.api.dto.NoteCountsResponse;
+import com.bluenote.content.note.api.dto.NoteCounterSourceItem;
+import com.bluenote.content.note.api.dto.NoteCounterSourceRequest;
+import com.bluenote.content.note.api.dto.NoteCounterSourceResponse;
 import com.bluenote.content.note.api.dto.NoteDetailResponse;
+import com.bluenote.content.note.api.dto.NoteLikeResponse;
 import com.bluenote.content.note.api.dto.NoteMediaInput;
 import com.bluenote.content.note.api.dto.NoteMediaResponse;
 import com.bluenote.content.note.api.dto.NoteSummaryItem;
@@ -27,8 +35,10 @@ import com.bluenote.content.note.api.dto.PublishNoteResponse;
 import com.bluenote.content.note.api.dto.UpsertNoteRequest;
 import com.bluenote.content.note.api.dto.ViewerActionResponse;
 import com.bluenote.content.note.infrastructure.client.MemberInternalClient;
+import com.bluenote.content.note.infrastructure.entity.NoteCollectionEntity;
 import com.bluenote.content.note.infrastructure.entity.NoteEntity;
 import com.bluenote.content.note.infrastructure.entity.NoteIdempotentRequestEntity;
+import com.bluenote.content.note.infrastructure.entity.NoteLikeEntity;
 import com.bluenote.content.note.infrastructure.entity.NoteMediaEntity;
 import com.bluenote.content.note.infrastructure.entity.NoteOutboxEventEntity;
 import com.bluenote.content.note.infrastructure.entity.NoteTopicEntity;
@@ -68,6 +78,9 @@ public class NoteApplicationService {
     private static final String OP_SAVE_DRAFT = "NOTE_SAVE_DRAFT";
     private static final String OP_PUBLISH_NOTE = "NOTE_PUBLISH";
     private static final String OP_PUBLISH_DRAFT = "NOTE_PUBLISH_DRAFT";
+    private static final String SCENE_NOTE_INTERACTION = "NOTE_INTERACTION";
+    private static final String INTERACTION_ACTIVE = "ACTIVE";
+    private static final String INTERACTION_CANCELED = "CANCELED";
     private static final String STATUS_DRAFT = "DRAFT";
     private static final String STATUS_PUBLISHED = "PUBLISHED";
     private static final String STATUS_PRIVATE = "PRIVATE";
@@ -290,6 +303,118 @@ public class NoteApplicationService {
         );
     }
 
+    @Transactional
+    public NoteLikeResponse likeNote(String userId, String noteId) {
+        Long parsedUserId = parseId(userId, ApiErrorCode.ACCESS_TOKEN_INVALID);
+        Long parsedNoteId = parseId(noteId, ApiErrorCode.NOTE_NOT_FOUND);
+        memberInternalClient.ensureUserAllowed(userId, SCENE_NOTE_INTERACTION);
+        NoteEntity note = requireVisibleNoteForInteraction(parsedNoteId, parsedUserId);
+        NoteLikeEntity existing = noteInteractionMapper.selectLikeByPair(parsedNoteId, parsedUserId);
+        if (existing != null && INTERACTION_ACTIVE.equals(existing.getLikeStatus())) {
+            return new NoteLikeResponse(noteId, true);
+        }
+        LocalDateTime now = now();
+        boolean changed = false;
+        if (existing == null) {
+            NoteLikeEntity entity = new NoteLikeEntity();
+            entity.setId(idGenerator.nextId());
+            entity.setNoteId(parsedNoteId);
+            entity.setAuthorId(note.getAuthorId());
+            entity.setUserId(parsedUserId);
+            entity.setLikeStatus(INTERACTION_ACTIVE);
+            entity.setLikedAt(now);
+            entity.setCreatedAt(now);
+            entity.setUpdatedAt(now);
+            try {
+                noteInteractionMapper.insertLike(entity);
+                changed = true;
+            } catch (DuplicateKeyException exception) {
+                existing = noteInteractionMapper.selectLikeByPair(parsedNoteId, parsedUserId);
+            }
+        }
+        if (!changed && existing != null && INTERACTION_CANCELED.equals(existing.getLikeStatus())) {
+            changed = noteInteractionMapper.activateLike(existing.getId(), now, now) > 0;
+        }
+        if (changed) {
+            insertNoteInteractionOutbox("NoteLiked", note, parsedUserId, now);
+        }
+        return new NoteLikeResponse(noteId, true);
+    }
+
+    @Transactional
+    public NoteLikeResponse unlikeNote(String userId, String noteId) {
+        Long parsedUserId = parseId(userId, ApiErrorCode.ACCESS_TOKEN_INVALID);
+        Long parsedNoteId = parseId(noteId, ApiErrorCode.NOTE_NOT_FOUND);
+        memberInternalClient.ensureUserAllowed(userId, SCENE_NOTE_INTERACTION);
+        NoteEntity note = requireVisibleNoteForInteraction(parsedNoteId, parsedUserId);
+        NoteLikeEntity existing = noteInteractionMapper.selectLikeByPair(parsedNoteId, parsedUserId);
+        if (existing == null || INTERACTION_CANCELED.equals(existing.getLikeStatus())) {
+            return new NoteLikeResponse(noteId, false);
+        }
+        LocalDateTime now = now();
+        boolean changed = noteInteractionMapper.cancelLike(existing.getId(), now, now) > 0;
+        if (changed) {
+            insertNoteInteractionOutbox("NoteUnliked", note, parsedUserId, now);
+        }
+        return new NoteLikeResponse(noteId, false);
+    }
+
+    @Transactional
+    public NoteCollectResponse collectNote(String userId, String noteId) {
+        Long parsedUserId = parseId(userId, ApiErrorCode.ACCESS_TOKEN_INVALID);
+        Long parsedNoteId = parseId(noteId, ApiErrorCode.NOTE_NOT_FOUND);
+        memberInternalClient.ensureUserAllowed(userId, SCENE_NOTE_INTERACTION);
+        NoteEntity note = requireVisibleNoteForInteraction(parsedNoteId, parsedUserId);
+        NoteCollectionEntity existing = noteInteractionMapper.selectCollectionByPair(parsedNoteId, parsedUserId);
+        if (existing != null && INTERACTION_ACTIVE.equals(existing.getCollectionStatus())) {
+            return new NoteCollectResponse(noteId, true);
+        }
+        LocalDateTime now = now();
+        boolean changed = false;
+        if (existing == null) {
+            NoteCollectionEntity entity = new NoteCollectionEntity();
+            entity.setId(idGenerator.nextId());
+            entity.setNoteId(parsedNoteId);
+            entity.setAuthorId(note.getAuthorId());
+            entity.setUserId(parsedUserId);
+            entity.setCollectionStatus(INTERACTION_ACTIVE);
+            entity.setCollectedAt(now);
+            entity.setCreatedAt(now);
+            entity.setUpdatedAt(now);
+            try {
+                noteInteractionMapper.insertCollection(entity);
+                changed = true;
+            } catch (DuplicateKeyException exception) {
+                existing = noteInteractionMapper.selectCollectionByPair(parsedNoteId, parsedUserId);
+            }
+        }
+        if (!changed && existing != null && INTERACTION_CANCELED.equals(existing.getCollectionStatus())) {
+            changed = noteInteractionMapper.activateCollection(existing.getId(), now, now) > 0;
+        }
+        if (changed) {
+            insertNoteInteractionOutbox("NoteCollected", note, parsedUserId, now);
+        }
+        return new NoteCollectResponse(noteId, true);
+    }
+
+    @Transactional
+    public NoteCollectResponse uncollectNote(String userId, String noteId) {
+        Long parsedUserId = parseId(userId, ApiErrorCode.ACCESS_TOKEN_INVALID);
+        Long parsedNoteId = parseId(noteId, ApiErrorCode.NOTE_NOT_FOUND);
+        memberInternalClient.ensureUserAllowed(userId, SCENE_NOTE_INTERACTION);
+        NoteEntity note = requireVisibleNoteForInteraction(parsedNoteId, parsedUserId);
+        NoteCollectionEntity existing = noteInteractionMapper.selectCollectionByPair(parsedNoteId, parsedUserId);
+        if (existing == null || INTERACTION_CANCELED.equals(existing.getCollectionStatus())) {
+            return new NoteCollectResponse(noteId, false);
+        }
+        LocalDateTime now = now();
+        boolean changed = noteInteractionMapper.cancelCollection(existing.getId(), now, now) > 0;
+        if (changed) {
+            insertNoteInteractionOutbox("NoteUncollected", note, parsedUserId, now);
+        }
+        return new NoteCollectResponse(noteId, false);
+    }
+
     @Transactional(readOnly = true)
     public CursorPage<NoteCardResponse> authorNotes(String authorId, String cursor, Integer size) {
         Long parsedAuthorId = parseId(authorId, ApiErrorCode.USER_NOT_FOUND);
@@ -336,20 +461,44 @@ public class NoteApplicationService {
             if (note == null || (!includeInvisible && !canView(note, viewerId))) {
                 continue;
             }
-            NoteVersionEntity version = requireVersion(note.getNoteId(), note.getCurrentVersion());
-            summaries.add(new NoteSummaryItem(
-                    String.valueOf(note.getNoteId()),
-                    String.valueOf(note.getAuthorId()),
-                    version.getTitle(),
-                    version.getContentPreview(),
-                    stringValue(note.getCoverFileId()),
-                    fileAccessUrl(note.getCoverFileId()),
-                    note.getNoteStatus(),
-                    note.getVisibility(),
-                    toOffsetString(note.getPublishedAt())
-            ));
+            summaries.add(toSummaryItem(note));
         }
         return new BatchNoteSummaryResponse(summaries);
+    }
+
+    @Transactional(readOnly = true)
+    public AuthorRecentNotesResponse authorRecentNotes(AuthorRecentNotesRequest request) {
+        int limitPerAuthor = normalizeLimitPerAuthor(request.limitPerAuthor());
+        LocalDateTime publishedAfter = parseOptionalOffsetDateTime(request.publishedAfter(), ApiErrorCode.PARAM_INVALID);
+        List<Long> authorIds = request.authorIds().stream()
+                .map(authorId -> parseId(authorId, ApiErrorCode.USER_NOT_FOUND))
+                .distinct()
+                .toList();
+        if (authorIds.isEmpty()) {
+            return new AuthorRecentNotesResponse(List.of());
+        }
+
+        List<NoteEntity> notes = noteMapper.selectRecentPublicByAuthors(
+                authorIds,
+                publishedAfter,
+                limitPerAuthor
+        );
+        Map<Long, List<NoteEntity>> notesByAuthor = notes.stream()
+                .collect(Collectors.groupingBy(
+                        NoteEntity::getAuthorId,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+        List<AuthorRecentNotesItem> authors = authorIds.stream()
+                .map(authorId -> new AuthorRecentNotesItem(
+                        String.valueOf(authorId),
+                        notesByAuthor.getOrDefault(authorId, List.of()).stream()
+                                .limit(limitPerAuthor)
+                                .map(this::toSummaryItem)
+                                .toList()
+                ))
+                .toList();
+        return new AuthorRecentNotesResponse(authors);
     }
 
     @Transactional(readOnly = true)
@@ -367,6 +516,37 @@ public class NoteApplicationService {
                 note.getNoteStatus(),
                 note.getVisibility()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public NoteCounterSourceResponse counterSource(NoteCounterSourceRequest request) {
+        List<NoteCounterSourceItem> items = request.targets().stream()
+                .map(target -> {
+                    Long targetId = parseId(target.targetId(), ApiErrorCode.PARAM_INVALID);
+                    Map<String, Long> counts = new LinkedHashMap<>();
+                    if ("NOTE".equals(target.targetType())) {
+                        for (String field : target.fields()) {
+                            if ("like_count".equals(field)) {
+                                counts.put(field, noteInteractionMapper.countLikes(targetId));
+                            } else if ("collect_count".equals(field)) {
+                                counts.put(field, noteInteractionMapper.countCollections(targetId));
+                            }
+                        }
+                    } else if ("USER".equals(target.targetType())) {
+                        for (String field : target.fields()) {
+                            if ("note_count".equals(field)) {
+                                counts.put(field, noteMapper.countPublicPublishedByAuthor(targetId));
+                            } else if ("liked_count".equals(field)) {
+                                counts.put(field, noteInteractionMapper.countActiveLikesByAuthor(targetId));
+                            }
+                        }
+                    } else {
+                        throw new BusinessException(ApiErrorCode.PARAM_INVALID);
+                    }
+                    return new NoteCounterSourceItem(target.targetType(), target.targetId(), counts);
+                })
+                .toList();
+        return new NoteCounterSourceResponse(items);
     }
 
     private NoteEntity insertNote(
@@ -622,6 +802,21 @@ public class NoteApplicationService {
         );
     }
 
+    private NoteSummaryItem toSummaryItem(NoteEntity note) {
+        NoteVersionEntity version = requireVersion(note.getNoteId(), note.getCurrentVersion());
+        return new NoteSummaryItem(
+                String.valueOf(note.getNoteId()),
+                String.valueOf(note.getAuthorId()),
+                version.getTitle(),
+                version.getContentPreview(),
+                stringValue(note.getCoverFileId()),
+                fileAccessUrl(note.getCoverFileId()),
+                note.getNoteStatus(),
+                note.getVisibility(),
+                toOffsetString(note.getPublishedAt())
+        );
+    }
+
     private List<NoteMediaResponse> noteMediaResponses(Long noteId, Integer versionNo) {
         return noteMediaMapper.selectByNoteAndVersion(noteId, versionNo).stream()
                 .map(media -> new NoteMediaResponse(
@@ -677,6 +872,14 @@ public class NoteApplicationService {
         return STATUS_PUBLISHED.equals(note.getNoteStatus()) && VISIBILITY_PUBLIC.equals(note.getVisibility());
     }
 
+    private NoteEntity requireVisibleNoteForInteraction(Long noteId, Long userId) {
+        NoteEntity note = requireNote(noteId);
+        if (!canView(note, userId)) {
+            throw new BusinessException(ApiErrorCode.NOTE_NOT_FOUND);
+        }
+        return note;
+    }
+
     private NoteEntity requireNote(Long noteId) {
         NoteEntity note = noteMapper.selectByNoteId(noteId);
         if (note == null) {
@@ -717,8 +920,19 @@ public class NoteApplicationService {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("noteId", String.valueOf(note.getNoteId()));
         payload.put("authorId", String.valueOf(note.getAuthorId()));
+        payload.put("visibility", note.getVisibility());
+        payload.put("noteStatus", note.getNoteStatus());
         payload.put("deletedAt", toOffsetString(now));
         insertOutbox("NoteDeleted", note.getNoteId(), payload, now);
+    }
+
+    private void insertNoteInteractionOutbox(String eventType, NoteEntity note, Long userId, LocalDateTime now) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("noteId", String.valueOf(note.getNoteId()));
+        payload.put("authorId", String.valueOf(note.getAuthorId()));
+        payload.put("userId", String.valueOf(userId));
+        payload.put("occurredAt", toOffsetString(now));
+        insertOutbox(eventType, note.getNoteId(), payload, now);
     }
 
     private void insertOutbox(String eventType, Long noteId, Map<String, Object> payload, LocalDateTime now) {
@@ -875,6 +1089,13 @@ public class NoteApplicationService {
         return Math.max(1, Math.min(size, 50));
     }
 
+    private int normalizeLimitPerAuthor(Integer limitPerAuthor) {
+        if (limitPerAuthor == null) {
+            return 20;
+        }
+        return Math.max(1, Math.min(limitPerAuthor, 50));
+    }
+
     private String normalizeOptionalNoteStatus(String status) {
         if (status == null || status.isBlank()) {
             return null;
@@ -894,6 +1115,17 @@ public class NoteApplicationService {
 
     private LocalDateTime sortAt(NoteEntity note) {
         return note.getPublishedAt() == null ? note.getUpdatedAt() : note.getPublishedAt();
+    }
+
+    private LocalDateTime parseOptionalOffsetDateTime(String value, ApiErrorCode errorCode) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return OffsetDateTime.parse(value).atZoneSameInstant(CHINA_ZONE).toLocalDateTime();
+        } catch (RuntimeException exception) {
+            throw new BusinessException(errorCode);
+        }
     }
 
     private Long parseId(String value, ApiErrorCode errorCode) {

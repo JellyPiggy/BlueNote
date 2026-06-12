@@ -1,7 +1,7 @@
 # API 通用契约
 
-版本：v0.1  
-状态：第一条主链路开发基线
+版本：v0.2
+状态：第一、第二条主链路开发基线
 
 ## 1. 入口边界
 
@@ -136,6 +136,10 @@ mobile -> bluenote-gateway -> backend apps
 | 发布笔记 | `clientRequestId` 或 `Idempotency-Key` |
 | 编辑笔记 | `clientRequestId` + `baseVersion` |
 | 点赞收藏 | `userId` + `noteId` 唯一业务键 |
+| 关注取关 | `followerId` + `followeeId` 最终状态 |
+| 发布评论或回复 | `clientRequestId` 或 `Idempotency-Key` |
+| 评论点赞 | `userId` + `commentId` 唯一业务键 |
+| 通知已读和删除 | `receiverId` + `notificationId` 最终状态 |
 
 重复请求已经成功时，应返回同一业务结果或当前最终状态。不能重复创建业务对象。
 
@@ -162,4 +166,3 @@ mobile -> bluenote-gateway -> backend apps
 3. 支持批量查询，避免 N+1。
 4. 单次批量大小默认不超过 100。
 5. 内部 DTO 与移动端 DTO 分开定义。
-

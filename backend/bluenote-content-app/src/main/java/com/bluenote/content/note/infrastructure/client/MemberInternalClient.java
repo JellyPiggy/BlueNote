@@ -32,11 +32,15 @@ public class MemberInternalClient {
     }
 
     public void ensureUserAllowed(String userId) {
+        ensureUserAllowed(userId, "NOTE_PUBLISH");
+    }
+
+    public void ensureUserAllowed(String userId, String scene) {
         JsonNode item = firstDataItem("/internal/users/status-check", "results", Map.of(
                 "userIds",
                 List.of(userId),
                 "scene",
-                "NOTE_PUBLISH"
+                scene
         ));
         if (!item.path("exists").asBoolean(false)) {
             throw new BusinessException(ApiErrorCode.USER_NOT_FOUND);

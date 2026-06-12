@@ -1,7 +1,7 @@
 # API 错误码契约
 
-版本：v0.1  
-状态：第一条主链路开发基线
+版本：v0.2
+状态：第一、第二条主链路开发基线
 
 ## 1. 编码规则
 
@@ -13,11 +13,11 @@
 | `21xxx` | 用户服务错误 |
 | `22xxx` | 文件服务错误 |
 | `23xxx` | 笔记服务错误 |
-| `24xxx` | 评论服务错误，后续补充 |
-| `25xxx` | 关系服务错误，后续补充 |
-| `26xxx` | 计数服务错误，后续补充 |
-| `27xxx` | Feed / 排行错误，后续补充 |
-| `28xxx` | 推送 / 通知错误，后续补充 |
+| `24xxx` | 评论服务错误 |
+| `25xxx` | 关系服务错误 |
+| `26xxx` | 计数服务错误 |
+| `27xxx` | Feed / 排行错误 |
+| `28xxx` | 推送 / 通知错误 |
 | `29xxx` | IM 错误，后续补充 |
 | `30xxx` | 订单错误，后续补充 |
 
@@ -103,7 +103,72 @@
 | `23012` | `NOTE_COMMENT_DISABLED` | 作者已关闭评论 | 禁用评论入口 |
 | `23013` | `NOTE_IDEMPOTENCY_MISMATCH` | 重复请求内容不一致 | 停止重试并提示 |
 
-## 7. 新增错误码规则
+## 7. 评论服务错误码
+
+| code | reason | message | 移动端处理 |
+|---|---|---|---|
+| `24001` | `COMMENT_NOT_FOUND` | 评论不存在 | 刷新评论区或 toast |
+| `24002` | `COMMENT_STATUS_INVALID` | 评论状态不可操作 | 刷新评论区 |
+| `24003` | `COMMENT_AUTHOR_FORBIDDEN` | 无权操作该评论 | toast |
+| `24004` | `COMMENT_CONTENT_INVALID` | 评论内容不符合要求 | 输入框提示 |
+| `24005` | `COMMENT_REPLY_TARGET_INVALID` | 回复目标不可用 | toast |
+| `24006` | `COMMENT_NOTE_NOT_ALLOWED` | 当前笔记不可评论 | 禁用评论入口 |
+| `24007` | `COMMENT_RATE_LIMITED` | 评论太频繁，请稍后再试 | toast，按钮短暂禁用 |
+| `24008` | `COMMENT_LIKE_RATE_LIMITED` | 操作太频繁，请稍后再试 | toast |
+| `24009` | `COMMENT_IDEMPOTENCY_MISMATCH` | 重复请求内容不一致 | 停止重试并提示 |
+| `24010` | `COMMENT_QUERY_DEGRADED` | 评论加载不完整，请稍后刷新 | 展示已返回内容并允许刷新 |
+
+## 8. 关系服务错误码
+
+| code | reason | message | 移动端处理 |
+|---|---|---|---|
+| `25001` | `RELATION_TARGET_NOT_FOUND` | 用户不存在 | toast 或空态 |
+| `25002` | `RELATION_TARGET_DISABLED` | 用户状态不可关注 | toast |
+| `25003` | `RELATION_SELF_FOLLOW_FORBIDDEN` | 不能关注自己 | toast |
+| `25004` | `RELATION_STATUS_INVALID` | 关注状态不可操作 | 刷新关注状态 |
+| `25005` | `RELATION_RATE_LIMITED` | 操作太频繁，请稍后再试 | toast，按钮短暂禁用 |
+| `25006` | `RELATION_BATCH_SIZE_EXCEEDED` | 批量查询数量超出限制 | 移动端拆分请求 |
+| `25007` | `RELATION_CURSOR_INVALID` | 分页游标不正确 | 重新刷新列表 |
+| `25008` | `RELATION_QUERY_DEGRADED` | 关系数据暂时不完整 | 展示降级状态 |
+
+## 9. 计数服务错误码
+
+| code | reason | message | 移动端处理 |
+|---|---|---|---|
+| `26001` | `COUNTER_BATCH_SIZE_EXCEEDED` | 批量查询数量超出限制 | 移动端不应直接收到 |
+| `26002` | `COUNTER_TARGET_TYPE_UNSUPPORTED` | 计数对象类型不支持 | 移动端不应直接收到 |
+| `26003` | `COUNTER_FIELD_NOT_SUPPORTED` | 计数字段不支持 | 移动端不应直接收到 |
+| `26004` | `COUNTER_TARGET_ID_INVALID` | 计数对象不正确 | 移动端不应直接收到 |
+| `26005` | `COUNTER_QUERY_DEGRADED` | 计数暂时不准确 | 展示后端返回的降级数据 |
+| `26006` | `COUNTER_REBUILD_TASK_NOT_FOUND` | 计数重建任务不存在 | 移动端不应直接收到 |
+| `26007` | `COUNTER_REBUILD_TOO_FREQUENT` | 计数修复过于频繁 | 移动端不应直接收到 |
+| `26008` | `COUNTER_SOURCE_UNAVAILABLE` | 计数来源暂时不可用 | 移动端不应直接收到 |
+
+## 10. Feed / 排行服务错误码
+
+| code | reason | message | 移动端处理 |
+|---|---|---|---|
+| `27001` | `FEED_CURSOR_INVALID` | 分页游标不正确 | 重新刷新 Feed |
+| `27002` | `FEED_SIZE_EXCEEDED` | 请求数量超出限制 | 使用默认分页大小重试 |
+| `27003` | `FEED_QUERY_DEGRADED` | 内容加载不完整，请稍后刷新 | 展示已返回内容 |
+| `27004` | `FEED_REBUILD_TASK_NOT_FOUND` | Feed 重建任务不存在 | 移动端不应直接收到 |
+| `27005` | `FEED_FANOUT_TASK_NOT_FOUND` | Feed 投递任务不存在 | 移动端不应直接收到 |
+| `27006` | `FEED_INTERNAL_DEPENDENCY_FAILED` | 内容服务暂时不可用 | toast，可重试 |
+
+## 11. 推送 / 通知服务错误码
+
+| code | reason | message | 移动端处理 |
+|---|---|---|---|
+| `28001` | `NOTIFICATION_NOT_FOUND` | 通知不存在 | 刷新通知列表 |
+| `28002` | `NOTIFICATION_OWNER_FORBIDDEN` | 无权操作该通知 | toast |
+| `28003` | `NOTIFICATION_CATEGORY_INVALID` | 通知分类不正确 | 使用默认分类刷新 |
+| `28004` | `NOTIFICATION_CURSOR_INVALID` | 分页游标不正确 | 重新刷新通知列表 |
+| `28005` | `NOTIFICATION_SIZE_EXCEEDED` | 请求数量超出限制 | 使用默认分页大小重试 |
+| `28006` | `NOTIFICATION_READ_STATE_CONFLICT` | 通知状态已变化 | 刷新未读数 |
+| `28007` | `NOTIFICATION_SYSTEM_REQUEST_INVALID` | 系统通知请求不正确 | 移动端不应直接收到 |
+| `28008` | `NOTIFICATION_REBUILD_TOO_FREQUENT` | 未读数修复过于频繁 | 移动端不应直接收到 |
+
+## 12. 新增错误码规则
 
 新增错误码必须：
 
@@ -112,4 +177,3 @@
 3. `message` 不暴露内部实现细节。
 4. `reason` 使用大写下划线。
 5. 移动端能明确判断是否需要重试、跳转登录、刷新页面或展示空态。
-
