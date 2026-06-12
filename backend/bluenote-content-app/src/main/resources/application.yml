@@ -29,6 +29,16 @@ bluenote:
       upload-url-expires-seconds: ${BLUENOTE_MINIO_UPLOAD_URL_EXPIRES_SECONDS:600}
   internal:
     member-uri: ${BLUENOTE_MEMBER_INTERNAL_URI:http://127.0.0.1:8081}
+  mq:
+    enabled: ${BLUENOTE_MQ_ENABLED:true}
+    name-server: ${BLUENOTE_ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
+    producer-group: ${BLUENOTE_CONTENT_MQ_PRODUCER_GROUP:bluenote-content-outbox-producer}
+    outbox:
+      enabled: ${BLUENOTE_OUTBOX_DISPATCH_ENABLED:true}
+      tables:
+        - table-name: bluenote_file.file_outbox_event
+        - table-name: bluenote_note.note_outbox_event
+        - table-name: bluenote_comment.comment_outbox_event
 
 management:
   endpoints:

@@ -29,6 +29,15 @@ bluenote:
   internal:
     member-uri: ${BLUENOTE_MEMBER_INTERNAL_URI:http://127.0.0.1:8081}
     content-uri: ${BLUENOTE_CONTENT_INTERNAL_URI:http://127.0.0.1:8082}
+  mq:
+    enabled: ${BLUENOTE_MQ_ENABLED:true}
+    name-server: ${BLUENOTE_ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
+    producer-group: ${BLUENOTE_SOCIAL_MQ_PRODUCER_GROUP:bluenote-social-outbox-producer}
+    outbox:
+      enabled: ${BLUENOTE_OUTBOX_DISPATCH_ENABLED:true}
+      tables:
+        - table-name: bluenote_relation.relation_outbox_event
+        - table-name: bluenote_counter.counter_outbox_event
 
 management:
   endpoints:
