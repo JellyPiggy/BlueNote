@@ -167,6 +167,12 @@
 | `28006` | `NOTIFICATION_READ_STATE_CONFLICT` | 通知状态已变化 | 刷新未读数 |
 | `28007` | `NOTIFICATION_SYSTEM_REQUEST_INVALID` | 系统通知请求不正确 | 移动端不应直接收到 |
 | `28008` | `NOTIFICATION_REBUILD_TOO_FREQUENT` | 未读数修复过于频繁 | 移动端不应直接收到 |
+| `28009` | `PUSH_DEVICE_NOT_FOUND` | 推送设备不存在 | 重新注册设备 |
+| `28010` | `PUSH_DEVICE_INVALID` | 推送设备信息不正确 | 重新注册设备 |
+| `28011` | `PUSH_PREFERENCE_INVALID` | 推送偏好不正确 | 恢复默认值后重试 |
+| `28012` | `PUSH_REQUEST_NOT_FOUND` | 推送请求不存在 | 移动端不应直接收到 |
+| `28013` | `PUSH_REQUEST_INVALID` | 推送请求不正确 | 移动端不应直接收到 |
+| `28014` | `PUSH_DELIVERY_UNAVAILABLE` | 推送暂时不可用 | 稍后重试 |
 
 ## 12. 新增错误码规则
 

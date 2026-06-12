@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.push.infrastructure.mapper.PushDeviceMapper">
+
+    <resultMap id="PushDeviceResultMap" type="com.bluenote.social.push.infrastructure.entity.PushDeviceEntity">
+        <id column="device_id" property="deviceId"/>
+        <result column="user_id" property="userId"/>
+        <result column="platform" property="platform"/>
+        <result column="push_provider" property="pushProvider"/>
+        <result column="provider_client_id" property="providerClientId"/>
+        <result column="app_version" property="appVersion"/>
+        <result column="os_version" property="osVersion"/>
+        <result column="device_model" property="deviceModel"/>
+        <result column="device_status" property="deviceStatus"/>
+        <result column="registered_at" property="registeredAt"/>
+        <result column="last_active_at" property="lastActiveAt"/>
+        <result column="unbound_at" property="unboundAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="PushDeviceColumns">
+        device_id, user_id, platform, push_provider, provider_client_id, app_version, os_version,
+        device_model, device_status, registered_at, last_active_at, unbound_at, created_at, updated_at
+    </sql>
+
+    <insert id="upsert" parameterType="com.bluenote.social.push.infrastructure.entity.PushDeviceEntity">
+        INSERT INTO bluenote_push.push_device (
+            device_id, user_id, platform, push_provider, provider_client_id, app_version, os_version,
+            device_model, device_status, registered_at, last_active_at, unbound_at, created_at, updated_at
+        ) VALUES (
+            #{deviceId}, #{userId}, #{platform}, #{pushProvider}, #{providerClientId}, #{appVersion}, #{osVersion},
+            #{deviceModel}, #{deviceStatus}, #{registeredAt}, #{lastActiveAt}, #{unboundAt}, #{createdAt}, #{updatedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            user_id = VALUES(user_id),
+            platform = VALUES(platform),
+            push_provider = VALUES(push_provider),
+            provider_client_id = VALUES(provider_client_id),
+            app_version = VALUES(app_version),
+            os_version = VALUES(os_version),
+            device_model = VALUES(device_model),
+            device_status = VALUES(device_status),
+            last_active_at = VALUES(last_active_at),
+            unbound_at = VALUES(unbound_at),
+            updated_at = VALUES(updated_at)
+    </insert>
+
+    <select id="selectByDeviceId" resultMap="PushDeviceResultMap">
+        SELECT <include refid="PushDeviceColumns"/>
+        FROM bluenote_push.push_device
+        WHERE device_id = #{deviceId}
+    </select>
+
+    <select id="selectByUser" resultMap="PushDeviceResultMap">
+        SELECT <include refid="PushDeviceColumns"/>
+        FROM bluenote_push.push_device
+        WHERE user_id = #{userId}
+        ORDER BY last_active_at DESC
+    </select>
+
+    <select id="selectActiveByUser" resultMap="PushDeviceResultMap">
+        SELECT <include refid="PushDeviceColumns"/>
+        FROM bluenote_push.push_device
+        WHERE user_id = #{userId}
+          AND device_status = 'ACTIVE'
+        ORDER BY last_active_at DESC
+    </select>
+
+    <update id="unbind">
+        UPDATE bluenote_push.push_device
+        SET device_status = 'UNBOUND',
+            unbound_at = #{unboundAt},
+            updated_at = #{updatedAt}
+        WHERE device_id = #{deviceId}
+          AND user_id = #{userId}
+    </update>
+</mapper>

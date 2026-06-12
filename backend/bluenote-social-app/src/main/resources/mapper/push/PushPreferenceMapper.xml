@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.push.infrastructure.mapper.PushPreferenceMapper">
+
+    <resultMap id="PushPreferenceResultMap" type="com.bluenote.social.push.infrastructure.entity.PushPreferenceEntity">
+        <id column="user_id" property="userId"/>
+        <result column="global_enabled" property="globalEnabled"/>
+        <result column="interaction_enabled" property="interactionEnabled"/>
+        <result column="follow_enabled" property="followEnabled"/>
+        <result column="system_enabled" property="systemEnabled"/>
+        <result column="order_enabled" property="orderEnabled"/>
+        <result column="im_enabled" property="imEnabled"/>
+        <result column="show_im_detail" property="showImDetail"/>
+        <result column="quiet_hours_enabled" property="quietHoursEnabled"/>
+        <result column="quiet_start" property="quietStart"/>
+        <result column="quiet_end" property="quietEnd"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insertIgnore" parameterType="com.bluenote.social.push.infrastructure.entity.PushPreferenceEntity">
+        INSERT IGNORE INTO bluenote_push.push_preference (
+            user_id, global_enabled, interaction_enabled, follow_enabled, system_enabled, order_enabled,
+            im_enabled, show_im_detail, quiet_hours_enabled, quiet_start, quiet_end, created_at, updated_at
+        ) VALUES (
+            #{userId}, #{globalEnabled}, #{interactionEnabled}, #{followEnabled}, #{systemEnabled}, #{orderEnabled},
+            #{imEnabled}, #{showImDetail}, #{quietHoursEnabled}, #{quietStart}, #{quietEnd}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.bluenote.social.push.infrastructure.entity.PushPreferenceEntity">
+        UPDATE bluenote_push.push_preference
+        SET global_enabled = #{globalEnabled},
+            interaction_enabled = #{interactionEnabled},
+            follow_enabled = #{followEnabled},
+            system_enabled = #{systemEnabled},
+            order_enabled = #{orderEnabled},
+            im_enabled = #{imEnabled},
+            show_im_detail = #{showImDetail},
+            quiet_hours_enabled = #{quietHoursEnabled},
+            quiet_start = #{quietStart},
+            quiet_end = #{quietEnd},
+            updated_at = #{updatedAt}
+        WHERE user_id = #{userId}
+    </update>
+
+    <select id="selectByUserId" resultMap="PushPreferenceResultMap">
+        SELECT user_id, global_enabled, interaction_enabled, follow_enabled, system_enabled, order_enabled,
+               im_enabled, show_im_detail, quiet_hours_enabled, quiet_start, quiet_end, created_at, updated_at
+        FROM bluenote_push.push_preference
+        WHERE user_id = #{userId}
+    </select>
+</mapper>

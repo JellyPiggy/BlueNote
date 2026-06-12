@@ -123,7 +123,24 @@ Hash 字段：
 2. Redis 未读缓存丢失后回源 MySQL。
 3. 聚合短锁失败时可退化为 MySQL 唯一约束冲突重试。
 
-## 6. Key 变更规则
+## 6. push keys
+
+| Key | 类型 | TTL | 写入方 | 读取方 | 用途 |
+|---|---|---|---|---|---|
+| `bluenote:{env}:push:device:active:{userId}` | ZSET | 30 天 | push | push | 用户活跃设备，score 为 lastActiveAtMillis，member 为 deviceId |
+| `bluenote:{env}:push:preference:{userId}` | Hash | 30 分钟 | push | push | 用户推送偏好缓存 |
+| `bluenote:{env}:push:online:user:{userId}` | Set | 2 分钟滚动 | push | push | 在线设备集合，WebSocket 接入后使用 |
+| `bluenote:{env}:push:online:device:{deviceId}` | Hash | 2 分钟滚动 | push | push | 设备在线连接路由，WebSocket 接入后使用 |
+| `bluenote:{env}:push:idempotent:{consumerGroup}:{eventId}` | String | 7 天 | push | push | MQ 消费短期幂等缓存 |
+| `bluenote:{env}:push:rate:user:{userId}:{minute}` | String | 2 分钟 | push | push | 用户维度推送限流 |
+
+重建方式：
+
+1. 活跃设备缓存从 `push_device` 中 `ACTIVE` 设备重建。
+2. 偏好缓存从 `push_preference` 重建，缺失时使用默认开启策略。
+3. 在线连接 key 丢失视为用户离线，不影响业务事实。
+
+## 7. Key 变更规则
 
 新增或修改 Key 必须同步说明：
 

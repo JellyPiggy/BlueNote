@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.push.infrastructure.mapper.PushDeliveryRequestMapper">
+
+    <resultMap id="PushDeliveryRequestResultMap" type="com.bluenote.social.push.infrastructure.entity.PushDeliveryRequestEntity">
+        <id column="request_id" property="requestId"/>
+        <result column="source_service" property="sourceService"/>
+        <result column="source_biz_type" property="sourceBizType"/>
+        <result column="source_biz_id" property="sourceBizId"/>
+        <result column="scene" property="scene"/>
+        <result column="target_user_id" property="targetUserId"/>
+        <result column="target_device_policy" property="targetDevicePolicy"/>
+        <result column="delivery_strategy" property="deliveryStrategy"/>
+        <result column="priority" property="priority"/>
+        <result column="title" property="title"/>
+        <result column="body" property="body"/>
+        <result column="data_json" property="dataJson"/>
+        <result column="request_status" property="requestStatus"/>
+        <result column="filtered_reason" property="filteredReason"/>
+        <result column="delivered_device_count" property="deliveredDeviceCount"/>
+        <result column="expire_at" property="expireAt"/>
+        <result column="completed_at" property="completedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="PushDeliveryRequestColumns">
+        request_id, source_service, source_biz_type, source_biz_id, scene, target_user_id,
+        target_device_policy, delivery_strategy, priority, title, body, data_json, request_status,
+        filtered_reason, delivered_device_count, expire_at, completed_at, created_at, updated_at
+    </sql>
+
+    <insert id="insertIgnore" parameterType="com.bluenote.social.push.infrastructure.entity.PushDeliveryRequestEntity">
+        INSERT IGNORE INTO bluenote_push.push_delivery_request (
+            request_id, source_service, source_biz_type, source_biz_id, scene, target_user_id,
+            target_device_policy, delivery_strategy, priority, title, body, data_json, request_status,
+            filtered_reason, delivered_device_count, expire_at, completed_at, created_at, updated_at
+        ) VALUES (
+            #{requestId}, #{sourceService}, #{sourceBizType}, #{sourceBizId}, #{scene}, #{targetUserId},
+            #{targetDevicePolicy}, #{deliveryStrategy}, #{priority}, #{title}, #{body}, #{dataJson}, #{requestStatus},
+            #{filteredReason}, #{deliveredDeviceCount}, #{expireAt}, #{completedAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectByRequestId" resultMap="PushDeliveryRequestResultMap">
+        SELECT <include refid="PushDeliveryRequestColumns"/>
+        FROM bluenote_push.push_delivery_request
+        WHERE request_id = #{requestId}
+    </select>
+
+    <select id="selectBySourceBiz" resultMap="PushDeliveryRequestResultMap">
+        SELECT <include refid="PushDeliveryRequestColumns"/>
+        FROM bluenote_push.push_delivery_request
+        WHERE source_service = #{sourceService}
+          AND source_biz_type = #{sourceBizType}
+          AND source_biz_id = #{sourceBizId}
+          AND scene = #{scene}
+        LIMIT 1
+    </select>
+
+    <select id="selectByRequestIdForUpdate" resultMap="PushDeliveryRequestResultMap">
+        SELECT <include refid="PushDeliveryRequestColumns"/>
+        FROM bluenote_push.push_delivery_request
+        WHERE request_id = #{requestId}
+        FOR UPDATE
+    </select>
+
+    <update id="updateStatus">
+        UPDATE bluenote_push.push_delivery_request
+        SET request_status = #{requestStatus},
+            filtered_reason = #{filteredReason},
+            delivered_device_count = #{deliveredDeviceCount},
+            completed_at = #{completedAt},
+            updated_at = #{updatedAt}
+        WHERE request_id = #{requestId}
+    </update>
+</mapper>

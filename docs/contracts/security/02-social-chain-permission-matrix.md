@@ -31,6 +31,12 @@
 | POST | `/api/notifications/read-all` | 是 | 当前用户 | 是 | 用户 | 批量已读 |
 | DELETE | `/api/notifications/{notificationId}` | 是 | 通知接收人 | 是 | 用户 | 删除通知 |
 | DELETE | `/api/notifications` | 是 | 当前用户 | 是 | 用户 | 批量删除通知 |
+| POST | `/api/push/devices/register` | 是 | 当前用户设备 | 业务唯一键 | 用户 / 设备 | 注册或刷新推送设备 |
+| GET | `/api/push/devices` | 是 | 当前用户 | 否 | 用户 | 查询我的推送设备 |
+| DELETE | `/api/push/devices/{deviceId}` | 是 | 当前用户设备 | 是 | 用户 / 设备 | 解绑设备 |
+| GET | `/api/push/preferences` | 是 | 当前用户 | 否 | 用户 | 查询推送偏好 |
+| PUT | `/api/push/preferences` | 是 | 当前用户 | 是 | 用户 | 更新推送偏好 |
+| POST | `/api/push/clicks` | 是 | 当前用户设备 | 是 | 用户 / 设备 | Push 点击回传 |
 
 说明：
 
@@ -60,6 +66,10 @@
 | POST | `/internal/notifications/batch-summary` | push / admin | notification | 服务身份认证，单次最多 100 |
 | POST | `/internal/notifications/users/{userId}/rebuild-unread` | ops / admin | notification | 内部管理权限，频率限制 |
 | POST | `/internal/notifications/events/replay` | ops / admin | notification | 内部管理权限，审计 |
+| POST | `/internal/push/requests/send` | notification / im / order / ops | push | 服务身份认证，按 requestId 幂等 |
+| GET | `/internal/push/requests/{requestId}` | notification / im / order / ops | push | 服务身份认证 |
+| POST | `/internal/push/requests/{requestId}/retry` | ops / admin | push | 内部管理权限，审计 |
+| POST | `/internal/push/events/replay` | ops / admin | push | 内部管理权限，审计 |
 | POST | `/internal/notes/authors/recent` | feed | note | 服务身份认证，单次最多 50 作者 |
 | POST | `/internal/notes/counter-source` | counter | note | 服务身份认证，字段白名单 |
 
@@ -79,6 +89,10 @@
 | 通知单条已读 | `notificationId` 最终状态 |
 | 通知批量已读 | `receiverId + category` 当前未读集合 |
 | 删除通知 | `receiverId + notificationId` 最终可见状态 |
+| 注册设备 | `deviceId` 最终绑定状态 |
+| 更新推送偏好 | `userId` 最终偏好状态 |
+| Push 点击回传 | `requestId + userId + deviceId + clickedAt` 日志幂等后续增强 |
+| Push 投递请求 | `requestId`，并辅以 `sourceService + sourceBizType + sourceBizId + scene` |
 
 重复请求已经成功时，应返回当前最终状态，不重复发布真实业务事件。
 
@@ -96,6 +110,11 @@
 | Feed `cursor` | `publishedAtMillis_noteId` |
 | 通知 `category` | `INTERACTION` / `FOLLOW` / `SYSTEM` / `ORDER` |
 | 通知批量删除 | 单次最多 50 条 |
+| `deviceId` | 非空，长度不超过 128 |
+| `platform` | `IOS` / `ANDROID` / `H5` |
+| `pushProvider` | `UNI_PUSH` / `APNS` / `FCM` / `VENDOR_PUSH` / `NOOP` |
+| 推送标题 | 不超过 128 字符 |
+| 推送正文 | 不超过 512 字符 |
 
 ## 5. 可见性和归属规则
 
@@ -105,6 +124,8 @@
 4. Feed 读取必须二次过滤已取关作者和不可见笔记。
 5. 通知查询、已读和删除必须校验 `receiverId == currentUserId`。
 6. 关注和评论写操作必须校验当前用户状态为 `NORMAL`。
+7. 设备解绑、点击回传必须校验设备属于当前用户或已经是当前用户最近绑定设备。
+8. Push 内部接口不得让移动端指定操作其他用户设备。
 
 ## 6. 限流建议
 
@@ -116,6 +137,9 @@
 | Feed 查询 | 用户、IP |
 | 通知列表查询 | 用户 |
 | 通知批量已读 / 删除 | 用户 |
+| 设备注册 / 解绑 | 用户、设备 |
+| Push 点击回传 | 用户、设备 |
+| Push 投递请求 | 目标用户、来源服务 |
 | 计数重建 | target、操作者 |
 | Feed 重建 | userId、操作者 |
 
@@ -127,5 +151,6 @@
 
 1. 关注、取关、评论、删除评论、评论点赞的操作日志。
 2. 通知已读、删除、系统通知创建的审计日志。
-3. 内部管理接口调用人、来源服务、请求参数摘要和 `traceId`。
-4. 权限失败和资源归属失败，不记录 Access Token、完整评论正文或敏感信息。
+3. 推送设备注册、解绑、偏好更新、投递请求和通道尝试日志。
+4. 内部管理接口调用人、来源服务、请求参数摘要和 `traceId`。
+5. 权限失败和资源归属失败，不记录 Access Token、完整评论正文、provider token 或敏感 payload。

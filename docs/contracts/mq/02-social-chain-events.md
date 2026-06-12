@@ -16,7 +16,8 @@
 | `feed-fanout-task-event` | `bluenote-feed` | `FeedFanoutSubTaskCreated` | Feed 服务内部扩散任务 |
 | `feed-event` | `bluenote-feed` | `FeedDelivered` / `FeedRebuilt` | 运维监控、后续读模型 |
 | `notification-event` | `bluenote-notification` | `NotificationCreated` / `NotificationAggregated` / `NotificationRead` / `NotificationReadBatch` / `NotificationDeleted` | 通知生命周期 |
-| `push-request-event` | `bluenote-notification` | `PushSendRequested` | 推送服务后续消费 |
+| `push-request-event` | `bluenote-notification` / `bluenote-im` / `bluenote-order` | `PushSendRequested` | 推送服务消费 |
+| `push-event` | `bluenote-push` | `PushDelivered` / `PushFiltered` / `PushFailed` | 推送结果事件，供通知、IM、运维后续消费 |
 
 第二条链路还消费第一条链路已定义的：
 
@@ -474,9 +475,38 @@ Topic：`push-request-event`
 }
 ```
 
-推送服务尚未落地时，通知服务只需可靠写出 outbox。
+推送服务消费后必须按 `requestId` 幂等，记录投递请求和通道尝试。第一阶段 `NOOP` 通道的 `DELIVERED` 只表示请求已被推送服务接收并记录。
 
-## 16. 消费组建议
+## 16. PushDelivered / PushFiltered / PushFailed
+
+Topic：`push-event`
+
+```json
+{
+  "eventId": "evt_push_delivered_push_req_n_1001",
+  "eventType": "PushDelivered",
+  "eventVersion": 1,
+  "occurredAt": "2026-06-11T11:50:01+08:00",
+  "traceId": "trace-id",
+  "producer": "bluenote-push",
+  "bizKey": "push_req_n_1001",
+  "payload": {
+    "requestId": "push_req_n_1001",
+    "targetUserId": "10001",
+    "sourceBizType": "NOTIFICATION",
+    "sourceBizId": "n_1001",
+    "scene": "COMMENT_NOTIFICATION",
+    "requestStatus": "DELIVERED",
+    "deliveredDeviceCount": 1,
+    "filteredReason": null,
+    "completedAt": "2026-06-11T11:50:01+08:00"
+  }
+}
+```
+
+`PushFiltered` 必须携带 `filteredReason`。`PushFailed` 必须携带不超过 512 字符的 `errorMessage`。
+
+## 17. 消费组建议
 
 | consumerGroup | 消费 Topic | 所属服务 |
 |---|---|---|
@@ -491,8 +521,9 @@ Topic：`push-request-event`
 | `bluenote-notification-comment-consumer` | `comment-event` | notification |
 | `bluenote-notification-relation-consumer` | `relation-event` | notification |
 | `bluenote-notification-note-consumer` | `note-event` | notification |
+| `bluenote-push-request-consumer` | `push-request-event` | push |
 
-## 17. 幂等和变更规则
+## 18. 幂等和变更规则
 
 1. 消费幂等统一使用 `consumer_group + event_id`。
 2. 业务重复判断不能只依赖 Redis，必须有 MySQL 唯一约束或消费记录兜底。

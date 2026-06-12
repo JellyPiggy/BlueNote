@@ -25,6 +25,7 @@ public class GatewayRouteConfiguration {
                 .route("social-relation", route -> route.path("/api/relations/**").uri(socialUri))
                 .route("social-feed", route -> route.path("/api/feed/**").uri(socialUri))
                 .route("social-notification", route -> route.path("/api/notifications/**").uri(socialUri))
+                .route("social-push", route -> route.path("/api/push/**").uri(socialUri))
                 .build();
     }
 }
