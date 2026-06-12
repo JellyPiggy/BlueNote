@@ -8,11 +8,12 @@ BlueNote 后端采用 Java 21、Spring Boot 3.5.x、Spring Cloud 2025.0.x 和 Ma
 注册/登录 -> 获取用户资料 -> 上传图片 -> 发布笔记 -> 查看笔记详情
 ```
 
-第二条主链路已开始落地，当前完成 relation 和 comment 的最小纵切面：
+第二条主链路已开始落地，当前完成 relation/comment/counter/feed 起步纵切面，并已接入基础 MQ/outbox 闭环：
 
 ```text
 关注用户 -> 关系事实落库 -> relation-event outbox
 评论/回复 -> 评论事实落库 -> comment-event outbox
+outbox dispatcher -> RocketMQ -> counter 自动消费 -> counter-event outbox
 ```
 
 ## 1. 模块
@@ -42,7 +43,7 @@ backend/
 | `bluenote-gateway-app` | 8080 | 网关、JWT 校验、路由、用户上下文 Header 注入 |
 | `bluenote-member-app` | 8081 | auth、user |
 | `bluenote-content-app` | 8082 | file、note、comment |
-| `bluenote-social-app` | 8083 | relation、counter，后续承载 feed、rank、notification |
+| `bluenote-social-app` | 8083 | relation、counter、feed，后续承载 rank、notification |
 
 ## 2. 当前实现状态
 
@@ -178,7 +179,7 @@ comment 内部接口：
 7. 评论发布/删除/点赞写 comment outbox。
 8. 评论列表聚合作者、正文、计数快照和 viewerAction。
 
-限制：完整 counter/feed/notification 链路尚未实现；note/comment outbox 目前只写库，尚未投递 MQ。
+限制：note/comment/file outbox 已可由通用 dispatcher 投递 RocketMQ；feed/notification 还没有消费这些事件生成完整读模型或通知。
 
 ### 2.4 Social App
 
@@ -209,6 +210,10 @@ counter 内部接口：
 | 接口 | 说明 |
 |---|---|
 | `POST /internal/counters/batch` | 批量聚合 NOTE / USER / COMMENT 计数 |
+| `POST /internal/counters/events/consume` | 内部事件消费入口，可用于 MQ listener、补偿和本地联调 |
+| `POST /internal/counters/reconcile` | 计数校准和重建 |
+| `GET /internal/counters/rebuild-tasks/{taskId}` | 查询重建任务 |
+| `POST /internal/counters/warmup` | 批量预热计数 |
 
 已接入能力：
 
@@ -219,6 +224,43 @@ counter 内部接口：
 5. 关注列表、粉丝列表和关注状态走 MySQL 查询。
 6. 通过 member 内部接口校验用户状态和补全用户摘要。
 7. counter 查询聚合 relation、note、comment 的 `counter-source`，供用户主页等接口使用。
+8. counter 已有快照表、delta 流水、消费幂等、Redis 在线计数、重建任务和 `CounterChanged` outbox。
+9. social-app 已启动 RocketMQ counter consumer，自动消费 `note-event`、`interaction-event`、`comment-event`、`relation-event`。
+
+### 2.5 MQ 与 Outbox
+
+`bluenote-common-mq` 已提供基础 MQ/outbox 能力：
+
+1. 通用 RocketMQ producer。
+2. 通用 RocketMQ consumer 容器。
+3. 事件类型到 Topic 的契约映射。
+4. 通用 outbox dispatcher，扫描 `INIT` / `FAILED` 事件并发送 RocketMQ。
+5. 发送成功标记 `SENT`，发送失败标记 `FAILED`、增加 `retry_count` 并写入 `next_retry_at`。
+6. 内部运维接口可查询积压、手动触发发送和重置失败事件。
+
+当前接入的 outbox 表：
+
+| 应用 | 表 |
+|---|---|
+| member | `bluenote_auth.auth_outbox_event`、`bluenote_user.user_outbox_event` |
+| content | `bluenote_file.file_outbox_event`、`bluenote_note.note_outbox_event`、`bluenote_comment.comment_outbox_event` |
+| social | `bluenote_relation.relation_outbox_event`、`bluenote_counter.counter_outbox_event` |
+
+本地默认启用 MQ/outbox，可通过环境变量关闭：
+
+| 环境变量 | 说明 | 默认 |
+|---|---|---|
+| `BLUENOTE_MQ_ENABLED` | 是否启动 RocketMQ producer/consumer | `true` |
+| `BLUENOTE_OUTBOX_DISPATCH_ENABLED` | 是否启动 outbox dispatcher | `true` |
+| `BLUENOTE_ROCKETMQ_NAME_SERVER` | RocketMQ NameServer 地址 | `127.0.0.1:9876` |
+
+MQ/outbox 内部运维接口：
+
+| 接口 | 说明 |
+|---|---|
+| `GET /internal/mq/outbox/stats` | 查询当前应用声明的 outbox 表积压、可重试失败、死信和已发送数量 |
+| `POST /internal/mq/outbox/dispatch-once` | 手动触发当前应用扫描发送一次 |
+| `POST /internal/mq/outbox/events/retry` | 将指定失败事件重置为可重试状态 |
 
 ## 3. 本地要求
 
@@ -277,6 +319,7 @@ mvn -pl bluenote-gateway-app spring-boot:run
 | social 数据源 | `jdbc:mysql://127.0.0.1:3306/bluenote_relation` |
 | MinIO endpoint | `http://127.0.0.1:9000` |
 | MinIO bucket | `bluenote-files` |
+| RocketMQ NameServer | `127.0.0.1:9876` |
 | Gateway member URI | `http://127.0.0.1:8081` |
 | Gateway content URI | `http://127.0.0.1:8082` |
 | Gateway social URI | `http://127.0.0.1:8083` |
@@ -309,7 +352,7 @@ http://127.0.0.1:{port}/swagger-ui.html
 ## 7. 已知待办
 
 1. 补后端自动化测试和接口集成测试。
-2. 补 outbox dispatcher、RocketMQ 投递、消费幂等和重试闭环。
-3. 补 counter 事件消费、快照、Redis 回填和重建任务。
-4. 补 feed/notification 第二条社交链路。
+2. 补 RocketMQ 死信告警和更完整的人工重放审计。
+3. 补 feed 发布事件投递、收件箱快照、Redis 读模型和重建任务。
+4. 补 notification 第二条社交链路。
 5. 补生产部署、备份恢复、监控告警配置。

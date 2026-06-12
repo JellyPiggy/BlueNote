@@ -51,6 +51,7 @@ docs/contracts/
     08-counter-api.md
     09-feed-api.md
     10-notification-api.md
+    11-mq-admin-api.md
   db/
     01-main-chain-schema.md
     02-social-chain-schema.md

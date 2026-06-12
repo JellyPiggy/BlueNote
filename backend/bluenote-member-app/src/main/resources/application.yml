@@ -26,6 +26,16 @@ bluenote:
       expires-in-seconds: ${BLUENOTE_ACCESS_TOKEN_EXPIRES_IN_SECONDS:3600}
   internal:
     counter-uri: ${BLUENOTE_COUNTER_INTERNAL_URI:http://127.0.0.1:8083}
+  mq:
+    enabled: ${BLUENOTE_MQ_ENABLED:true}
+    name-server: ${BLUENOTE_ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
+    producer-group: ${BLUENOTE_MEMBER_MQ_PRODUCER_GROUP:bluenote-member-outbox-producer}
+    outbox:
+      enabled: ${BLUENOTE_OUTBOX_DISPATCH_ENABLED:true}
+      tables:
+        - table-name: bluenote_auth.auth_outbox_event
+          status-column: status
+        - table-name: bluenote_user.user_outbox_event
 
 management:
   endpoints:
