@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.rank.infrastructure.mapper.RankScoreChangeLogMapper">
+
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO bluenote_rank.rank_score_change_log (
+            change_id, source_event_id, source_event_type, rank_code, period_id,
+            member_type, member_id, source_type, source_id, field_name,
+            delta_value, score_delta, score_after, occurred_at, created_at
+        ) VALUES (
+            #{changeId}, #{sourceEventId}, #{sourceEventType}, #{rankCode}, #{periodId},
+            #{memberType}, #{memberId}, #{sourceType}, #{sourceId}, #{fieldName},
+            #{deltaValue}, #{scoreDelta}, #{scoreAfter}, #{occurredAt}, #{createdAt}
+        )
+    </insert>
+</mapper>

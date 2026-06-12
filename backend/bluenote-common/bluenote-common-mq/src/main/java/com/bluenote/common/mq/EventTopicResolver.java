@@ -35,6 +35,8 @@ public final class EventTopicResolver {
             Map.entry("FeedFanoutSubTaskCreated", "feed-fanout-task-event"),
             Map.entry("FeedDelivered", "feed-event"),
             Map.entry("FeedRebuilt", "feed-event"),
+            Map.entry("RankChanged", "rank-event"),
+            Map.entry("RankFrozen", "rank-event"),
             Map.entry("NotificationCreated", "notification-event"),
             Map.entry("NotificationAggregated", "notification-event"),
             Map.entry("NotificationRead", "notification-event"),

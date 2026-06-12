@@ -1,7 +1,7 @@
 # BlueNote 契约目录
 
-版本：v0.3
-状态：第一、第二、第三条主链路完成基线，第四条订单链路 foundation 开发基线
+版本：v0.4
+状态：第一、第二、第三条主链路完成基线，第四条订单链路 foundation 开发基线，排行榜 foundation 契约开发基线
 更新时间：2026-06-12
 
 ## 1. 目录目标
@@ -44,10 +44,11 @@
 6. `bluenote-comment`
 7. `bluenote-counter`
 8. `bluenote-feed`
-9. `bluenote-notification`
-10. `bluenote-push`
-11. `bluenote-im`
-12. `bluenote-order`
+9. `bluenote-rank`
+10. `bluenote-notification`
+11. `bluenote-push`
+12. `bluenote-im`
+13. `bluenote-order`
 
 ## 2. 目录结构
 
@@ -70,6 +71,7 @@ docs/contracts/
     12-push-api.md
     13-im-api.md
     14-order-api.md
+    15-rank-api.md
   db/
     01-main-chain-schema.md
     02-social-chain-schema.md
@@ -103,10 +105,11 @@ docs/contracts/
 9. `方案/services/06-评论服务设计.md`
 10. `方案/services/07-计数服务设计.md`
 11. `方案/services/08-Timeline-Feed服务设计.md`
-12. `方案/services/11-通知服务设计.md`
-13. `方案/services/10-推送与实时投递服务设计.md`
-14. `方案/services/12-IM服务设计.md`
-15. `方案/services/13-订单服务设计.md`
+12. `方案/services/09-排行榜服务设计.md`
+13. `方案/services/11-通知服务设计.md`
+14. `方案/services/10-推送与实时投递服务设计.md`
+15. `方案/services/12-IM服务设计.md`
+16. `方案/services/13-订单服务设计.md`
 
 如果本目录与旧方案示例冲突，以本目录为开发契约。典型例子：旧方案中部分响应示例使用字符串型 `"code": "OK"`，本目录统一改为数字型 `"code": 0`。
 
@@ -187,6 +190,16 @@ docs/contracts/
 5. 通知服务可以根据关注、点赞、收藏、评论、回复事件生成站内通知和未读数。
 6. 取关、笔记删除、私密、下架后 Feed 读取必须过滤不可见内容。
 7. 所有第二链路外部接口必须经过网关鉴权，内部接口不得暴露给移动端。
+
+排行榜 foundation 联调必须通过：
+
+1. `note-event` 可建立或更新排行榜笔记轻量索引。
+2. `counter-event` 的 `CounterChanged` 可驱动本周热门笔记榜和本年创作者成长榜分数。
+3. 重复事件不会重复加分。
+4. 本周热门笔记榜和本年创作者成长榜可以分页查询 Top 100。
+5. 当前创作者可以查询本人本年成长排名，支持 `EXACT`、`ESTIMATED`、`NOT_RANKED`。
+6. Redis 榜单丢失后可从 MySQL 成员分数重建。
+7. 榜单快照可以写入 MySQL，供降级和排查使用。
 
 第四条订单链路 foundation 联调必须通过：
 

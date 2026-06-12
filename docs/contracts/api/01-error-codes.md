@@ -16,7 +16,7 @@
 | `24xxx` | 评论服务错误 |
 | `25xxx` | 关系服务错误 |
 | `26xxx` | 计数服务错误 |
-| `27xxx` | Feed / 排行错误 |
+| `27xxx` | Feed / 排行榜错误 |
 | `28xxx` | 推送 / 通知错误 |
 | `29xxx` | IM 错误 |
 | `30xxx` | 订单错误 |
@@ -144,7 +144,7 @@
 | `26007` | `COUNTER_REBUILD_TOO_FREQUENT` | 计数修复过于频繁 | 移动端不应直接收到 |
 | `26008` | `COUNTER_SOURCE_UNAVAILABLE` | 计数来源暂时不可用 | 移动端不应直接收到 |
 
-## 10. Feed / 排行服务错误码
+## 10. Feed / 排行榜服务错误码
 
 | code | reason | message | 移动端处理 |
 |---|---|---|---|
@@ -154,6 +154,17 @@
 | `27004` | `FEED_REBUILD_TASK_NOT_FOUND` | Feed 重建任务不存在 | 移动端不应直接收到 |
 | `27005` | `FEED_FANOUT_TASK_NOT_FOUND` | Feed 投递任务不存在 | 移动端不应直接收到 |
 | `27006` | `FEED_INTERNAL_DEPENDENCY_FAILED` | 内容服务暂时不可用 | toast，可重试 |
+| `27007` | `RANK_CODE_UNSUPPORTED` | 不支持的榜单 | 使用默认榜单或隐藏入口 |
+| `27008` | `RANK_PERIOD_NOT_FOUND` | 榜单周期不存在 | 刷新榜单 |
+| `27009` | `RANK_MEMBER_TYPE_INVALID` | 榜单成员类型不正确 | 移动端不应直接收到 |
+| `27010` | `RANK_MEMBER_NOT_FOUND` | 榜单成员不存在 | 空态或刷新 |
+| `27011` | `RANK_NOTE_NOT_ELIGIBLE` | 笔记不具备上榜资格 | 刷新榜单 |
+| `27012` | `RANK_QUERY_SIZE_EXCEEDED` | 榜单查询数量超出限制 | 使用默认分页大小重试 |
+| `27013` | `RANK_CURSOR_INVALID` | 榜单游标不正确 | 重新刷新榜单 |
+| `27014` | `RANK_REBUILD_TASK_NOT_FOUND` | 榜单重建任务不存在 | 移动端不应直接收到 |
+| `27015` | `RANK_REBUILD_TOO_FREQUENT` | 榜单重建过于频繁 | 移动端不应直接收到 |
+| `27016` | `RANK_SCORE_RULE_INVALID` | 榜单分数规则不正确 | 移动端不应直接收到 |
+| `27017` | `RANK_QUERY_DEGRADED` | 榜单数据暂时不完整 | 展示已返回内容 |
 
 ## 11. 推送 / 通知服务错误码
 

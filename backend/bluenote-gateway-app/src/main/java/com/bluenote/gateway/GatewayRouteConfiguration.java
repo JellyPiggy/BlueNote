@@ -26,6 +26,7 @@ public class GatewayRouteConfiguration {
                 .route("content-comment", route -> route.path("/api/comments/**").uri(contentUri))
                 .route("social-relation", route -> route.path("/api/relations/**").uri(socialUri))
                 .route("social-feed", route -> route.path("/api/feed/**").uri(socialUri))
+                .route("social-rank", route -> route.path("/api/ranks/**").uri(socialUri))
                 .route("social-notification", route -> route.path("/api/notifications/**").uri(socialUri))
                 .route("social-push", route -> route.path("/api/push/**").uri(socialUri))
                 .route("social-im", route -> route.path("/api/im/**").uri(socialUri))

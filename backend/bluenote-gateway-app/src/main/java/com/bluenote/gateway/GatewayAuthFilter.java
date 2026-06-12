@@ -35,6 +35,7 @@ public class GatewayAuthFilter implements GlobalFilter, Ordered {
     private static final Pattern COMMENT_NOTE_LIST_PATH = Pattern.compile("^/api/comments/notes/[^/]+$");
     private static final Pattern COMMENT_REPLY_LIST_PATH = Pattern.compile("^/api/comments/[^/]+/replies$");
     private static final Pattern RELATION_PUBLIC_LIST_PATH = Pattern.compile("^/api/relations/users/[^/]+/(following|followers)$");
+    private static final Pattern PUBLIC_RANK_LIST_PATH = Pattern.compile("^/api/ranks/(weekly-hot-notes|yearly-creator-growth)$");
 
     private final JwtAccessTokenService accessTokenService;
     private final ObjectMapper objectMapper;
@@ -114,7 +115,8 @@ public class GatewayAuthFilter implements GlobalFilter, Ordered {
                 || NOTE_USER_LIST_PATH.matcher(path).matches()
                 || COMMENT_NOTE_LIST_PATH.matcher(path).matches()
                 || COMMENT_REPLY_LIST_PATH.matcher(path).matches()
-                || RELATION_PUBLIC_LIST_PATH.matcher(path).matches();
+                || RELATION_PUBLIC_LIST_PATH.matcher(path).matches()
+                || PUBLIC_RANK_LIST_PATH.matcher(path).matches();
     }
 
     private String bearerToken(ServerHttpRequest request) {
