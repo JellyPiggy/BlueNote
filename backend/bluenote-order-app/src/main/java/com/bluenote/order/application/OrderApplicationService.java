@@ -5,9 +5,12 @@ import com.bluenote.common.core.BusinessException;
 import com.bluenote.common.observability.TraceIdHolder;
 import com.bluenote.order.api.dto.OrderDtos.ActivityCurrentResponse;
 import com.bluenote.order.api.dto.OrderDtos.ActivityStatusResponse;
+import com.bluenote.order.api.dto.OrderDtos.InternalActivityListItem;
+import com.bluenote.order.api.dto.OrderDtos.InternalActivityListResponse;
 import com.bluenote.order.api.dto.OrderDtos.InternalActivityResponse;
 import com.bluenote.order.api.dto.OrderDtos.InternalActivityOpsSummaryResponse;
 import com.bluenote.order.api.dto.OrderDtos.InternalCreateActivityRequest;
+import com.bluenote.order.api.dto.OrderDtos.OrderActivityPrecheckResponse;
 import com.bluenote.order.api.dto.OrderDtos.OrderActivityItem;
 import com.bluenote.order.api.dto.OrderDtos.OrderCancelResponse;
 import com.bluenote.order.api.dto.OrderDtos.OrderConsumeEventRequest;
@@ -17,6 +20,8 @@ import com.bluenote.order.api.dto.OrderDtos.OrderPayRequest;
 import com.bluenote.order.api.dto.OrderDtos.OrderPayResponse;
 import com.bluenote.order.api.dto.OrderDtos.OrderRedisRebuildResponse;
 import com.bluenote.order.api.dto.OrderDtos.OrderRedisSnapshot;
+import com.bluenote.order.api.dto.OrderDtos.OrderStockAdjustRequest;
+import com.bluenote.order.api.dto.OrderDtos.OrderStockAdjustResponse;
 import com.bluenote.order.api.dto.OrderDtos.OrderStockReconcileRequest;
 import com.bluenote.order.api.dto.OrderDtos.OrderStockReconcileResponse;
 import com.bluenote.order.api.dto.OrderDtos.OrderSweepStuckRequest;
@@ -52,6 +57,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -80,6 +86,7 @@ public class OrderApplicationService {
     private static final String ACTIVITY_SOLD_OUT = "SOLD_OUT";
     private static final String ACTIVITY_PAUSED = "PAUSED";
     private static final String ACTIVITY_ENDED = "ENDED";
+    private static final String ACTIVITY_CANCELLED = "CANCELLED";
     private static final String REQUEST_PROCESSING = "PROCESSING";
     private static final String REQUEST_SUCCESS = "SUCCESS";
     private static final String REQUEST_WAIT_PAY = "WAIT_PAY";
@@ -199,27 +206,68 @@ public class OrderApplicationService {
         return new InternalActivityResponse(String.valueOf(activityId), String.valueOf(templateId), ACTIVITY_READY);
     }
 
+    @Transactional(readOnly = true)
+    public InternalActivityListResponse listActivities(String status, String cursor, Integer pageSize) {
+        String normalizedStatus = normalizeActivityStatus(status);
+        int size = normalizePageSize(pageSize);
+        ActivityCursor parsedCursor = parseActivityCursor(cursor);
+        List<CouponActivity> rows = orderMapper.selectActivities(
+                normalizedStatus,
+                parsedCursor == null ? null : parsedCursor.createdAt(),
+                parsedCursor == null ? null : parsedCursor.activityId(),
+                size + 1
+        );
+        boolean hasMore = rows.size() > size;
+        List<CouponActivity> page = hasMore ? rows.subList(0, size) : rows;
+        LocalDateTime now = now();
+        List<InternalActivityListItem> items = page.stream()
+                .map(activity -> toActivityListItem(activity, orderMapper.selectTemplateById(activity.getTemplateId()), now))
+                .toList();
+        return new InternalActivityListResponse(items, nextActivityCursor(page, hasMore), hasMore);
+    }
+
     @Transactional
     public ActivityStatusResponse preheat(String activityId) {
         Long parsedActivityId = parseId(activityId, ApiErrorCode.ORDER_ACTIVITY_NOT_FOUND);
         CouponActivity activity = requireActivity(parsedActivityId);
         LocalDateTime now = now();
+        assertPreheatAllowed(activity, now);
         redisStore.preheat(parsedActivityId, safeInt(activity.getAvailableStock()), redisTtl(activity, now));
-        orderMapper.markActivityPreheated(parsedActivityId, now);
+        int updated = orderMapper.markActivityPreheated(parsedActivityId, now);
+        if (updated <= 0) {
+            throw new BusinessException(ApiErrorCode.ORDER_ACTIVITY_STATUS_INVALID);
+        }
         return new ActivityStatusResponse(String.valueOf(parsedActivityId), ACTIVITY_PREHEATED);
     }
 
     @Transactional
     public ActivityStatusResponse updateActivityStatus(String activityId, String action) {
         Long parsedActivityId = parseId(activityId, ApiErrorCode.ORDER_ACTIVITY_NOT_FOUND);
-        requireActivity(parsedActivityId);
+        CouponActivity activity = requireActivity(parsedActivityId);
+        LocalDateTime now = now();
+        List<String> allowedStatuses;
         String status = switch (action) {
-            case "pause" -> ACTIVITY_PAUSED;
-            case "resume" -> ACTIVITY_PREHEATED;
-            case "end" -> ACTIVITY_ENDED;
+            case "pause" -> {
+                assertPauseAllowed(activity);
+                allowedStatuses = List.of(ACTIVITY_PREHEATED, ACTIVITY_ONLINE, ACTIVITY_SOLD_OUT);
+                yield ACTIVITY_PAUSED;
+            }
+            case "resume" -> {
+                assertResumeAllowed(activity);
+                allowedStatuses = List.of(ACTIVITY_PAUSED);
+                yield safeInt(activity.getAvailableStock()) <= 0 ? ACTIVITY_SOLD_OUT : ACTIVITY_PREHEATED;
+            }
+            case "end" -> {
+                assertEndAllowed(activity);
+                allowedStatuses = List.of(ACTIVITY_READY, ACTIVITY_PREHEATED, ACTIVITY_ONLINE, ACTIVITY_SOLD_OUT, ACTIVITY_PAUSED);
+                yield ACTIVITY_ENDED;
+            }
             default -> throw new BusinessException(ApiErrorCode.PARAM_INVALID);
         };
-        orderMapper.updateActivityStatus(parsedActivityId, status, now());
+        int updated = orderMapper.updateActivityStatus(parsedActivityId, status, now, allowedStatuses);
+        if (updated <= 0) {
+            throw new BusinessException(ApiErrorCode.ORDER_ACTIVITY_STATUS_INVALID);
+        }
         return new ActivityStatusResponse(String.valueOf(parsedActivityId), status);
     }
 
@@ -468,6 +516,36 @@ public class OrderApplicationService {
         return transactionTemplate.execute(status -> reconcileStockInTransaction(parsedActivityId, repair));
     }
 
+    @Transactional(readOnly = true)
+    public OrderActivityPrecheckResponse precheck(String activityId) {
+        Long parsedActivityId = parseId(activityId, ApiErrorCode.ORDER_ACTIVITY_NOT_FOUND);
+        CouponActivity activity = requireActivity(parsedActivityId);
+        return buildPrecheck(activity, now());
+    }
+
+    public OrderStockAdjustResponse adjustStock(String activityId, OrderStockAdjustRequest request) {
+        Long parsedActivityId = parseId(activityId, ApiErrorCode.ORDER_ACTIVITY_NOT_FOUND);
+        if (request == null || request.deltaStock() == null || request.deltaStock() == 0) {
+            throw new BusinessException(ApiErrorCode.PARAM_INVALID);
+        }
+        int deltaStock = request.deltaStock();
+        if (deltaStock == Integer.MIN_VALUE || Math.abs(deltaStock) > 100000) {
+            throw new BusinessException(ApiErrorCode.PARAM_INVALID);
+        }
+        String reason = requireText(request.reason(), 256, ApiErrorCode.PARAM_INVALID);
+        String operatorId = isBlank(request.operatorId()) ? "order-ops" : requireText(request.operatorId(), 64, ApiErrorCode.PARAM_INVALID);
+        RedisActivitySnapshot beforeRedis = redisStore.snapshot(parsedActivityId);
+        OrderStockAdjustResponse response = transactionTemplate.execute(status ->
+                adjustStockInTransaction(parsedActivityId, deltaStock, reason, operatorId)
+        );
+        if (response != null && Boolean.TRUE.equals(beforeRedis.stockKeyExists())) {
+            CouponActivity activity = requireActivity(parsedActivityId);
+            Set<Long> participantUserIds = new LinkedHashSet<>(orderMapper.selectActiveParticipantUserIds(parsedActivityId));
+            redisStore.rebuild(parsedActivityId, safeInt(activity.getAvailableStock()), participantUserIds, redisTtl(activity, now()));
+        }
+        return response;
+    }
+
     public OrderSweepStuckResponse sweepStuckRequests(OrderSweepStuckRequest request) {
         int stuckSeconds = Math.max(10, request == null || request.stuckSeconds() == null ? 60 : request.stuckSeconds());
         int limit = Math.min(100, Math.max(1, request == null || request.limit() == null ? timeoutScanBatchSize : request.limit()));
@@ -561,6 +639,51 @@ public class OrderApplicationService {
                 consistent,
                 repaired,
                 consistent ? "stock consistent" : (repaired ? "stock repaired" : "stock inconsistent")
+        );
+    }
+
+    private OrderStockAdjustResponse adjustStockInTransaction(Long activityId, int deltaStock, String reason, String operatorId) {
+        CouponActivity before = orderMapper.selectActivityByIdForUpdate(activityId);
+        if (before == null) {
+            throw new BusinessException(ApiErrorCode.ORDER_ACTIVITY_NOT_FOUND);
+        }
+        if (ACTIVITY_ENDED.equals(before.getActivityStatus()) || ACTIVITY_CANCELLED.equals(before.getActivityStatus())) {
+            throw new BusinessException(ApiErrorCode.ORDER_ACTIVITY_STATUS_INVALID);
+        }
+        StockExpectation stock = stockExpectation(before);
+        if (!stock.consistent(before)) {
+            throw new BusinessException(ApiErrorCode.ORDER_ACTIVITY_STATUS_INVALID);
+        }
+        LocalDateTime now = now();
+        int updated = orderMapper.adjustActivityStock(activityId, deltaStock, now);
+        if (updated <= 0) {
+            throw new BusinessException(ApiErrorCode.ORDER_STOCK_NOT_ENOUGH);
+        }
+        CouponActivity after = orderMapper.selectActivityById(activityId);
+        orderMapper.insertStockLog(
+                idGenerator.nextId(),
+                activityId,
+                null,
+                null,
+                "OPS_ADJUST",
+                deltaStock,
+                safeInt(before.getAvailableStock()),
+                after == null ? null : safeInt(after.getAvailableStock()),
+                "OPS",
+                operatorId,
+                reason,
+                now
+        );
+        return new OrderStockAdjustResponse(
+                String.valueOf(activityId),
+                safeInt(before.getTotalStock()),
+                safeInt(before.getAvailableStock()),
+                safeInt(before.getSoldStock()),
+                after == null ? 0 : safeInt(after.getTotalStock()),
+                after == null ? 0 : safeInt(after.getAvailableStock()),
+                after == null ? 0 : safeInt(after.getSoldStock()),
+                after == null ? before.getActivityStatus() : after.getActivityStatus(),
+                displayStatus(after == null ? before : after, now)
         );
     }
 
@@ -693,7 +816,20 @@ public class OrderApplicationService {
             orderMapper.insertTimeoutTask(task);
         }
 
-        orderMapper.insertStockLog(idGenerator.nextId(), activity.getActivityId(), orderId, requestId, "DEDUCT", -1, now);
+        orderMapper.insertStockLog(
+                idGenerator.nextId(),
+                activity.getActivityId(),
+                orderId,
+                requestId,
+                "DEDUCT",
+                -1,
+                null,
+                null,
+                "SYSTEM",
+                "order-service",
+                "ORDER_CREATE",
+                now
+        );
         orderMapper.insertStatusLog(idGenerator.nextId(), orderId, null, order.getOrderStatus(), "CREATE", "SYSTEM", "order-service", now);
         orderMapper.updateRequestResult(
                 requestId,
@@ -781,7 +917,20 @@ public class OrderApplicationService {
             throw new BusinessException(ApiErrorCode.ORDER_STATUS_INVALID);
         }
         orderMapper.replenishActivityStock(order.getActivityId(), now);
-        orderMapper.insertStockLog(idGenerator.nextId(), order.getActivityId(), orderId, order.getRequestId(), "CANCEL_REPLENISH", 1, now);
+        orderMapper.insertStockLog(
+                idGenerator.nextId(),
+                order.getActivityId(),
+                orderId,
+                order.getRequestId(),
+                "CANCEL_REPLENISH",
+                1,
+                null,
+                null,
+                "USER",
+                String.valueOf(currentUserId),
+                "USER_CANCEL",
+                now
+        );
         orderMapper.insertStatusLog(idGenerator.nextId(), orderId, ORDER_WAIT_PAY, ORDER_CANCELLED, "USER_CANCEL", "USER", String.valueOf(currentUserId), now);
         orderMapper.updateRequestResult(order.getRequestId(), REQUEST_CANCELLED, orderId, null, 0, order.getPayAmount(), null, "订单已取消", now, now);
         orderMapper.updateTimeoutTaskStatus(orderId, "CANCELLED", now, null, now);
@@ -818,7 +967,20 @@ public class OrderApplicationService {
             return false;
         }
         orderMapper.replenishActivityStock(order.getActivityId(), now);
-        orderMapper.insertStockLog(idGenerator.nextId(), order.getActivityId(), orderId, order.getRequestId(), "TIMEOUT_REPLENISH", 1, now);
+        orderMapper.insertStockLog(
+                idGenerator.nextId(),
+                order.getActivityId(),
+                orderId,
+                order.getRequestId(),
+                "TIMEOUT_REPLENISH",
+                1,
+                null,
+                null,
+                "SYSTEM",
+                "order-service",
+                "TIMEOUT_CLOSE",
+                now
+        );
         orderMapper.insertStatusLog(idGenerator.nextId(), orderId, ORDER_WAIT_PAY, ORDER_CLOSED, "TIMEOUT_CLOSE", "SYSTEM", "order-service", now);
         orderMapper.updateRequestResult(order.getRequestId(), REQUEST_CLOSED, orderId, null, 0, order.getPayAmount(), null, "订单超时关闭", now, now);
         orderMapper.updateTimeoutTaskStatus(orderId, ORDER_CLOSED, now, null, now);
@@ -976,6 +1138,43 @@ public class OrderApplicationService {
         insertOutbox("PushSendRequested", "push_req_order_" + sceneBiz + "_" + orderId, payload, now);
     }
 
+    private void assertPreheatAllowed(CouponActivity activity, LocalDateTime now) {
+        if (ACTIVITY_PAUSED.equals(activity.getActivityStatus())
+                || ACTIVITY_ENDED.equals(activity.getActivityStatus())
+                || ACTIVITY_CANCELLED.equals(activity.getActivityStatus())) {
+            throw new BusinessException(ApiErrorCode.ORDER_ACTIVITY_STATUS_INVALID);
+        }
+        if (activity.getEndAt() == null || !activity.getEndAt().isAfter(now)) {
+            throw new BusinessException(ApiErrorCode.ORDER_ACTIVITY_STATUS_INVALID);
+        }
+        if (!List.of(ACTIVITY_READY, ACTIVITY_PREHEATED, ACTIVITY_ONLINE).contains(activity.getActivityStatus())) {
+            throw new BusinessException(ApiErrorCode.ORDER_ACTIVITY_STATUS_INVALID);
+        }
+        StockExpectation stock = stockExpectation(activity);
+        if (!stock.consistent(activity)) {
+            throw new BusinessException(ApiErrorCode.ORDER_ACTIVITY_STATUS_INVALID);
+        }
+    }
+
+    private void assertPauseAllowed(CouponActivity activity) {
+        if (!List.of(ACTIVITY_PREHEATED, ACTIVITY_ONLINE, ACTIVITY_SOLD_OUT).contains(activity.getActivityStatus())) {
+            throw new BusinessException(ApiErrorCode.ORDER_ACTIVITY_STATUS_INVALID);
+        }
+    }
+
+    private void assertResumeAllowed(CouponActivity activity) {
+        if (!ACTIVITY_PAUSED.equals(activity.getActivityStatus())) {
+            throw new BusinessException(ApiErrorCode.ORDER_ACTIVITY_STATUS_INVALID);
+        }
+    }
+
+    private void assertEndAllowed(CouponActivity activity) {
+        if (!List.of(ACTIVITY_READY, ACTIVITY_PREHEATED, ACTIVITY_ONLINE, ACTIVITY_SOLD_OUT, ACTIVITY_PAUSED)
+                .contains(activity.getActivityStatus())) {
+            throw new BusinessException(ApiErrorCode.ORDER_ACTIVITY_STATUS_INVALID);
+        }
+    }
+
     private void insertOutbox(String eventType, String bizKey, Map<String, Object> payload, LocalDateTime now) {
         String eventId = "evt_" + eventType + "_" + bizKey + "_" + UUID.randomUUID();
         OrderOutboxEvent entity = new OrderOutboxEvent();
@@ -1080,6 +1279,92 @@ public class OrderApplicationService {
         );
     }
 
+    private InternalActivityListItem toActivityListItem(CouponActivity activity, CouponTemplate template, LocalDateTime now) {
+        return new InternalActivityListItem(
+                String.valueOf(activity.getActivityId()),
+                activity.getActivityName(),
+                String.valueOf(activity.getTemplateId()),
+                template == null ? "" : template.getTemplateName(),
+                activity.getActivityStatus(),
+                displayStatus(activity, now),
+                safeInt(activity.getTotalStock()),
+                safeInt(activity.getAvailableStock()),
+                safeInt(activity.getSoldStock()),
+                safeInt(activity.getPayAmount()),
+                toOffsetString(activity.getStartAt()),
+                toOffsetString(activity.getEndAt()),
+                toOffsetString(activity.getPreheatedAt()),
+                toOffsetString(activity.getCreatedAt()),
+                toOffsetString(activity.getUpdatedAt())
+        );
+    }
+
+    private OrderActivityPrecheckResponse buildPrecheck(CouponActivity activity, LocalDateTime now) {
+        List<String> blockers = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
+        CouponTemplate template = orderMapper.selectTemplateById(activity.getTemplateId());
+        if (template == null) {
+            blockers.add("TEMPLATE_NOT_FOUND");
+        } else if (!"ACTIVE".equals(template.getTemplateStatus())) {
+            blockers.add("TEMPLATE_INACTIVE");
+        }
+        if (activity.getStartAt() == null || activity.getEndAt() == null || !activity.getEndAt().isAfter(activity.getStartAt())) {
+            blockers.add("ACTIVITY_TIME_INVALID");
+        } else if (!activity.getEndAt().isAfter(now)) {
+            blockers.add("ACTIVITY_ENDED");
+        }
+        if (ACTIVITY_ENDED.equals(activity.getActivityStatus()) || ACTIVITY_CANCELLED.equals(activity.getActivityStatus())) {
+            blockers.add("ACTIVITY_STATUS_CLOSED");
+        }
+        if (safeInt(activity.getTotalStock()) <= 0) {
+            blockers.add("STOCK_EMPTY");
+        }
+        StockExpectation stock = stockExpectation(activity);
+        boolean stockConsistent = stock.consistent(activity);
+        if (!stockConsistent) {
+            blockers.add("MYSQL_STOCK_INCONSISTENT");
+        }
+        if (safeInt(activity.getAvailableStock()) <= 0) {
+            warnings.add("STOCK_SOLD_OUT");
+        }
+        RedisActivitySnapshot redis = redisStore.snapshot(activity.getActivityId());
+        if (Boolean.TRUE.equals(redis.rebuilding())) {
+            blockers.add("REDIS_REBUILDING");
+        }
+        boolean shouldHaveRedis = List.of(ACTIVITY_PREHEATED, ACTIVITY_ONLINE, ACTIVITY_SOLD_OUT, ACTIVITY_PAUSED)
+                .contains(activity.getActivityStatus());
+        if (shouldHaveRedis && !Boolean.TRUE.equals(redis.stockKeyExists())) {
+            warnings.add("REDIS_STOCK_KEY_MISSING");
+        }
+        if (Boolean.TRUE.equals(redis.stockKeyExists())
+                && redis.stock() != null
+                && redis.stock().intValue() != safeInt(activity.getAvailableStock())) {
+            blockers.add("REDIS_STOCK_MISMATCH");
+        }
+        if (shouldHaveRedis) {
+            int expectedParticipants = orderMapper.selectActiveParticipantUserIds(activity.getActivityId()).size();
+            if (safeInt(redis.participantCount()) != expectedParticipants) {
+                warnings.add("REDIS_PARTICIPANT_MISMATCH");
+            }
+        }
+        return new OrderActivityPrecheckResponse(
+                String.valueOf(activity.getActivityId()),
+                blockers.isEmpty(),
+                blockers,
+                warnings,
+                activity.getActivityStatus(),
+                displayStatus(activity, now),
+                safeInt(activity.getTotalStock()),
+                safeInt(activity.getAvailableStock()),
+                safeInt(activity.getSoldStock()),
+                stock.availableStock(),
+                stock.soldStock(),
+                stockConsistent,
+                toRedisSnapshot(redis),
+                toOffsetString(now)
+        );
+    }
+
     private StockExpectation stockExpectation(CouponActivity activity) {
         int occupied = safeInt(orderMapper.countSuccessfulOrdersByActivity(activity.getActivityId()));
         int soldStock = Math.min(safeInt(activity.getTotalStock()), Math.max(0, occupied));
@@ -1114,11 +1399,11 @@ public class OrderApplicationService {
         if (ACTIVITY_PAUSED.equals(activity.getActivityStatus())) {
             return ACTIVITY_PAUSED;
         }
-        if (ACTIVITY_SOLD_OUT.equals(activity.getActivityStatus()) || safeInt(activity.getAvailableStock()) <= 0) {
-            return ACTIVITY_SOLD_OUT;
-        }
         if (ACTIVITY_ENDED.equals(activity.getActivityStatus()) || !activity.getEndAt().isAfter(now)) {
             return ACTIVITY_ENDED;
+        }
+        if (ACTIVITY_SOLD_OUT.equals(activity.getActivityStatus()) || safeInt(activity.getAvailableStock()) <= 0) {
+            return ACTIVITY_SOLD_OUT;
         }
         if (activity.getStartAt().isAfter(now)) {
             return ACTIVITY_PREHEATED.equals(activity.getActivityStatus()) ? ACTIVITY_PREHEATED : "NOT_STARTED";
@@ -1244,6 +1529,25 @@ public class OrderApplicationService {
         return normalized;
     }
 
+    private String normalizeActivityStatus(String status) {
+        if (isBlank(status)) {
+            return null;
+        }
+        String normalized = status.trim().toUpperCase(Locale.ROOT);
+        if (!List.of(
+                ACTIVITY_READY,
+                ACTIVITY_PREHEATED,
+                ACTIVITY_ONLINE,
+                ACTIVITY_SOLD_OUT,
+                ACTIVITY_PAUSED,
+                ACTIVITY_ENDED,
+                ACTIVITY_CANCELLED
+        ).contains(normalized)) {
+            throw new BusinessException(ApiErrorCode.PARAM_INVALID);
+        }
+        return normalized;
+    }
+
     private int normalizePageSize(Integer pageSize) {
         int value = pageSize == null ? DEFAULT_PAGE_SIZE : pageSize;
         if (value <= 0) {
@@ -1270,6 +1574,24 @@ public class OrderApplicationService {
         }
     }
 
+    private ActivityCursor parseActivityCursor(String cursor) {
+        if (isBlank(cursor)) {
+            return null;
+        }
+        String[] parts = cursor.split("_", 2);
+        if (parts.length != 2) {
+            throw new BusinessException(ApiErrorCode.ORDER_CURSOR_INVALID);
+        }
+        try {
+            long millis = Long.parseLong(parts[0]);
+            Long activityId = parseId(parts[1], ApiErrorCode.ORDER_CURSOR_INVALID);
+            LocalDateTime createdAt = LocalDateTime.ofInstant(Instant.ofEpochMilli(millis), ZONE);
+            return new ActivityCursor(createdAt, activityId);
+        } catch (NumberFormatException exception) {
+            throw new BusinessException(ApiErrorCode.ORDER_CURSOR_INVALID);
+        }
+    }
+
     private String nextCouponCursor(List<UserCoupon> page, boolean hasMore) {
         if (!hasMore || page.isEmpty()) {
             return null;
@@ -1277,6 +1599,15 @@ public class OrderApplicationService {
         UserCoupon last = page.get(page.size() - 1);
         long millis = last.getIssuedAt().atZone(ZONE).toInstant().toEpochMilli();
         return millis + "_" + last.getUserCouponId();
+    }
+
+    private String nextActivityCursor(List<CouponActivity> page, boolean hasMore) {
+        if (!hasMore || page.isEmpty()) {
+            return null;
+        }
+        CouponActivity last = page.get(page.size() - 1);
+        long millis = last.getCreatedAt().atZone(ZONE).toInstant().toEpochMilli();
+        return millis + "_" + last.getActivityId();
     }
 
     private int positive(Integer value, ApiErrorCode errorCode) {
@@ -1322,6 +1653,9 @@ public class OrderApplicationService {
     }
 
     private record CouponCursor(LocalDateTime issuedAt, Long userCouponId) {
+    }
+
+    private record ActivityCursor(LocalDateTime createdAt, Long activityId) {
     }
 
     private record StockExpectation(Integer availableStock, Integer soldStock) {

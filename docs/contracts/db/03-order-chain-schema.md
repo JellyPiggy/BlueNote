@@ -40,12 +40,15 @@
 7. `order_consume_record.uk_order_consumer_event(consumer_group, event_id)` 保证 MQ 消费幂等。
 8. `order_consume_record.event_id` 和 `order_outbox_event.event_id` 长度为 128，容纳 `evt_{eventType}_{bizKey}_{uuid}` 格式事件 ID。
 9. 订单库存对账以 `voucher_order` 中 `WAIT_PAY`、`SUCCESS` 订单为已占用事实，`coupon_activity.available_stock` / `sold_stock` 必须能由订单事实重算修复。
+10. 运营库存调整必须写入 `coupon_stock_log`，`change_type=OPS_ADJUST`，并记录 `operator_type`、`operator_id`、`reason`。扣库存、取消回补、超时回补也应写入操作来源，便于后台审计。
 
 ## 4. 游标和状态
 
 `user_coupon` 使用 `issued_at DESC, user_coupon_id DESC` 稳定分页，游标格式为 `issuedAtMillis_userCouponId`。
 
 活动状态：`READY`、`PREHEATED`、`ONLINE`、`SOLD_OUT`、`PAUSED`、`ENDED`、`CANCELLED`。
+
+内部活动列表使用 `created_at DESC, activity_id DESC` 稳定分页，游标格式为 `createdAtMillis_activityId`。
 
 请求状态：`PROCESSING`、`SUCCESS`、`WAIT_PAY`、`SOLD_OUT`、`DUPLICATE`、`CANCELLED`、`CLOSED`、`FAILED`。
 
