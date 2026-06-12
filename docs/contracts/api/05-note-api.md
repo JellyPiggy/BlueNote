@@ -450,7 +450,23 @@ GET /api/notes/me/collections?cursor=xxx&size=20
 2. 已删除、下架、私密且非本人可见的笔记不展示。
 3. 按收藏时间倒序游标分页。
 
-## 14. 内部接口：批量查询笔记摘要
+## 14. 查询我的赞过
+
+```text
+GET /api/notes/me/likes?cursor=xxx&size=20
+```
+
+鉴权：需要。
+
+响应结构同作者笔记列表。
+
+说明：
+
+1. 只返回仍可见的点赞笔记。
+2. 已删除、下架、私密且非本人可见的笔记不展示。
+3. 按点赞时间倒序游标分页。
+
+## 15. 内部接口：批量查询笔记摘要
 
 ```text
 POST /internal/notes/batch-summary
@@ -493,7 +509,7 @@ POST /internal/notes/batch-summary
 }
 ```
 
-## 15. 内部接口：校验笔记可评论
+## 16. 内部接口：校验笔记可评论
 
 ```text
 POST /internal/notes/comment-check
@@ -527,7 +543,7 @@ POST /internal/notes/comment-check
 }
 ```
 
-## 16. 内部接口：查询作者近期公开笔记
+## 17. 内部接口：查询作者近期公开笔记
 
 ```text
 POST /internal/notes/authors/recent
@@ -583,7 +599,7 @@ POST /internal/notes/authors/recent
 3. 只返回 `visibility=PUBLIC` 且 `noteStatus=PUBLISHED` 的笔记。
 4. 返回顺序按 `publishedAt DESC, noteId DESC`。
 
-## 17. 内部接口：计数来源
+## 18. 内部接口：计数来源
 
 ```text
 POST /internal/notes/counter-source
@@ -647,7 +663,7 @@ POST /internal/notes/counter-source
 3. `USER.note_count` 只统计公开已发布笔记。
 4. `USER.liked_count` 统计用户公开作品累计获赞数。
 
-## 18. 后端实现要求
+## 19. 后端实现要求
 
 1. 笔记发布、编辑、删除必须写 outbox 事件。
 2. 文件必须通过文件服务校验和绑定。
@@ -655,7 +671,7 @@ POST /internal/notes/counter-source
 4. Redis 只做缓存和限流，MySQL 是事实来源。
 5. 私密、删除、下架笔记不能通过列表或详情泄露给无权限用户。
 
-## 19. 移动端实现要求
+## 20. 移动端实现要求
 
 1. 发布、编辑、点赞、收藏按钮必须防重复点击。
 2. 发布失败要保留用户输入。

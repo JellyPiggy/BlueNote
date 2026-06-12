@@ -20,6 +20,7 @@
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
         <result column="deleted" property="deleted"/>
+        <result column="interaction_at" property="interactionAt"/>
     </resultMap>
 
     <sql id="NoteColumns">
@@ -114,6 +115,58 @@
           )
         </if>
         ORDER BY COALESCE(published_at, updated_at) DESC, note_id DESC
+        LIMIT #{size}
+    </select>
+
+    <select id="selectMyCollectedNotesPage" resultMap="NoteResultMap">
+        SELECT note.note_id, note.author_id, note.note_type, note.note_status, note.visibility,
+               note.current_version, note.latest_version, note.cover_file_id, note.comment_enabled,
+               note.published_at, note.last_edited_at, note.offline_reason, note.deleted_at,
+               note.created_at, note.updated_at, note.deleted,
+               collection_item.collected_at AS interaction_at
+        FROM bluenote_note.note_collection collection_item
+        INNER JOIN bluenote_note.note note
+          ON note.note_id = collection_item.note_id
+        WHERE collection_item.user_id = #{userId}
+          AND collection_item.collection_status = 'ACTIVE'
+          AND note.deleted = 0
+          AND (
+            (note.note_status = 'PUBLISHED' AND note.visibility = 'PUBLIC')
+            OR (note.author_id = #{userId} AND note.note_status IN ('PUBLISHED', 'PRIVATE'))
+          )
+        <if test="cursorInteractionAt != null and cursorNoteId != null">
+          AND (
+            collection_item.collected_at &lt; #{cursorInteractionAt}
+            OR (collection_item.collected_at = #{cursorInteractionAt} AND note.note_id &lt; #{cursorNoteId})
+          )
+        </if>
+        ORDER BY collection_item.collected_at DESC, note.note_id DESC
+        LIMIT #{size}
+    </select>
+
+    <select id="selectMyLikedNotesPage" resultMap="NoteResultMap">
+        SELECT note.note_id, note.author_id, note.note_type, note.note_status, note.visibility,
+               note.current_version, note.latest_version, note.cover_file_id, note.comment_enabled,
+               note.published_at, note.last_edited_at, note.offline_reason, note.deleted_at,
+               note.created_at, note.updated_at, note.deleted,
+               note_like.liked_at AS interaction_at
+        FROM bluenote_note.note_like note_like
+        INNER JOIN bluenote_note.note note
+          ON note.note_id = note_like.note_id
+        WHERE note_like.user_id = #{userId}
+          AND note_like.like_status = 'ACTIVE'
+          AND note.deleted = 0
+          AND (
+            (note.note_status = 'PUBLISHED' AND note.visibility = 'PUBLIC')
+            OR (note.author_id = #{userId} AND note.note_status IN ('PUBLISHED', 'PRIVATE'))
+          )
+        <if test="cursorInteractionAt != null and cursorNoteId != null">
+          AND (
+            note_like.liked_at &lt; #{cursorInteractionAt}
+            OR (note_like.liked_at = #{cursorInteractionAt} AND note.note_id &lt; #{cursorNoteId})
+          )
+        </if>
+        ORDER BY note_like.liked_at DESC, note.note_id DESC
         LIMIT #{size}
     </select>
 

@@ -46,6 +46,7 @@
 | POST | `/api/notes/{noteId}/collect` | 是 | 当前用户 | 业务唯一键 | 用户 | 收藏 |
 | DELETE | `/api/notes/{noteId}/collect` | 是 | 当前用户 | 业务唯一键 | 用户 | 取消收藏 |
 | GET | `/api/notes/me/collections` | 是 | 当前用户 | 否 | 用户 | 我的收藏 |
+| GET | `/api/notes/me/likes` | 是 | 当前用户 | 否 | 用户 | 我的赞过 |
 
 ## 3. 内部接口权限矩阵
 

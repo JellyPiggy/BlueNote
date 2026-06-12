@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
-import { getMyNotes } from '@/api/note'
+import { onPullDownRefresh, onReachBottom, onShow } from '@dcloudio/uni-app'
+import { getMyCollections, getMyLikedNotes, getMyNotes } from '@/api/note'
 import { showApiError } from '@/api/request'
 import type { NoteCard, UserHome } from '@/api/types'
 import { getUserHome } from '@/api/user'
@@ -13,14 +13,18 @@ import { useNotificationStore } from '@/stores/notification'
 
 const auth = useAuthStore()
 const notifications = useNotificationStore()
-const notes = ref<NoteCard[]>([])
 const profileHome = ref<UserHome | null>(null)
 const loading = ref(false)
 const accountMenuOpen = ref(false)
+const activeTab = ref<ProfileTabKey>('NOTES')
+const listStates = ref<Record<ProfileTabKey, ProfileListState>>(createListStates())
 
 const profile = computed(() => auth.profile)
-const leftNotes = computed(() => notes.value.filter((_, index) => index % 2 === 0))
-const rightNotes = computed(() => notes.value.filter((_, index) => index % 2 === 1))
+const activeState = computed(() => listStates.value[activeTab.value])
+const activeItems = computed(() => activeState.value.items)
+const activeConfig = computed(() => profileTabs.find((tab) => tab.key === activeTab.value) ?? profileTabs[0])
+const leftNotes = computed(() => activeItems.value.filter((_, index) => index % 2 === 0))
+const rightNotes = computed(() => activeItems.value.filter((_, index) => index % 2 === 1))
 const heroStats = computed(() => {
   const counts = profileHome.value?.counts
   return [
@@ -48,6 +52,45 @@ const coverStyle = computed(() => {
   }
 })
 
+type ProfileTabKey = 'NOTES' | 'COLLECTIONS' | 'LIKES'
+
+interface ProfileTabConfig {
+  key: ProfileTabKey
+  label: string
+  emptyTitle: string
+  emptySubtitle: string
+}
+
+interface ProfileListState {
+  items: NoteCard[]
+  nextCursor: string | null
+  hasMore: boolean
+  loading: boolean
+  loaded: boolean
+  errorText: string
+}
+
+const profileTabs: ProfileTabConfig[] = [
+  {
+    key: 'NOTES',
+    label: '笔记',
+    emptyTitle: '还没有笔记',
+    emptySubtitle: '从一张图片开始，发布你的第一条 BlueNote。'
+  },
+  {
+    key: 'COLLECTIONS',
+    label: '收藏',
+    emptyTitle: '还没有收藏',
+    emptySubtitle: '遇到想反复看的笔记，可以先收藏起来。'
+  },
+  {
+    key: 'LIKES',
+    label: '赞过',
+    emptyTitle: '还没有赞过',
+    emptySubtitle: '喜欢的内容会在这里留下痕迹。'
+  }
+]
+
 onShow(() => {
   if (auth.isAuthenticated) {
     void loadProfile()
@@ -62,21 +105,51 @@ onPullDownRefresh(async () => {
   }
 })
 
+onReachBottom(() => {
+  if (activeState.value.loaded && activeState.value.hasMore) {
+    void loadActiveList(false)
+  }
+})
+
 async function loadProfile() {
   loading.value = true
   try {
     await auth.fetchCurrentUser()
     const userId = auth.profile?.userId ?? auth.userId
-    const [page, home] = await Promise.all([
-      getMyNotes(undefined, null, 30),
-      userId ? getUserHome(userId).catch(() => null) : Promise.resolve(null)
-    ])
-    notes.value = page.items
+    const home = userId ? await getUserHome(userId).catch(() => null) : null
     profileHome.value = home
+    await loadActiveList(true)
   } catch (error) {
     showApiError(error, '个人页加载失败')
   } finally {
     loading.value = false
+  }
+}
+
+async function loadActiveList(reset = false) {
+  if (!auth.isAuthenticated) {
+    return
+  }
+  const state = activeState.value
+  if (state.loading) {
+    return
+  }
+  if (!reset && state.loaded && !state.hasMore) {
+    return
+  }
+  state.loading = true
+  state.errorText = ''
+  try {
+    const page = await fetchProfileList(activeTab.value, reset ? null : state.nextCursor, 20)
+    state.items = reset ? page.items : mergeNotes(state.items, page.items)
+    state.nextCursor = page.nextCursor
+    state.hasMore = page.hasMore
+    state.loaded = true
+  } catch (error) {
+    state.errorText = '内容加载失败'
+    showApiError(error, '内容加载失败')
+  } finally {
+    state.loading = false
   }
 }
 
@@ -86,6 +159,10 @@ function goLogin() {
 
 function goPublish() {
   uni.switchTab({ url: '/pages/publish/index' })
+}
+
+function goHome() {
+  uni.switchTab({ url: '/pages/home/index' })
 }
 
 function openNote(noteId: string) {
@@ -98,6 +175,13 @@ function openAccountMenu() {
 
 function openNotifications() {
   uni.navigateTo({ url: '/pages/notifications/index' })
+}
+
+async function switchProfileTab(tab: ProfileTabKey) {
+  activeTab.value = tab
+  if (!activeState.value.loaded && !activeState.value.loading) {
+    await loadActiveList(true)
+  }
 }
 
 function closeAccountMenu() {
@@ -120,7 +204,7 @@ async function refreshFromMenu() {
 async function logout() {
   accountMenuOpen.value = false
   await auth.logoutCurrentDevice()
-  notes.value = []
+  listStates.value = createListStates()
   profileHome.value = null
   uni.navigateTo({ url: '/pages/login/index' })
 }
@@ -128,9 +212,43 @@ async function logout() {
 async function switchAccount() {
   accountMenuOpen.value = false
   await auth.logoutCurrentDevice()
-  notes.value = []
+  listStates.value = createListStates()
   profileHome.value = null
   uni.navigateTo({ url: '/pages/login/index' })
+}
+
+function fetchProfileList(tab: ProfileTabKey, cursor?: string | null, size = 20) {
+  if (tab === 'COLLECTIONS') {
+    return getMyCollections(cursor, size)
+  }
+  if (tab === 'LIKES') {
+    return getMyLikedNotes(cursor, size)
+  }
+  return getMyNotes(undefined, cursor, size)
+}
+
+function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
+  const exists = new Set(current.map((item) => item.noteId))
+  return [...current, ...incoming.filter((item) => !exists.has(item.noteId))]
+}
+
+function createListStates(): Record<ProfileTabKey, ProfileListState> {
+  return {
+    NOTES: createListState(),
+    COLLECTIONS: createListState(),
+    LIKES: createListState()
+  }
+}
+
+function createListState(): ProfileListState {
+  return {
+    items: [],
+    nextCursor: null,
+    hasMore: false,
+    loading: false,
+    loaded: false,
+    errorText: ''
+  }
 }
 
 function formatCount(value: number) {
@@ -184,16 +302,31 @@ function formatCount(value: number) {
         </view>
 
         <view class="profile-tabs">
-          <view class="profile-tab active">笔记</view>
-          <view class="profile-tab">收藏</view>
-          <view class="profile-tab">赞过</view>
+          <button
+            v-for="tab in profileTabs"
+            :key="tab.key"
+            class="profile-tab"
+            :class="{ active: activeTab === tab.key }"
+            @tap="switchProfileTab(tab.key)"
+          >
+            {{ tab.label }}
+          </button>
         </view>
       </view>
 
-      <view v-if="loading && !notes.length" class="loading-copy">正在读取个人资料</view>
+      <view v-if="activeState.loading && !activeState.loaded" class="loading-copy">正在读取内容</view>
 
-      <EmptyState v-else-if="!notes.length" title="还没有笔记" subtitle="从一张图片开始，发布你的第一条 BlueNote。">
-        <button class="primary-button login-action" @tap="goPublish">发布笔记</button>
+      <EmptyState v-else-if="activeState.errorText" title="暂时读不到内容" subtitle="稍后刷新，或检查本地网关是否正在运行。">
+        <button class="secondary-button login-action" @tap="loadActiveList(true)">重新加载</button>
+      </EmptyState>
+
+      <EmptyState
+        v-else-if="activeState.loaded && !activeItems.length"
+        :title="activeConfig.emptyTitle"
+        :subtitle="activeConfig.emptySubtitle"
+      >
+        <button v-if="activeTab === 'NOTES'" class="primary-button login-action" @tap="goPublish">发布笔记</button>
+        <button v-else class="secondary-button login-action" @tap="goHome">去首页</button>
       </EmptyState>
 
       <view v-else class="masonry">
@@ -204,6 +337,12 @@ function formatCount(value: number) {
           <NoteCardView v-for="note in rightNotes" :key="note.noteId" :note="note" @open="openNote" />
         </view>
       </view>
+
+      <button v-if="activeState.hasMore" class="load-more-button" :disabled="activeState.loading" @tap="loadActiveList(false)">
+        {{ activeState.loading ? '加载中' : '加载更多' }}
+      </button>
+
+      <view v-else-if="activeState.loaded && activeItems.length" class="list-end">没有更多内容</view>
 
       <view v-if="accountMenuOpen" class="account-menu-mask" @tap="closeAccountMenu">
         <view class="account-drawer" @tap.stop>
@@ -471,6 +610,32 @@ function formatCount(value: number) {
 .column {
   flex: 1;
   min-width: 0;
+}
+
+.load-more-button {
+  width: 260rpx;
+  height: 64rpx;
+  margin: 18rpx auto 0;
+  border-radius: 999rpx;
+  background: #fff;
+  color: #5f6670;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  font-weight: 760;
+  box-shadow: var(--bn-shadow-soft);
+}
+
+.load-more-button[disabled] {
+  opacity: 0.58;
+}
+
+.list-end {
+  padding: 24rpx 0 8rpx;
+  color: var(--bn-faint);
+  text-align: center;
+  font-size: 23rpx;
 }
 
 .account-menu-mask {

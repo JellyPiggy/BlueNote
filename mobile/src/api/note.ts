@@ -92,3 +92,25 @@ export function getMyNotes(status?: string, cursor?: string | null, size = 20) {
     path: `/api/notes/me?${query.toString()}`
   })
 }
+
+export function getMyCollections(cursor?: string | null, size = 20) {
+  const query = new URLSearchParams()
+  query.set('size', String(size))
+  if (cursor) {
+    query.set('cursor', cursor)
+  }
+  return apiRequest<CursorPage<NoteCard>>({
+    path: `/api/notes/me/collections?${query.toString()}`
+  })
+}
+
+export function getMyLikedNotes(cursor?: string | null, size = 20) {
+  const query = new URLSearchParams()
+  query.set('size', String(size))
+  if (cursor) {
+    query.set('cursor', cursor)
+  }
+  return apiRequest<CursorPage<NoteCard>>({
+    path: `/api/notes/me/likes?${query.toString()}`
+  })
+}
