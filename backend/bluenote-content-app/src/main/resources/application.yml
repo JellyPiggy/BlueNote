@@ -29,6 +29,7 @@ bluenote:
       upload-url-expires-seconds: ${BLUENOTE_MINIO_UPLOAD_URL_EXPIRES_SECONDS:600}
   internal:
     member-uri: ${BLUENOTE_MEMBER_INTERNAL_URI:http://127.0.0.1:8081}
+    counter-uri: ${BLUENOTE_COUNTER_INTERNAL_URI:http://127.0.0.1:8083}
   mq:
     enabled: ${BLUENOTE_MQ_ENABLED:true}
     name-server: ${BLUENOTE_ROCKETMQ_NAME_SERVER:127.0.0.1:9876}

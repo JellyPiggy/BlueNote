@@ -178,7 +178,7 @@ comment 内部接口：
 2. 文件元数据、上传会话、绑定关系落库。
 3. 笔记、媒体、版本、话题、幂等请求落库。
 4. 发布、删除、点赞、取消点赞、收藏、取消收藏写 note outbox。
-5. 笔记详情聚合作者、媒体、计数结构和 viewerAction。
+5. 笔记详情聚合作者、媒体、counter 计数结构和 viewerAction，counter 异常时降级展示。
 6. 评论、回复、删除、评论点赞落 MySQL。
 7. 评论发布/删除/点赞写 comment outbox。
 8. 评论列表聚合作者、正文、计数快照和 viewerAction。
