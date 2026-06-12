@@ -172,7 +172,7 @@ CREATE TABLE IF NOT EXISTS order_timeout_task (
 CREATE TABLE IF NOT EXISTS order_consume_record (
     id BIGINT NOT NULL,
     consumer_group VARCHAR(128) NOT NULL,
-    event_id VARCHAR(64) NOT NULL,
+    event_id VARCHAR(128) NOT NULL,
     topic VARCHAR(128) NOT NULL,
     event_type VARCHAR(64) NOT NULL,
     biz_key VARCHAR(128) NULL,
@@ -190,7 +190,7 @@ CREATE TABLE IF NOT EXISTS order_consume_record (
 
 CREATE TABLE IF NOT EXISTS order_outbox_event (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    event_id VARCHAR(64) NOT NULL,
+    event_id VARCHAR(128) NOT NULL,
     event_type VARCHAR(64) NOT NULL,
     aggregate_id VARCHAR(128) NOT NULL,
     payload JSON NOT NULL,

@@ -115,6 +115,9 @@ public final class OrderDtos {
     public record ActivityStatusResponse(String activityId, String status) {
     }
 
+    public record OrderTimeoutScanResponse(Integer scannedCount, Integer closedCount, Integer failedCount) {
+    }
+
     public record OrderConsumeEventRequest(
             String topic,
             String consumerGroup,

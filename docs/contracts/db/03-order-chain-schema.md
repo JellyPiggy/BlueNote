@@ -38,6 +38,7 @@
 5. `user_coupon.uk_user_coupon_source_order(source_order_id)` 防止重复发券。
 6. `payment_record.uk_payment_channel_trade(channel, channel_trade_no)` 防止重复支付回调。
 7. `order_consume_record.uk_order_consumer_event(consumer_group, event_id)` 保证 MQ 消费幂等。
+8. `order_consume_record.event_id` 和 `order_outbox_event.event_id` 长度为 128，容纳 `evt_{eventType}_{bizKey}_{uuid}` 格式事件 ID。
 
 ## 4. 游标和状态
 

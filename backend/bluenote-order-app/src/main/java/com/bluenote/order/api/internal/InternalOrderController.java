@@ -5,6 +5,7 @@ import com.bluenote.common.observability.TraceIdHolder;
 import com.bluenote.order.api.dto.OrderDtos.ActivityStatusResponse;
 import com.bluenote.order.api.dto.OrderDtos.InternalActivityResponse;
 import com.bluenote.order.api.dto.OrderDtos.InternalCreateActivityRequest;
+import com.bluenote.order.api.dto.OrderDtos.OrderTimeoutScanResponse;
 import com.bluenote.order.application.OrderApplicationService;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -58,6 +59,14 @@ public class InternalOrderController {
     public ApiResponse<ActivityStatusResponse> end(@PathVariable("activityId") String activityId) {
         return ApiResponse.success(
                 orderApplicationService.updateActivityStatus(activityId, "end"),
+                TraceIdHolder.currentOrNew()
+        );
+    }
+
+    @PostMapping("/timeout-tasks/scan-once")
+    public ApiResponse<OrderTimeoutScanResponse> scanTimeoutTasksOnce() {
+        return ApiResponse.success(
+                orderApplicationService.scanTimeoutTasksOnce(),
                 TraceIdHolder.currentOrNew()
         );
     }

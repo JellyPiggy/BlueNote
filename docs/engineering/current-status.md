@@ -115,6 +115,7 @@ backend/sql/
   V012__push_realtime.sql
   V013__im.sql
   V014__order.sql
+  V015__order_event_id_width.sql
 ```
 
 本地依赖已配置：
@@ -413,6 +414,7 @@ order 已完成：
    - `POST /internal/order/coupon-activities/{activityId}/pause`
    - `POST /internal/order/coupon-activities/{activityId}/resume`
    - `POST /internal/order/coupon-activities/{activityId}/end`
+   - `POST /internal/order/timeout-tasks/scan-once`
 3. 已落 `bluenote_order.coupon_template`、`coupon_activity`、`coupon_seckill_request`、`voucher_order`、`payment_record`、`user_coupon`、`coupon_stock_log`、`order_status_log`、`order_timeout_task`、`order_consume_record`、`order_outbox_event`。
 4. 活动预热会将 MySQL 可用库存写入 Redis，并清理售罄标识。
 5. 秒杀提交使用 Redis Lua 原子校验 token、库存和用户参与标记，预扣成功后写出 `CouponSeckillAccepted` outbox。
@@ -606,6 +608,12 @@ npm run dev:h5
 21. 本轮新增 WebSocket 实时投递、在线设备 Redis 路由、ACK 落库、移动端自动设备注册和 realtime 连接后，`cd backend && mvn -q -DskipTests compile`、`cd mobile && npm run typecheck` 通过。
 22. 本轮新增 IM 单聊文字消息、会话列表、消息列表、已读/送达、未读数、IM outbox、IM `PushSendRequested`、移动端私信列表和聊天页后，`cd backend && mvn -q -DskipTests compile`、`cd mobile && npm run typecheck`、`cd mobile && npm run build:h5` 通过。
 23. 本轮新增订单契约、`V014__order.sql`、`bluenote-order-app`、gateway `/api/order/**` 路由、订单 MQ topic 映射和移动端神券页后，`cd backend && mvn -q -DskipTests compile`、`cd mobile && npm run typecheck`、`cd mobile && npm run build:h5` 通过。
+24. 本轮订单 foundation 本地 E2E 已通过：
+    - 已执行 `V014__order.sql` 和 `V015__order_event_id_width.sql`。
+    - 通过 gateway 注册用户并完成免费券链路：活动 `323820730292649984`，请求 `323820731039236096`，订单 `323820783199600640`，券 `323820783220572160`。
+    - 完成付费券链路：活动 `323820787901415424`，请求 `323820788320845824`，订单 `323820790116007936`，MOCK 支付后券 `323820792905220096`。
+    - 完成超时关单和库存回补：活动 `323821511053950976`，订单 `323821514950459392`，`POST /internal/order/timeout-tasks/scan-once` 返回 `scannedCount=1`、`closedCount=1`、`failedCount=0`，库存从 `0,1` 回补到 `1,0`。
+    - 验收前已修正 `order_outbox_event.event_id`、`order_consume_record.event_id` 长度为 128，避免订单 outbox 事件 ID 被截断。
 
 ## 6. 待完成事项
 

@@ -298,6 +298,7 @@ POST /internal/order/coupon-activities/{activityId}/preheat
 POST /internal/order/coupon-activities/{activityId}/pause
 POST /internal/order/coupon-activities/{activityId}/resume
 POST /internal/order/coupon-activities/{activityId}/end
+POST /internal/order/timeout-tasks/scan-once
 ```
 
 创建活动请求：
@@ -335,5 +336,15 @@ POST /internal/order/coupon-activities/{activityId}/end
 {
   "activityId": "10001",
   "status": "PREHEATED"
+}
+```
+
+超时任务扫一次响应：
+
+```json
+{
+  "scannedCount": 1,
+  "closedCount": 1,
+  "failedCount": 0
 }
 ```

@@ -25,6 +25,7 @@
 | POST | `/internal/order/coupon-activities/{activityId}/pause` | ops / admin | order | 内部管理权限，状态 CAS |
 | POST | `/internal/order/coupon-activities/{activityId}/resume` | ops / admin | order | 内部管理权限，状态 CAS |
 | POST | `/internal/order/coupon-activities/{activityId}/end` | ops / admin | order | 内部管理权限，状态 CAS |
+| POST | `/internal/order/timeout-tasks/scan-once` | ops / scheduler | order | 内部运维权限，触发一次超时关单扫描 |
 
 网关不得暴露 `/internal/**` 到公网。
 

@@ -14,6 +14,7 @@ import com.bluenote.order.api.dto.OrderDtos.OrderCouponListResponse;
 import com.bluenote.order.api.dto.OrderDtos.OrderDetailResponse;
 import com.bluenote.order.api.dto.OrderDtos.OrderPayRequest;
 import com.bluenote.order.api.dto.OrderDtos.OrderPayResponse;
+import com.bluenote.order.api.dto.OrderDtos.OrderTimeoutScanResponse;
 import com.bluenote.order.api.dto.OrderDtos.SeckillResultResponse;
 import com.bluenote.order.api.dto.OrderDtos.SeckillSubmitRequest;
 import com.bluenote.order.api.dto.OrderDtos.SeckillSubmitResponse;
@@ -384,14 +385,24 @@ public class OrderApplicationService {
             fixedDelayString = "${bluenote.order.timeout-scan-fixed-delay-millis:30000}"
     )
     public void closeExpiredOrdersScheduled() {
+        scanTimeoutTasksOnce();
+    }
+
+    public OrderTimeoutScanResponse scanTimeoutTasksOnce() {
         List<OrderTimeoutTask> tasks = orderMapper.selectDueTimeoutTasks(now(), timeoutScanBatchSize);
+        int closedCount = 0;
+        int failedCount = 0;
         for (OrderTimeoutTask task : tasks) {
             try {
-                closeExpiredOrder(task.getOrderId(), true);
+                if (closeExpiredOrder(task.getOrderId(), true)) {
+                    closedCount++;
+                }
             } catch (RuntimeException exception) {
+                failedCount++;
                 log.warn("Failed to close expired order, orderId={}", task.getOrderId(), exception);
             }
         }
+        return new OrderTimeoutScanResponse(tasks.size(), closedCount, failedCount);
     }
 
     private SeckillSubmitResponse insertTerminalRequest(
@@ -640,30 +651,31 @@ public class OrderApplicationService {
         return new OrderCancelResponse(String.valueOf(orderId), ORDER_CANCELLED, true);
     }
 
-    private void closeExpiredOrder(Long orderId, boolean forceDue) {
-        transactionTemplate.executeWithoutResult(status -> closeExpiredOrderInTransaction(orderId, forceDue));
+    private boolean closeExpiredOrder(Long orderId, boolean forceDue) {
+        Boolean closed = transactionTemplate.execute(status -> closeExpiredOrderInTransaction(orderId, forceDue));
+        return Boolean.TRUE.equals(closed);
     }
 
-    private void closeExpiredOrderInTransaction(Long orderId, boolean forceDue) {
+    private boolean closeExpiredOrderInTransaction(Long orderId, boolean forceDue) {
         VoucherOrder order = orderMapper.selectOrderByIdForUpdate(orderId);
         if (order == null) {
-            return;
+            return false;
         }
         LocalDateTime now = now();
         if (!ORDER_WAIT_PAY.equals(order.getOrderStatus())) {
             orderMapper.updateTimeoutTaskStatus(orderId, "SKIPPED", now, "order status " + order.getOrderStatus(), now);
-            return;
+            return false;
         }
         if (!forceDue && order.getExpireAt() != null && order.getExpireAt().isAfter(now)) {
-            return;
+            return false;
         }
         if (order.getExpireAt() != null && order.getExpireAt().isAfter(now)) {
-            return;
+            return false;
         }
         int updated = orderMapper.updateOrderStatusCas(orderId, ORDER_WAIT_PAY, ORDER_CLOSED, null, null, now, now);
         if (updated <= 0) {
             orderMapper.updateTimeoutTaskStatus(orderId, "SKIPPED", now, "status changed", now);
-            return;
+            return false;
         }
         orderMapper.replenishActivityStock(order.getActivityId(), now);
         orderMapper.insertStockLog(idGenerator.nextId(), order.getActivityId(), orderId, order.getRequestId(), "TIMEOUT_REPLENISH", 1, now);
@@ -673,6 +685,7 @@ public class OrderApplicationService {
         redisStore.recoverReservation(order.getActivityId(), order.getUserId());
         insertOrderClosedOutbox(order, now);
         insertPushOutbox("ORDER_CLOSED", order.getUserId(), orderId, null, "订单已关闭", "你的神券订单已超时关闭", now);
+        return true;
     }
 
     private UserCoupon createCoupon(VoucherOrder order, CouponActivity activity, CouponTemplate template, LocalDateTime now) {
