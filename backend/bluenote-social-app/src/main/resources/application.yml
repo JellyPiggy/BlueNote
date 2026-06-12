@@ -39,6 +39,7 @@ bluenote:
         - table-name: bluenote_relation.relation_outbox_event
         - table-name: bluenote_counter.counter_outbox_event
         - table-name: bluenote_feed.feed_outbox_event
+        - table-name: bluenote_notification.notification_outbox_event
 
 management:
   endpoints:

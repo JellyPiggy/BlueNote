@@ -8,13 +8,14 @@ BlueNote 后端采用 Java 21、Spring Boot 3.5.x、Spring Cloud 2025.0.x 和 Ma
 注册/登录 -> 获取用户资料 -> 上传图片 -> 发布笔记 -> 查看笔记详情
 ```
 
-第二条主链路已开始落地，当前完成 relation/comment/counter/feed 起步纵切面，并已接入基础 MQ/outbox 闭环：
+第二条主链路已开始落地，当前完成 relation/comment/counter/feed/notification 起步纵切面，并已接入基础 MQ/outbox 闭环：
 
 ```text
 关注用户 -> 关系事实落库 -> relation-event outbox
 评论/回复 -> 评论事实落库 -> comment-event outbox
 outbox dispatcher -> RocketMQ -> counter 自动消费 -> counter-event outbox
 NotePublished/UserFollowed -> feed 自动消费 -> 收件箱/重建/feed-event outbox
+点赞/收藏/评论/关注/笔记状态事件 -> notification 自动消费 -> 站内通知/未读数/notification-event/push-request-event outbox
 ```
 
 ## 1. 模块
@@ -44,7 +45,7 @@ backend/
 | `bluenote-gateway-app` | 8080 | 网关、JWT 校验、路由、用户上下文 Header 注入 |
 | `bluenote-member-app` | 8081 | auth、user |
 | `bluenote-content-app` | 8082 | file、note、comment |
-| `bluenote-social-app` | 8083 | relation、counter、feed，后续承载 rank、notification |
+| `bluenote-social-app` | 8083 | relation、counter、feed、notification，后续承载 rank |
 
 ## 2. 当前实现状态
 
@@ -180,11 +181,11 @@ comment 内部接口：
 7. 评论发布/删除/点赞写 comment outbox。
 8. 评论列表聚合作者、正文、计数快照和 viewerAction。
 
-限制：note/comment/file outbox 已可由通用 dispatcher 投递 RocketMQ；feed 已消费 note/relation 事件生成关注页读模型，notification 还没有消费这些事件生成通知。
+限制：note/comment/file outbox 已可由通用 dispatcher 投递 RocketMQ；feed 已消费 note/relation 事件生成关注页读模型，notification 已消费 interaction/comment/relation/note 状态事件生成站内通知。
 
 ### 2.4 Social App
 
-`bluenote-social-app` 已新增 relation 最小可用链路。
+`bluenote-social-app` 已新增 relation/counter/feed/notification 最小可用链路。
 
 relation 外部接口：
 
@@ -231,6 +232,27 @@ feed 内部接口：
 | `GET /internal/feed/fanout-tasks/{taskId}` | 查询笔记 Feed 投递任务 |
 | `POST /internal/feed/fanout-tasks/{taskId}/retry` | 手动重试 Feed 投递任务 |
 
+notification 外部接口：
+
+| 接口 | 说明 |
+|---|---|
+| `GET /api/notifications/unread-count` | 查询总未读数和分类未读数 |
+| `GET /api/notifications` | 按分类和游标查询通知列表 |
+| `GET /api/notifications/{notificationId}` | 查询通知详情 |
+| `POST /api/notifications/{notificationId}/read` | 标记单条已读，幂等 |
+| `POST /api/notifications/read-all` | 按分类或全部标记已读 |
+| `DELETE /api/notifications/{notificationId}` | 删除单条通知 |
+| `DELETE /api/notifications` | 批量删除通知 |
+
+notification 内部接口：
+
+| 接口 | 说明 |
+|---|---|
+| `POST /internal/notifications/system` | 创建系统通知，按 requestId 幂等 |
+| `POST /internal/notifications/batch-summary` | 批量查询通知摘要 |
+| `POST /internal/notifications/users/{userId}/rebuild-unread` | 从通知事实表重建用户未读数 |
+| `POST /internal/notifications/events/replay` | 基于消费记录重放事件 |
+
 已接入能力：
 
 1. `relation_following` 关注事实落库。
@@ -248,6 +270,13 @@ feed 内部接口：
    - `bluenote-feed-relation-consumer`：`relation-event`
    - `bluenote-feed-fanout-executor`：`feed-fanout-task-event`
 12. Feed 读取优先级为 Redis 收件箱 -> MySQL 收件箱 -> 关注作者近期公开笔记回源，并在读取时过滤已取关作者和不可见笔记。
+13. notification 已落 `bluenote_notification.notification_record`、`notification_aggregate_actor`、`notification_unread_counter`、`notification_consume_record`、`notification_outbox_event`。
+14. notification 支持点赞/收藏聚合通知、评论/回复明细通知、关注通知、系统通知、未读数 Redis 缓存和 MySQL 重建。
+15. notification 已启动 RocketMQ consumer，自动消费：
+   - `bluenote-notification-interaction-consumer`：`interaction-event`
+   - `bluenote-notification-comment-consumer`：`comment-event`
+   - `bluenote-notification-relation-consumer`：`relation-event`
+   - `bluenote-notification-note-consumer`：`note-event`
 
 ### 2.5 MQ 与 Outbox
 
@@ -266,7 +295,7 @@ feed 内部接口：
 |---|---|
 | member | `bluenote_auth.auth_outbox_event`、`bluenote_user.user_outbox_event` |
 | content | `bluenote_file.file_outbox_event`、`bluenote_note.note_outbox_event`、`bluenote_comment.comment_outbox_event` |
-| social | `bluenote_relation.relation_outbox_event`、`bluenote_counter.counter_outbox_event`、`bluenote_feed.feed_outbox_event` |
+| social | `bluenote_relation.relation_outbox_event`、`bluenote_counter.counter_outbox_event`、`bluenote_feed.feed_outbox_event`、`bluenote_notification.notification_outbox_event` |
 
 本地默认启用 MQ/outbox，可通过环境变量关闭：
 
@@ -346,7 +375,7 @@ mvn -pl bluenote-gateway-app spring-boot:run
 | Gateway content URI | `http://127.0.0.1:8082` |
 | Gateway social URI | `http://127.0.0.1:8083` |
 
-注意：member/content/social 当前各自只配置一个 datasource URL，但 DDL 中按逻辑 schema 拆分为 `bluenote_auth`、`bluenote_user`、`bluenote_file`、`bluenote_note`、`bluenote_comment`、`bluenote_relation`、`bluenote_counter`、`bluenote_feed`。应用内 SQL 使用显式 schema 名访问本应用拥有的逻辑 schema。
+注意：member/content/social 当前各自只配置一个 datasource URL，但 DDL 中按逻辑 schema 拆分为 `bluenote_auth`、`bluenote_user`、`bluenote_file`、`bluenote_note`、`bluenote_comment`、`bluenote_relation`、`bluenote_counter`、`bluenote_feed`、`bluenote_notification`。应用内 SQL 使用显式 schema 名访问本应用拥有的逻辑 schema。
 
 ## 6. 检查入口
 
@@ -375,6 +404,6 @@ http://127.0.0.1:{port}/swagger-ui.html
 
 1. 补后端自动化测试和接口集成测试。
 2. 补 RocketMQ 死信告警和更完整的人工重放审计。
-3. 补 notification 第二条社交链路。
+3. 补移动端通知页和消息入口未读角标。
 4. 补 feed 大 V 推拉结合策略、清理任务后台化和更完整的补偿审计。
 5. 补生产部署、备份恢复、监控告警配置。

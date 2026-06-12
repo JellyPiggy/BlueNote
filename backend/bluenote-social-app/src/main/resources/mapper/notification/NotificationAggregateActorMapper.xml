@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.notification.infrastructure.mapper.NotificationAggregateActorMapper">
+
+    <resultMap id="NotificationAggregateActorResultMap" type="com.bluenote.social.notification.infrastructure.entity.NotificationAggregateActorEntity">
+        <id column="id" property="id"/>
+        <result column="notification_id" property="notificationId"/>
+        <result column="actor_id" property="actorId"/>
+        <result column="source_biz_id" property="sourceBizId"/>
+        <result column="acted_at" property="actedAt"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="insertIgnore" parameterType="com.bluenote.social.notification.infrastructure.entity.NotificationAggregateActorEntity">
+        INSERT IGNORE INTO bluenote_notification.notification_aggregate_actor (
+            id, notification_id, actor_id, source_biz_id, acted_at, created_at
+        ) VALUES (
+            #{id}, #{notificationId}, #{actorId}, #{sourceBizId}, #{actedAt}, #{createdAt}
+        )
+    </insert>
+
+    <select id="countActors" resultType="int">
+        SELECT COUNT(1)
+        FROM bluenote_notification.notification_aggregate_actor
+        WHERE notification_id = #{notificationId}
+    </select>
+
+    <select id="selectLatestActors" resultMap="NotificationAggregateActorResultMap">
+        SELECT id, notification_id, actor_id, source_biz_id, acted_at, created_at
+        FROM bluenote_notification.notification_aggregate_actor
+        WHERE notification_id = #{notificationId}
+        ORDER BY acted_at DESC, id DESC
+        LIMIT #{size}
+    </select>
+</mapper>

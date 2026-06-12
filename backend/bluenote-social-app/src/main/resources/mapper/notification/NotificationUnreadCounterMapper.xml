@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.notification.infrastructure.mapper.NotificationUnreadCounterMapper">
+
+    <resultMap id="NotificationUnreadCounterResultMap" type="com.bluenote.social.notification.infrastructure.entity.NotificationUnreadCounterEntity">
+        <id column="user_id" property="userId"/>
+        <id column="category" property="category"/>
+        <result column="unread_count" property="unreadCount"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="upsertDelta">
+        INSERT INTO bluenote_notification.notification_unread_counter (
+            user_id, category, unread_count, updated_at
+        ) VALUES (
+            #{userId}, #{category}, GREATEST(0, #{delta}), #{updatedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            unread_count = GREATEST(0, unread_count + VALUES(unread_count) - GREATEST(0, -#{delta})),
+            updated_at = VALUES(updated_at)
+    </insert>
+
+    <insert id="upsertValue">
+        INSERT INTO bluenote_notification.notification_unread_counter (
+            user_id, category, unread_count, updated_at
+        ) VALUES (
+            #{userId}, #{category}, GREATEST(0, #{unreadCount}), #{updatedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            unread_count = VALUES(unread_count),
+            updated_at = VALUES(updated_at)
+    </insert>
+
+    <select id="selectByUser" resultMap="NotificationUnreadCounterResultMap">
+        SELECT user_id, category, unread_count, updated_at
+        FROM bluenote_notification.notification_unread_counter
+        WHERE user_id = #{userId}
+    </select>
+</mapper>
