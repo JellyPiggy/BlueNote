@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.push.infrastructure.mapper.PushDeliveryAttemptMapper">
+
+    <resultMap id="PushDeliveryAttemptResultMap" type="com.bluenote.social.push.infrastructure.entity.PushDeliveryAttemptEntity">
+        <id column="attempt_id" property="attemptId"/>
+        <result column="request_id" property="requestId"/>
+        <result column="target_user_id" property="targetUserId"/>
+        <result column="device_id" property="deviceId"/>
+        <result column="channel" property="channel"/>
+        <result column="attempt_status" property="attemptStatus"/>
+        <result column="skip_reason" property="skipReason"/>
+        <result column="provider_message_id" property="providerMessageId"/>
+        <result column="error_message" property="errorMessage"/>
+        <result column="attempted_at" property="attemptedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.bluenote.social.push.infrastructure.entity.PushDeliveryAttemptEntity">
+        INSERT INTO bluenote_push.push_delivery_attempt (
+            attempt_id, request_id, target_user_id, device_id, channel, attempt_status, skip_reason,
+            provider_message_id, error_message, attempted_at, created_at, updated_at
+        ) VALUES (
+            #{attemptId}, #{requestId}, #{targetUserId}, #{deviceId}, #{channel}, #{attemptStatus}, #{skipReason},
+            #{providerMessageId}, #{errorMessage}, #{attemptedAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectByRequestId" resultMap="PushDeliveryAttemptResultMap">
+        SELECT attempt_id, request_id, target_user_id, device_id, channel, attempt_status, skip_reason,
+               provider_message_id, error_message, attempted_at, created_at, updated_at
+        FROM bluenote_push.push_delivery_attempt
+        WHERE request_id = #{requestId}
+        ORDER BY attempted_at ASC, attempt_id ASC
+    </select>
+</mapper>

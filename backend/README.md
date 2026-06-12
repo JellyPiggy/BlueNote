@@ -8,7 +8,7 @@ BlueNote 后端采用 Java 21、Spring Boot 3.5.x、Spring Cloud 2025.0.x 和 Ma
 注册/登录 -> 获取用户资料 -> 上传图片 -> 发布笔记 -> 查看笔记详情
 ```
 
-第二条主链路已开始落地，当前完成 relation/comment/counter/feed/notification 起步纵切面，并已接入基础 MQ/outbox 闭环：
+第二条主链路已开始落地，当前完成 relation/comment/counter/feed/notification/push 起步纵切面，并已接入基础 MQ/outbox 闭环：
 
 ```text
 关注用户 -> 关系事实落库 -> relation-event outbox
@@ -16,6 +16,7 @@ BlueNote 后端采用 Java 21、Spring Boot 3.5.x、Spring Cloud 2025.0.x 和 Ma
 outbox dispatcher -> RocketMQ -> counter 自动消费 -> counter-event outbox
 NotePublished/UserFollowed -> feed 自动消费 -> 收件箱/重建/feed-event outbox
 点赞/收藏/评论/关注/笔记状态事件 -> notification 自动消费 -> 站内通知/未读数/notification-event/push-request-event outbox
+PushSendRequested -> push 自动消费 -> 设备/偏好过滤 -> 投递请求/尝试日志/push-event outbox
 ```
 
 ## 1. 模块
@@ -45,7 +46,7 @@ backend/
 | `bluenote-gateway-app` | 8080 | 网关、JWT 校验、路由、用户上下文 Header 注入 |
 | `bluenote-member-app` | 8081 | auth、user |
 | `bluenote-content-app` | 8082 | file、note、comment |
-| `bluenote-social-app` | 8083 | relation、counter、feed、notification，后续承载 rank |
+| `bluenote-social-app` | 8083 | relation、counter、feed、notification、push，后续承载 rank |
 
 ## 2. 当前实现状态
 
@@ -187,7 +188,7 @@ comment 内部接口：
 
 ### 2.4 Social App
 
-`bluenote-social-app` 已新增 relation/counter/feed/notification 最小可用链路。
+`bluenote-social-app` 已新增 relation/counter/feed/notification/push 最小可用链路。
 
 relation 外部接口：
 
@@ -255,6 +256,26 @@ notification 内部接口：
 | `POST /internal/notifications/users/{userId}/rebuild-unread` | 从通知事实表重建用户未读数 |
 | `POST /internal/notifications/events/replay` | 基于消费记录重放事件 |
 
+push 外部接口：
+
+| 接口 | 说明 |
+|---|---|
+| `POST /api/push/devices/register` | 登录后注册或更新当前设备 |
+| `GET /api/push/devices` | 查询当前用户设备列表 |
+| `DELETE /api/push/devices/{deviceId}` | 解绑当前用户设备 |
+| `GET /api/push/preferences` | 查询当前用户推送偏好 |
+| `PUT /api/push/preferences` | 更新当前用户推送偏好 |
+| `POST /api/push/clicks` | 记录 Push 点击回传 |
+
+push 内部接口：
+
+| 接口 | 说明 |
+|---|---|
+| `POST /internal/push/requests/send` | 创建或复用推送请求并执行投递 |
+| `GET /internal/push/requests/{requestId}` | 查询推送请求和尝试日志 |
+| `POST /internal/push/requests/{requestId}/retry` | 重试推送请求 |
+| `POST /internal/push/events/replay` | 基于消费记录重放 Push 事件 |
+
 已接入能力：
 
 1. `relation_following` 关注事实落库。
@@ -279,6 +300,9 @@ notification 内部接口：
    - `bluenote-notification-comment-consumer`：`comment-event`
    - `bluenote-notification-relation-consumer`：`relation-event`
    - `bluenote-notification-note-consumer`：`note-event`
+16. push 已落 `bluenote_push.push_device`、`push_preference`、`push_delivery_request`、`push_delivery_attempt`、`push_click_log`、`push_consume_record`、`push_outbox_event`。
+17. push 已启动 `bluenote-push-request-consumer`，自动消费 `push-request-event` 中的 `PushSendRequested`。
+18. push 当前投递通道为 `NOOP` 基座，可完成幂等、偏好过滤、免打扰过滤、活跃设备过滤、投递尝试日志和 `PushDelivered` / `PushFiltered` outbox；真实 WebSocket / uni-push / 厂商 Push 后续接入。
 
 ### 2.5 MQ 与 Outbox
 
@@ -297,7 +321,7 @@ notification 内部接口：
 |---|---|
 | member | `bluenote_auth.auth_outbox_event`、`bluenote_user.user_outbox_event` |
 | content | `bluenote_file.file_outbox_event`、`bluenote_note.note_outbox_event`、`bluenote_comment.comment_outbox_event` |
-| social | `bluenote_relation.relation_outbox_event`、`bluenote_counter.counter_outbox_event`、`bluenote_feed.feed_outbox_event`、`bluenote_notification.notification_outbox_event` |
+| social | `bluenote_relation.relation_outbox_event`、`bluenote_counter.counter_outbox_event`、`bluenote_feed.feed_outbox_event`、`bluenote_notification.notification_outbox_event`、`bluenote_push.push_outbox_event` |
 
 本地默认启用 MQ/outbox，可通过环境变量关闭：
 
@@ -377,7 +401,7 @@ mvn -pl bluenote-gateway-app spring-boot:run
 | Gateway content URI | `http://127.0.0.1:8082` |
 | Gateway social URI | `http://127.0.0.1:8083` |
 
-注意：member/content/social 当前各自只配置一个 datasource URL，但 DDL 中按逻辑 schema 拆分为 `bluenote_auth`、`bluenote_user`、`bluenote_file`、`bluenote_note`、`bluenote_comment`、`bluenote_relation`、`bluenote_counter`、`bluenote_feed`、`bluenote_notification`。应用内 SQL 使用显式 schema 名访问本应用拥有的逻辑 schema。
+注意：member/content/social 当前各自只配置一个 datasource URL，但 DDL 中按逻辑 schema 拆分为 `bluenote_auth`、`bluenote_user`、`bluenote_file`、`bluenote_note`、`bluenote_comment`、`bluenote_relation`、`bluenote_counter`、`bluenote_feed`、`bluenote_notification`、`bluenote_push`。应用内 SQL 使用显式 schema 名访问本应用拥有的逻辑 schema。
 
 ## 6. 检查入口
 
@@ -406,6 +430,6 @@ http://127.0.0.1:{port}/swagger-ui.html
 
 1. 补后端自动化测试和接口集成测试。
 2. 补 RocketMQ 死信告警和更完整的人工重放审计。
-3. 补移动端通知页和消息入口未读角标。
+3. 补真实 WebSocket / uni-push 投递通道、ACK 和移动端设备注册联调。
 4. 补 feed 大 V 推拉结合策略、清理任务后台化和更完整的补偿审计。
 5. 补生产部署、备份恢复、监控告警配置。

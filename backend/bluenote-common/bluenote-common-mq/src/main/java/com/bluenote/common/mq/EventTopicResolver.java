@@ -40,7 +40,10 @@ public final class EventTopicResolver {
             Map.entry("NotificationRead", "notification-event"),
             Map.entry("NotificationReadBatch", "notification-event"),
             Map.entry("NotificationDeleted", "notification-event"),
-            Map.entry("PushSendRequested", "push-request-event")
+            Map.entry("PushSendRequested", "push-request-event"),
+            Map.entry("PushDelivered", "push-event"),
+            Map.entry("PushFiltered", "push-event"),
+            Map.entry("PushFailed", "push-event")
     );
 
     private EventTopicResolver() {

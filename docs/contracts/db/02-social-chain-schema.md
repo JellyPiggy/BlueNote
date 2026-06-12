@@ -3,7 +3,7 @@
 版本：v0.2
 状态：第二条主链路开发基线
 
-本文定义关系、评论、计数、Feed、通知五个逻辑服务第一阶段必须落地的 schema、核心表、唯一约束和索引。本文不是最终可执行 SQL，后续 `backend/sql/` 的 DDL 必须以本文为基线生成。
+本文定义关系、评论、计数、Feed、通知、Push 逻辑服务第一阶段必须落地的 schema、核心表、唯一约束和索引。本文不是最终可执行 SQL，后续 `backend/sql/` 的 DDL 必须以本文为基线生成。
 
 ## 1. 通用表规则
 
@@ -24,6 +24,7 @@
 | `bluenote_counter` | `bluenote-counter` | 计数快照、delta、重建任务 |
 | `bluenote_feed` | `bluenote-feed` | Feed 轻量索引、收件箱快照、fanout 任务 |
 | `bluenote_notification` | `bluenote-notification` | 站内通知、聚合、未读数、通知事件 |
+| `bluenote_push` | `bluenote-push` | 推送设备、偏好、投递请求、通道尝试 |
 
 说明：笔记点赞和收藏事实表仍在 `bluenote_note.note_like`、`bluenote_note.note_collection`，见 `01-main-chain-schema.md`。
 
@@ -399,7 +400,76 @@ Feed 服务的笔记轻量索引。
 
 索引同通用 outbox 和消费记录要求。
 
-## 8. DDL 生成要求
+## 8. bluenote_push
+
+Push 第一阶段物理部署在 `bluenote-social-app`，但使用独立 schema 和包结构。
+
+### 8.1 push_device
+
+用户设备绑定事实表。
+
+字段：`device_id`、`user_id`、`platform`、`push_provider`、`provider_client_id`、`app_version`、`os_version`、`device_model`、`device_status`、`registered_at`、`last_active_at`、`unbound_at`、`created_at`、`updated_at`。
+
+索引：
+
+| 索引 | 说明 |
+|---|---|
+| `PRIMARY KEY(device_id)` | 设备唯一 |
+| `idx_push_device_user_status(user_id, device_status, last_active_at)` | 查询用户活跃设备 |
+| `idx_push_device_provider(push_provider, provider_client_id)` | 排查通道 token |
+
+### 8.2 push_preference
+
+用户推送偏好表。
+
+字段：`user_id`、`global_enabled`、`interaction_enabled`、`follow_enabled`、`system_enabled`、`order_enabled`、`im_enabled`、`show_im_detail`、`quiet_hours_enabled`、`quiet_start`、`quiet_end`、`created_at`、`updated_at`。
+
+索引：`PRIMARY KEY(user_id)`。
+
+### 8.3 push_delivery_request
+
+投递请求事实表。来源可以是 MQ `PushSendRequested` 或内部接口。
+
+字段：`request_id`、`source_service`、`source_biz_type`、`source_biz_id`、`scene`、`target_user_id`、`target_device_policy`、`delivery_strategy`、`priority`、`title`、`body`、`data_json`、`request_status`、`filtered_reason`、`delivered_device_count`、`expire_at`、`completed_at`、`created_at`、`updated_at`。
+
+索引：
+
+| 索引 | 说明 |
+|---|---|
+| `PRIMARY KEY(request_id)` | 请求幂等 |
+| `uk_push_source_biz(source_service, source_biz_type, source_biz_id, scene)` | 来源业务幂等 |
+| `idx_push_request_user_time(target_user_id, created_at)` | 用户维度排查 |
+| `idx_push_request_status(request_status, updated_at)` | 运维扫描 |
+
+### 8.4 push_delivery_attempt
+
+通道尝试日志表。
+
+字段：`attempt_id`、`request_id`、`target_user_id`、`device_id`、`channel`、`attempt_status`、`skip_reason`、`provider_message_id`、`error_message`、`attempted_at`、`created_at`、`updated_at`。
+
+索引：`idx_push_attempt_request(request_id, attempted_at)`、`idx_push_attempt_device(device_id, attempted_at)`、`idx_push_attempt_status(attempt_status, attempted_at)`。
+
+### 8.5 push_click_log
+
+移动端点击系统通知回传日志。
+
+字段：`id`、`request_id`、`user_id`、`device_id`、`data_json`、`clicked_at`、`created_at`。
+
+索引：`idx_push_click_request(request_id, clicked_at)`、`idx_push_click_user(user_id, clicked_at)`。
+
+### 8.6 push_consume_record / push_outbox_event
+
+`push_consume_record` 用于 MQ 消费幂等和事件重放，允许保存 `envelope_json`。
+
+`push_outbox_event` 支持：
+
+1. `PushDelivered`
+2. `PushFiltered`
+3. `PushFailed`
+
+索引同通用 outbox 和消费记录要求。
+
+## 9. DDL 生成要求
 
 后续生成 `backend/sql/` 时：
 
