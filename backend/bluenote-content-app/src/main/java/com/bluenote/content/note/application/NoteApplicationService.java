@@ -446,6 +446,34 @@ public class NoteApplicationService {
     }
 
     @Transactional(readOnly = true)
+    public CursorPage<NoteCardResponse> myCollections(String userId, String cursor, Integer size) {
+        Long parsedUserId = parseId(userId, ApiErrorCode.ACCESS_TOKEN_INVALID);
+        PageCursor pageCursor = parseCursor(cursor);
+        int pageSize = normalizePageSize(size);
+        List<NoteEntity> notes = noteMapper.selectMyCollectedNotesPage(
+                parsedUserId,
+                pageCursor.sortAt(),
+                pageCursor.noteId(),
+                pageSize + 1
+        );
+        return toInteractionCardPage(notes, pageSize);
+    }
+
+    @Transactional(readOnly = true)
+    public CursorPage<NoteCardResponse> myLikes(String userId, String cursor, Integer size) {
+        Long parsedUserId = parseId(userId, ApiErrorCode.ACCESS_TOKEN_INVALID);
+        PageCursor pageCursor = parseCursor(cursor);
+        int pageSize = normalizePageSize(size);
+        List<NoteEntity> notes = noteMapper.selectMyLikedNotesPage(
+                parsedUserId,
+                pageCursor.sortAt(),
+                pageCursor.noteId(),
+                pageSize + 1
+        );
+        return toInteractionCardPage(notes, pageSize);
+    }
+
+    @Transactional(readOnly = true)
     public BatchNoteSummaryResponse batchSummary(BatchNoteSummaryRequest request) {
         List<Long> noteIds = request.noteIds().stream()
                 .map(noteId -> parseId(noteId, ApiErrorCode.NOTE_NOT_FOUND))
@@ -776,6 +804,14 @@ public class NoteApplicationService {
     }
 
     private CursorPage<NoteCardResponse> toCardPage(List<NoteEntity> notes, int pageSize) {
+        return toCardPage(notes, pageSize, false);
+    }
+
+    private CursorPage<NoteCardResponse> toInteractionCardPage(List<NoteEntity> notes, int pageSize) {
+        return toCardPage(notes, pageSize, true);
+    }
+
+    private CursorPage<NoteCardResponse> toCardPage(List<NoteEntity> notes, int pageSize, boolean useInteractionSort) {
         boolean hasMore = notes.size() > pageSize;
         List<NoteEntity> pageItems = hasMore ? notes.subList(0, pageSize) : notes;
         List<NoteCardResponse> cards = pageItems.stream()
@@ -784,7 +820,10 @@ public class NoteApplicationService {
         String nextCursor = null;
         if (hasMore && !pageItems.isEmpty()) {
             NoteEntity last = pageItems.get(pageItems.size() - 1);
-            nextCursor = toOffsetString(sortAt(last)) + "_" + last.getNoteId();
+            LocalDateTime cursorSortAt = useInteractionSort && last.getInteractionAt() != null
+                    ? last.getInteractionAt()
+                    : sortAt(last);
+            nextCursor = toOffsetString(cursorSortAt) + "_" + last.getNoteId();
         }
         return new CursorPage<>(cards, nextCursor, hasMore);
     }

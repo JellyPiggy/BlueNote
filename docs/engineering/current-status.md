@@ -1,9 +1,9 @@
 # BlueNote 当前工程状态
 
-版本：v0.9
-状态：第一条主链路完成，第二条社交链路 relation/counter/feed/notification 持续落地，通知读模型、MQ 消费和移动端通知中心已接入
+版本：v0.10
+状态：第一条主链路完成，第二条社交链路 relation/counter/feed/notification 持续落地，移动端通知中心和我的页互动列表已接入
 更新时间：2026-06-12
-当前分支：`codex/mobile-notification-foundation`
+当前分支：`codex/mobile-profile-interactions`
 当前基线提交：以本分支最新提交为准
 
 ## 1. 文档用途
@@ -102,6 +102,7 @@ backend/sql/
   V007__counter.sql
   V008__feed.sql
   V009__notification.sql
+  V010__note_interaction_lists.sql
 ```
 
 本地依赖已配置：
@@ -222,14 +223,16 @@ note 已完成：
 5. 笔记详情：`GET /api/notes/{noteId}`
 6. 用户笔记列表：`GET /api/notes/users/{userId}`
 7. 我的笔记列表：`GET /api/notes/me`
-8. 笔记点赞/取消点赞：`POST /api/notes/{noteId}/like`、`DELETE /api/notes/{noteId}/like`
-9. 笔记收藏/取消收藏：`POST /api/notes/{noteId}/collect`、`DELETE /api/notes/{noteId}/collect`
-10. 内部批量笔记摘要：`POST /internal/notes/batch-summary`
-11. 内部评论前校验：`POST /internal/notes/comment-check`
-12. 内部计数来源：`POST /internal/notes/counter-source`
-13. 内部作者近期公开笔记：`POST /internal/notes/authors/recent`
-14. 笔记、媒体、版本、话题、幂等请求、互动明细等表结构已接入。
-15. 发布、删除、点赞、取消点赞、收藏、取消收藏写 note outbox。
+8. 我的收藏列表：`GET /api/notes/me/collections`
+9. 我的赞过列表：`GET /api/notes/me/likes`
+10. 笔记点赞/取消点赞：`POST /api/notes/{noteId}/like`、`DELETE /api/notes/{noteId}/like`
+11. 笔记收藏/取消收藏：`POST /api/notes/{noteId}/collect`、`DELETE /api/notes/{noteId}/collect`
+12. 内部批量笔记摘要：`POST /internal/notes/batch-summary`
+13. 内部评论前校验：`POST /internal/notes/comment-check`
+14. 内部计数来源：`POST /internal/notes/counter-source`
+15. 内部作者近期公开笔记：`POST /internal/notes/authors/recent`
+16. 笔记、媒体、版本、话题、幂等请求、互动明细等表结构已接入。
+17. 发布、删除、点赞、取消点赞、收藏、取消收藏写 note outbox。
 
 comment 已完成：
 
@@ -402,7 +405,8 @@ mobile/src/
 13. 消息页已按互动、关注、系统三类 Tab 展示通知，支持分页加载、下拉刷新、空态、错误态、未登录态。
 14. 首页和我的页已接消息入口未读角标，App 回到前台会刷新未读数。
 15. 点击通知会先标记已读，再按 `jump.page` 跳转到笔记详情；用户主页和系统公告目标当前先做提示兜底。
-16. H5 真实浏览器验收已做过多轮视觉检查。
+16. 我的页“笔记 / 收藏 / 赞过”三 tab 已接真实数据，收藏和赞过列表按互动时间游标分页。
+17. H5 真实浏览器验收已做过多轮视觉检查。
 
 当前 UI 风格已经从早期工程占位调整为移动端社区产品风格，但不使用小红书品牌元素。
 
@@ -431,6 +435,8 @@ mobile/src/
 | `b0f216b` | feed fanout 基座 |
 | `8588a24` | notification 通知读模型和 MQ 消费 |
 | `718db8e` | 合并 notification foundation |
+| `0275b5f` | 移动端通知中心 |
+| `7d7df07` | 合并移动端通知中心 |
 
 ## 5. 当前运行与验证方式
 
@@ -486,6 +492,7 @@ npm run dev:h5
     - `notification_outbox_event` 中 `NotificationCreated`、`NotificationRead`、`NotificationDeleted`、`PushSendRequested` 已由通用 dispatcher 标记 `SENT`。
 16. 本轮新增移动端消息页和未读角标后，移动端 `npm run typecheck`、`npm run build:h5` 通过。
 17. 本轮已启动 H5 预览并通过内置浏览器检查通知页未登录态和首页消息入口渲染，未发现明显重叠或空白。
+18. 本轮新增我的收藏/赞过后端接口、移动端我的页真实 tab 和 `V010__note_interaction_lists.sql` 后，`cd backend && mvn -q -DskipTests compile`、`cd mobile && npm run typecheck` 通过。
 
 ## 6. 待完成事项
 
@@ -505,10 +512,9 @@ npm run dev:h5
 下一批移动端任务：
 
 1. 编辑主页真实页面和 `PUT /api/users/me/profile` 联调。
-2. 我的页“收藏”和“赞过”tab 接真实数据。
-3. 首页从“我的笔记”过渡到更真实的推荐/发现数据源。
-4. 图片上传失败重试、上传进度、重复发布保护再打磨。
-5. 空态、错误态、弱网态和 token 过期后的提示继续统一。
+2. 首页从“我的笔记”过渡到更真实的推荐/发现数据源。
+3. 图片上传失败重试、上传进度、重复发布保护再打磨。
+4. 空态、错误态、弱网态和 token 过期后的提示继续统一。
 
 ### 6.3 第二条社交链路
 
@@ -521,9 +527,8 @@ npm run dev:h5
 待落地：
 
 1. RocketMQ 死信告警和更完整的人工重放审计。
-2. 我的收藏列表和赞过列表。
-3. content 笔记详情、列表等读接口逐步切换到 counter 计数。
-4. feed 大 V 推拉结合策略、清理任务后台化、失败任务批量补偿和完整运维审计。
+2. content 笔记详情、列表等读接口逐步切换到 counter 计数。
+3. feed 大 V 推拉结合策略、清理任务后台化、失败任务批量补偿和完整运维审计。
 
 ### 6.4 后续链路
 

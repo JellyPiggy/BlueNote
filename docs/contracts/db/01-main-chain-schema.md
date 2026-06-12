@@ -443,6 +443,7 @@
 |---|---|
 | `uk_note_like_user(note_id, user_id)` | 点赞幂等 |
 | `idx_note_like_note_time(note_id, like_status, liked_at)` | 点赞列表和校准 |
+| `idx_note_like_user_time(user_id, like_status, liked_at, note_id)` | 我的赞过列表 |
 
 ### 6.6 note_collection
 

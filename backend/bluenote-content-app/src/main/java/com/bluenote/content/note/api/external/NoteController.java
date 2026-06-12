@@ -144,6 +144,28 @@ public class NoteController {
         );
     }
 
+    @GetMapping("/me/collections")
+    public ApiResponse<CursorPage<NoteCardResponse>> myCollections(
+            @RequestParam(value = "cursor", required = false) String cursor,
+            @RequestParam(value = "size", required = false) Integer size
+    ) {
+        return ApiResponse.success(
+                noteApplicationService.myCollections(requireUserId(), cursor, size),
+                TraceIdHolder.currentOrNew()
+        );
+    }
+
+    @GetMapping("/me/likes")
+    public ApiResponse<CursorPage<NoteCardResponse>> myLikes(
+            @RequestParam(value = "cursor", required = false) String cursor,
+            @RequestParam(value = "size", required = false) Integer size
+    ) {
+        return ApiResponse.success(
+                noteApplicationService.myLikes(requireUserId(), cursor, size),
+                TraceIdHolder.currentOrNew()
+        );
+    }
+
     private String requireUserId() {
         UserContext userContext = UserContextHolder.current();
         if (userContext == null || !userContext.authenticated()) {

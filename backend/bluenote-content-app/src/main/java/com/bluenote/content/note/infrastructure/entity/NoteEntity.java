@@ -20,6 +20,7 @@ public class NoteEntity {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Integer deleted;
+    private LocalDateTime interactionAt;
 
     public Long getNoteId() {
         return noteId;
@@ -148,5 +149,12 @@ public class NoteEntity {
     public void setDeleted(Integer deleted) {
         this.deleted = deleted;
     }
-}
 
+    public LocalDateTime getInteractionAt() {
+        return interactionAt;
+    }
+
+    public void setInteractionAt(LocalDateTime interactionAt) {
+        this.interactionAt = interactionAt;
+    }
+}

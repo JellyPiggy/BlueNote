@@ -44,6 +44,20 @@ public interface NoteMapper {
             @Param("size") int size
     );
 
+    List<NoteEntity> selectMyCollectedNotesPage(
+            @Param("userId") Long userId,
+            @Param("cursorInteractionAt") LocalDateTime cursorInteractionAt,
+            @Param("cursorNoteId") Long cursorNoteId,
+            @Param("size") int size
+    );
+
+    List<NoteEntity> selectMyLikedNotesPage(
+            @Param("userId") Long userId,
+            @Param("cursorInteractionAt") LocalDateTime cursorInteractionAt,
+            @Param("cursorNoteId") Long cursorNoteId,
+            @Param("size") int size
+    );
+
     List<NoteEntity> selectRecentPublicByAuthors(
             @Param("authorIds") List<Long> authorIds,
             @Param("publishedAfter") LocalDateTime publishedAfter,
