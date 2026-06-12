@@ -7,8 +7,10 @@ import type { NoteCard } from '@/api/types'
 import EmptyState from '@/components/EmptyState.vue'
 import NoteCardView from '@/components/NoteCard.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationStore } from '@/stores/notification'
 
 const auth = useAuthStore()
+const notifications = useNotificationStore()
 const notes = ref<NoteCard[]>([])
 const loading = ref(false)
 const loaded = ref(false)
@@ -62,6 +64,14 @@ function goLogin() {
 function goPublish() {
   uni.switchTab({ url: '/pages/publish/index' })
 }
+
+function openNotifications() {
+  if (!auth.isAuthenticated) {
+    goLogin()
+    return
+  }
+  uni.navigateTo({ url: '/pages/notifications/index' })
+}
 </script>
 
 <template>
@@ -71,6 +81,10 @@ function goPublish() {
       <button class="search-pill" @tap="goPublish">
         <text class="search-mark">⌕</text>
         <text class="search-copy">搜索笔记、话题</text>
+      </button>
+      <button class="message-button" @tap="openNotifications">
+        <text class="message-icon">◌</text>
+        <text v-if="notifications.badgeText" class="message-badge">{{ notifications.badgeText }}</text>
       </button>
       <button class="new-button" @tap="goPublish">+</button>
     </view>
@@ -175,6 +189,44 @@ function goPublish() {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.message-button {
+  position: relative;
+  flex: 0 0 auto;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  color: var(--bn-ink);
+  background: #fff;
+  box-shadow: 0 6rpx 18rpx rgba(18, 22, 28, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.message-icon {
+  font-size: 38rpx;
+  line-height: 1;
+}
+
+.message-badge {
+  position: absolute;
+  right: -8rpx;
+  top: -8rpx;
+  min-width: 30rpx;
+  height: 30rpx;
+  padding: 0 8rpx;
+  border-radius: 999rpx;
+  background: var(--bn-coral);
+  color: #fff;
+  border: 3rpx solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18rpx;
+  font-weight: 820;
+  line-height: 1;
 }
 
 .channel-tabs {

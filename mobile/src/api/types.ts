@@ -224,3 +224,83 @@ export interface CommentLikeResponse {
   commentId: string
   liked: boolean
 }
+
+export type NotificationCategory = 'INTERACTION' | 'FOLLOW' | 'SYSTEM' | 'ORDER'
+
+export interface NotificationActorSummary {
+  userId: string
+  nickname: string
+  avatarUrl: string | null
+}
+
+export interface NotificationTarget {
+  targetType?: string
+  targetId?: string
+  title?: string
+  coverUrl?: string | null
+  [key: string]: unknown
+}
+
+export interface NotificationJump {
+  page?: string
+  noteId?: string
+  commentId?: string
+  userId?: string
+  noticeId?: string
+  [key: string]: unknown
+}
+
+export interface NotificationItem {
+  notificationId: string
+  category: NotificationCategory
+  notificationType: string
+  aggregate: boolean
+  actorCount: number
+  title: string
+  content: string
+  read: boolean
+  actors: NotificationActorSummary[]
+  target: NotificationTarget
+  jump: NotificationJump
+  createdAt: string
+  lastEventAt: string
+}
+
+export interface NotificationListResponse extends CursorPage<NotificationItem> {}
+
+export interface NotificationUnreadCountResponse {
+  totalUnread: number
+  categories: Record<NotificationCategory, number>
+}
+
+export interface NotificationDetailResponse {
+  notificationId: string
+  category: NotificationCategory
+  notificationType: string
+  title: string
+  content: string
+  read: boolean
+  snapshot: Record<string, unknown>
+  jump: NotificationJump
+}
+
+export interface NotificationReadResponse {
+  notificationId: string
+  read: boolean
+  totalUnread: number
+}
+
+export interface NotificationReadAllResponse {
+  updatedCount: number
+  totalUnread: number
+  categories: Record<NotificationCategory, number>
+}
+
+export interface NotificationDeleteResponse {
+  notificationId: string
+  deleted: boolean
+}
+
+export interface NotificationDeleteBatchResponse {
+  deletedCount: number
+}
