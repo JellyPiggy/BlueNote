@@ -170,6 +170,73 @@ export interface NoteCard {
   publishedAt: string | null
 }
 
+export interface RankCounts {
+  likeCount: number
+  commentCount: number
+  collectCount: number
+}
+
+export interface WeeklyHotNoteRankItem {
+  rankNo: number
+  noteId: string
+  authorId: string
+  authorNickname: string | null
+  authorAvatarUrl: string | null
+  title: string
+  coverUrl: string | null
+  score: number
+  counts: RankCounts
+  publishedAt: string | null
+}
+
+export interface WeeklyHotNotesRankResponse {
+  rankCode: 'WEEKLY_HOT_NOTE'
+  periodId: string
+  items: WeeklyHotNoteRankItem[]
+  nextCursor: string | null
+  hasMore: boolean
+  degraded: boolean
+}
+
+export interface CreatorRankStats {
+  publicNoteCount: number
+  followerCount: number
+  likedCount: number
+}
+
+export type RankMode = 'EXACT' | 'ESTIMATED' | 'NOT_RANKED' | string
+
+export interface YearlyCreatorRankItem {
+  rankNo: number
+  creatorId: string
+  nickname: string | null
+  avatarUrl: string | null
+  bio: string | null
+  score: number
+  rankMode: RankMode
+  stats: CreatorRankStats
+}
+
+export interface YearlyCreatorGrowthRankResponse {
+  rankCode: 'YEARLY_CREATOR_GROWTH'
+  periodId: string
+  items: YearlyCreatorRankItem[]
+  nextCursor: string | null
+  hasMore: boolean
+  degraded: boolean
+}
+
+export interface MyYearlyCreatorRankResponse {
+  rankCode: 'YEARLY_CREATOR_GROWTH'
+  periodId: string
+  creatorId: string
+  rankNo: number | null
+  rankMode: RankMode
+  score: number
+  notRanked: boolean
+  degraded: boolean
+}
+
 export interface NoteDetail {
   noteId: string
   author: {

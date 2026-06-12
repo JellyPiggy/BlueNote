@@ -80,6 +80,10 @@ function openOrderActivity() {
   }
   uni.navigateTo({ url: '/pages/order/activity' })
 }
+
+function openRank() {
+  uni.navigateTo({ url: '/pages/rank/index' })
+}
 </script>
 
 <template>
@@ -94,6 +98,7 @@ function openOrderActivity() {
         <text class="message-icon">◌</text>
         <text v-if="notifications.badgeText" class="message-badge">{{ notifications.badgeText }}</text>
       </button>
+      <button class="rank-button" @tap="openRank">榜</button>
       <button class="coupon-button" @tap="openOrderActivity">券</button>
       <button class="new-button" @tap="goPublish">+</button>
     </view>
@@ -101,7 +106,7 @@ function openOrderActivity() {
     <view class="channel-tabs">
       <button class="channel active">推荐</button>
       <button class="channel">关注</button>
-      <button class="channel">最新</button>
+      <button class="channel" @tap="openRank">榜单</button>
       <button class="channel">我的</button>
     </view>
 
@@ -222,6 +227,21 @@ function openOrderActivity() {
   color: #7a4d00;
   background: #fff4cf;
   box-shadow: 0 6rpx 18rpx rgba(243, 190, 62, 0.18);
+  font-size: 27rpx;
+  font-weight: 860;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rank-button {
+  flex: 0 0 auto;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  color: #164c7a;
+  background: #e5f3ff;
+  box-shadow: 0 6rpx 18rpx rgba(44, 116, 214, 0.14);
   font-size: 27rpx;
   font-weight: 860;
   display: flex;

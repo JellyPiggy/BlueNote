@@ -53,6 +53,13 @@
       }
     },
     {
+      "path": "pages/rank/index",
+      "style": {
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/login/index",
       "style": {
         "navigationStyle": "custom"
