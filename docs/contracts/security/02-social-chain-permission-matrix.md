@@ -1,7 +1,7 @@
 # 第二条主链路权限矩阵
 
-版本：v0.2
-状态：第二条主链路开发基线
+版本：v0.3
+状态：第二条主链路开发基线，排行榜 foundation 契约开发基线
 
 本文补充关注、评论、Feed、通知和计数相关接口的权限、归属、幂等和限流要求。网关用户上下文继承 `01-permission-matrix.md`。
 
@@ -24,6 +24,9 @@
 | DELETE | `/api/comments/{commentId}/like` | 是 | 当前用户 | 业务唯一键 | 用户 | 取消评论点赞 |
 | GET | `/api/comments/me` | 是 | 当前用户 | 否 | 用户 | 查询我的评论 |
 | GET | `/api/feed/following` | 是 | 当前用户 | 否 | 用户 / IP | 查询关注页 Feed |
+| GET | `/api/ranks/weekly-hot-notes` | 可选 | 公开榜单 | 否 | 用户 / IP | 查询本周热门笔记榜 |
+| GET | `/api/ranks/yearly-creator-growth` | 可选 | 公开榜单 | 否 | 用户 / IP | 查询本年创作者成长榜 |
+| GET | `/api/ranks/creators/me/yearly-growth-rank` | 是 | 当前用户 | 否 | 用户 | 查询本人本年成长排名 |
 | GET | `/api/notifications/unread-count` | 是 | 当前用户 | 否 | 用户 | 查询通知未读数 |
 | GET | `/api/notifications` | 是 | 当前用户 | 否 | 用户 | 查询通知列表 |
 | GET | `/api/notifications/{notificationId}` | 是 | 通知接收人 | 否 | 用户 | 查询通知详情 |
@@ -71,6 +74,12 @@
 | GET | `/internal/feed/rebuild-tasks/{taskId}` | ops / admin | feed | 内部管理权限 |
 | GET | `/internal/feed/fanout-tasks/{taskId}` | ops / admin | feed | 内部管理权限 |
 | POST | `/internal/feed/fanout-tasks/{taskId}/retry` | ops / admin | feed | 内部管理权限，审计 |
+| POST | `/internal/ranks/members/batch-rank` | feed / notification / ops | rank | 服务身份认证，单次最多 100 |
+| POST | `/internal/ranks/rebuild` | ops / admin | rank | 内部管理权限，频率限制 |
+| GET | `/internal/ranks/rebuild-tasks/{taskId}` | ops / admin | rank | 内部管理权限 |
+| POST | `/internal/ranks/snapshots` | ops / admin | rank | 内部管理权限，审计 |
+| GET | `/internal/ranks/snapshots/latest` | ops / admin | rank | 内部管理权限 |
+| POST | `/internal/ranks/events/consume` | ops / mq-admin | rank | 内部管理权限，事件重放审计 |
 | POST | `/internal/notifications/system` | admin / system | notification | 内部管理权限，写审计 |
 | POST | `/internal/notifications/batch-summary` | push / admin | notification | 服务身份认证，单次最多 100 |
 | POST | `/internal/notifications/users/{userId}/rebuild-unread` | ops / admin | notification | 内部管理权限，频率限制 |
@@ -136,6 +145,10 @@
 | `clientMsgId` | 非空，长度不超过 128 |
 | IM 文字消息 | 1 到 1000 字符 |
 | IM 分页 | 会话 `pageSize` 最大 50，消息 `limit` 最大 100 |
+| Rank `size` | 1 到 50 |
+| Rank `cursor` | `rankNo_memberId` |
+| Rank `rankCode` | `WEEKLY_HOT_NOTE` / `YEARLY_CREATOR_GROWTH` |
+| Rank `memberIds` | 单次最多 100 |
 
 ## 5. 可见性和归属规则
 
@@ -150,6 +163,8 @@
 9. Push 内部接口不得让移动端指定操作其他用户设备。
 10. IM 会话列表、消息查询、已读、送达、设置和删除必须校验当前用户是会话成员。
 11. IM 发送时服务端以当前登录用户作为 `senderId`，不信任移动端传发送人。
+12. 排行榜周榜查询必须二次校验笔记公开和已发布。
+13. 排行榜本人排名只能使用当前登录用户 ID，移动端不得传 creatorId。
 
 ## 6. 限流建议
 
@@ -159,6 +174,7 @@
 | 评论发布 | 用户、笔记、IP |
 | 评论点赞 | 用户、评论 |
 | Feed 查询 | 用户、IP |
+| 榜单查询 | 用户、IP |
 | 通知列表查询 | 用户 |
 | 通知批量已读 / 删除 | 用户 |
 | 设备注册 / 解绑 | 用户、设备 |
@@ -168,6 +184,7 @@
 | IM 会话和消息查询 | 用户 |
 | 计数重建 | target、操作者 |
 | Feed 重建 | userId、操作者 |
+| Rank 重建 / 快照 / 事件重放 | rankCode、periodId、操作者 |
 
 限流失败统一返回 `10005 RATE_LIMITED` 或对应业务细分错误码。
 

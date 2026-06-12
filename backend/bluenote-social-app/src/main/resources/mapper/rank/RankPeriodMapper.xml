@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.rank.infrastructure.mapper.RankPeriodMapper">
+
+    <resultMap id="RankPeriodResultMap" type="com.bluenote.social.rank.infrastructure.entity.RankEntities$RankPeriodEntity">
+        <id column="id" property="id"/>
+        <result column="rank_code" property="rankCode"/>
+        <result column="period_id" property="periodId"/>
+        <result column="period_type" property="periodType"/>
+        <result column="period_status" property="periodStatus"/>
+        <result column="start_at" property="startAt"/>
+        <result column="end_at" property="endAt"/>
+        <result column="frozen_at" property="frozenAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insertIgnore" parameterType="com.bluenote.social.rank.infrastructure.entity.RankEntities$RankPeriodEntity">
+        INSERT IGNORE INTO bluenote_rank.rank_period (
+            id, rank_code, period_id, period_type, period_status,
+            start_at, end_at, frozen_at, created_at, updated_at
+        ) VALUES (
+            #{id}, #{rankCode}, #{periodId}, #{periodType}, #{periodStatus},
+            #{startAt}, #{endAt}, #{frozenAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectByRankAndPeriod" resultMap="RankPeriodResultMap">
+        SELECT id, rank_code, period_id, period_type, period_status,
+               start_at, end_at, frozen_at, created_at, updated_at
+        FROM bluenote_rank.rank_period
+        WHERE rank_code = #{rankCode}
+          AND period_id = #{periodId}
+    </select>
+</mapper>

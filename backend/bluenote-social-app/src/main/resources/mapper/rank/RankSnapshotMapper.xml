@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.rank.infrastructure.mapper.RankSnapshotMapper">
+
+    <resultMap id="RankSnapshotResultMap" type="com.bluenote.social.rank.infrastructure.entity.RankEntities$RankSnapshotEntity">
+        <id column="snapshot_id" property="snapshotId"/>
+        <result column="rank_code" property="rankCode"/>
+        <result column="period_id" property="periodId"/>
+        <result column="snapshot_type" property="snapshotType"/>
+        <result column="item_count" property="itemCount"/>
+        <result column="source_version" property="sourceVersion"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <resultMap id="RankSnapshotItemResultMap" type="com.bluenote.social.rank.infrastructure.entity.RankEntities$RankSnapshotItemEntity">
+        <id column="id" property="id"/>
+        <result column="snapshot_id" property="snapshotId"/>
+        <result column="rank_no" property="rankNo"/>
+        <result column="member_type" property="memberType"/>
+        <result column="member_id" property="memberId"/>
+        <result column="score" property="score"/>
+        <result column="rank_score" property="rankScore"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="insertSnapshot" parameterType="com.bluenote.social.rank.infrastructure.entity.RankEntities$RankSnapshotEntity">
+        INSERT INTO bluenote_rank.rank_snapshot (
+            snapshot_id, rank_code, period_id, snapshot_type, item_count, source_version, created_at
+        ) VALUES (
+            #{snapshotId}, #{rankCode}, #{periodId}, #{snapshotType}, #{itemCount}, #{sourceVersion}, #{createdAt}
+        )
+    </insert>
+
+    <insert id="insertSnapshotItem" parameterType="com.bluenote.social.rank.infrastructure.entity.RankEntities$RankSnapshotItemEntity">
+        INSERT INTO bluenote_rank.rank_snapshot_item (
+            id, snapshot_id, rank_no, member_type, member_id, score, rank_score, created_at
+        ) VALUES (
+            #{id}, #{snapshotId}, #{rankNo}, #{memberType}, #{memberId}, #{score}, #{rankScore}, #{createdAt}
+        )
+    </insert>
+
+    <select id="selectLatest" resultMap="RankSnapshotResultMap">
+        SELECT snapshot_id, rank_code, period_id, snapshot_type, item_count, source_version, created_at
+        FROM bluenote_rank.rank_snapshot
+        WHERE rank_code = #{rankCode}
+          AND period_id = #{periodId}
+          AND snapshot_type = #{snapshotType}
+        ORDER BY created_at DESC, snapshot_id DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectItems" resultMap="RankSnapshotItemResultMap">
+        SELECT id, snapshot_id, rank_no, member_type, member_id, score, rank_score, created_at
+        FROM bluenote_rank.rank_snapshot_item
+        WHERE snapshot_id = #{snapshotId}
+        ORDER BY rank_no ASC
+    </select>
+</mapper>

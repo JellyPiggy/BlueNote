@@ -1,7 +1,7 @@
 # 第二条主链路 Redis Key 契约
 
-版本：v0.2
-状态：第二条主链路开发基线
+版本：v0.3
+状态：第二条主链路开发基线，排行榜 foundation 契约开发基线
 
 Redis 只作为缓存、短锁、限流、在线计数和 Feed 在线读模型。所有 Key 丢失后必须能从 MySQL、对象存储、关系服务或笔记服务重建。
 
@@ -94,7 +94,25 @@ Hash 字段：
 1. 收件箱从 `feed_inbox_item`、作者发件箱、关系服务和笔记服务重建。
 2. 作者发件箱从 `feed_note_index` 或 `/internal/notes/authors/recent` 重建。
 
-## 5. notification keys
+## 5. rank keys
+
+| Key | 类型 | TTL | 写入方 | 读取方 | 用途 |
+|---|---|---|---|---|---|
+| `bluenote:{env}:rank:{rankCode}:{periodId}:exact` | ZSET | 当前周期不设置短 TTL | rank | rank | 精确榜，member 为成员 ID，score 为 rankScore |
+| `bluenote:{env}:rank:YEARLY_CREATOR_GROWTH:{periodId}:segment` | Hash | 当前周期不设置短 TTL | rank | rank | 年榜粗估排名分段统计 |
+| `bluenote:{env}:rank:{rankCode}:{periodId}:score:{memberType}:{memberId}` | Hash | 30 分钟 | rank | rank | 成员分数短缓存 |
+| `bluenote:{env}:rank:dedupe:{yyyyMMdd}` | Set | 30 天 | rank | rank | 事件短期去重 |
+| `bluenote:{env}:rank:dirty` | ZSET | 不设置 | rank | rank | 需要快照的榜单集合 |
+| `bluenote:{env}:rank:{rankCode}:{periodId}:page:{cursorHash}` | String(JSON) | 5 到 30 秒 | rank | rank | 榜单页短缓存 |
+
+重建方式：
+
+1. 精确榜从 `rank_member_score` 中 `member_status=ACTIVE` 的成员重建。
+2. 年榜分段统计从 `rank_member_score` 的真实整数分重建。
+3. 成员短缓存丢失后回源 MySQL。
+4. Redis 去重丢失不影响长期幂等，MySQL `rank_event_consume_log` 和 `rank_score_change_log` 兜底。
+
+## 6. notification keys
 
 | Key | 类型 | TTL | 写入方 | 读取方 | 用途 |
 |---|---|---|---|---|---|
@@ -123,7 +141,7 @@ Hash 字段：
 2. Redis 未读缓存丢失后回源 MySQL。
 3. 聚合短锁失败时可退化为 MySQL 唯一约束冲突重试。
 
-## 6. push keys
+## 7. push keys
 
 | Key | 类型 | TTL | 写入方 | 读取方 | 用途 |
 |---|---|---|---|---|---|
@@ -140,7 +158,7 @@ Hash 字段：
 2. 偏好缓存从 `push_preference` 重建，缺失时使用默认开启策略。
 3. 在线连接 key 丢失视为用户离线，不影响业务事实。
 
-## 7. im keys
+## 8. im keys
 
 | Key | 类型 | TTL | 写入方 | 读取方 | 用途 |
 |---|---|---|---|---|---|
@@ -156,7 +174,7 @@ Hash 字段：
 2. `im:conversation:list:{userId}` 从 `im_conversation_member` 和 `im_conversation` 按最近消息时间重建。
 3. 幂等和限流 Key 丢失不影响事实一致性。
 
-## 8. Key 变更规则
+## 9. Key 变更规则
 
 新增或修改 Key 必须同步说明：
 

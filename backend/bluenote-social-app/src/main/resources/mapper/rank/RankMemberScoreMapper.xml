@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.rank.infrastructure.mapper.RankMemberScoreMapper">
+
+    <resultMap id="RankMemberScoreResultMap" type="com.bluenote.social.rank.infrastructure.entity.RankEntities$RankMemberScoreEntity">
+        <id column="id" property="id"/>
+        <result column="rank_code" property="rankCode"/>
+        <result column="period_id" property="periodId"/>
+        <result column="member_type" property="memberType"/>
+        <result column="member_id" property="memberId"/>
+        <result column="score" property="score"/>
+        <result column="rank_score" property="rankScore"/>
+        <result column="score_version" property="scoreVersion"/>
+        <result column="member_status" property="memberStatus"/>
+        <result column="last_score_at" property="lastScoreAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="RankMemberScoreColumns">
+        id, rank_code, period_id, member_type, member_id, score, rank_score,
+        score_version, member_status, last_score_at, created_at, updated_at
+    </sql>
+
+    <insert id="insertIgnore" parameterType="com.bluenote.social.rank.infrastructure.entity.RankEntities$RankMemberScoreEntity">
+        INSERT IGNORE INTO bluenote_rank.rank_member_score (
+            id, rank_code, period_id, member_type, member_id, score, rank_score,
+            score_version, member_status, last_score_at, created_at, updated_at
+        ) VALUES (
+            #{id}, #{rankCode}, #{periodId}, #{memberType}, #{memberId}, #{score}, #{rankScore},
+            #{scoreVersion}, #{memberStatus}, #{lastScoreAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectForUpdate" resultMap="RankMemberScoreResultMap">
+        SELECT <include refid="RankMemberScoreColumns"/>
+        FROM bluenote_rank.rank_member_score
+        WHERE rank_code = #{rankCode}
+          AND period_id = #{periodId}
+          AND member_type = #{memberType}
+          AND member_id = #{memberId}
+        FOR UPDATE
+    </select>
+
+    <select id="selectOne" resultMap="RankMemberScoreResultMap">
+        SELECT <include refid="RankMemberScoreColumns"/>
+        FROM bluenote_rank.rank_member_score
+        WHERE rank_code = #{rankCode}
+          AND period_id = #{periodId}
+          AND member_type = #{memberType}
+          AND member_id = #{memberId}
+    </select>
+
+    <update id="updateScore">
+        UPDATE bluenote_rank.rank_member_score
+        SET score = #{score},
+            rank_score = #{rankScore},
+            member_status = #{memberStatus},
+            last_score_at = #{lastScoreAt},
+            updated_at = #{updatedAt}
+        WHERE rank_code = #{rankCode}
+          AND period_id = #{periodId}
+          AND member_type = #{memberType}
+          AND member_id = #{memberId}
+    </update>
+
+    <select id="selectTop" resultMap="RankMemberScoreResultMap">
+        SELECT <include refid="RankMemberScoreColumns"/>
+        FROM bluenote_rank.rank_member_score
+        WHERE rank_code = #{rankCode}
+          AND period_id = #{periodId}
+          AND member_status = 'ACTIVE'
+          AND score &gt; 0
+        ORDER BY rank_score DESC, member_id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectActiveByRank" resultMap="RankMemberScoreResultMap">
+        SELECT <include refid="RankMemberScoreColumns"/>
+        FROM bluenote_rank.rank_member_score
+        WHERE rank_code = #{rankCode}
+          AND period_id = #{periodId}
+          AND member_status = 'ACTIVE'
+          AND score &gt; 0
+        ORDER BY rank_score DESC, member_id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countHigherScore" resultType="int">
+        SELECT COUNT(1)
+        FROM bluenote_rank.rank_member_score
+        WHERE rank_code = #{rankCode}
+          AND period_id = #{periodId}
+          AND member_status = 'ACTIVE'
+          AND score &gt; #{score}
+    </select>
+</mapper>

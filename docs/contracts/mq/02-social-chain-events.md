@@ -1,7 +1,7 @@
 # 第二条主链路 MQ 事件契约
 
-版本：v0.2
-状态：第二条主链路开发基线
+版本：v0.3
+状态：第二条主链路开发基线，排行榜 foundation 契约开发基线
 
 本文扩展第二条主链路需要的 Topic、事件类型、payload 和消费组。Event Envelope 继承 `01-main-chain-events.md`。
 
@@ -15,6 +15,7 @@
 | `counter-event` | `bluenote-counter` | `CounterChanged` / `CounterRebuilt` | 排行、展示读模型后续 |
 | `feed-fanout-task-event` | `bluenote-feed` | `FeedFanoutSubTaskCreated` | Feed 服务内部扩散任务 |
 | `feed-event` | `bluenote-feed` | `FeedDelivered` / `FeedRebuilt` | 运维监控、后续读模型 |
+| `rank-event` | `bluenote-rank` | `RankChanged` / `RankFrozen` | 榜单变化、运营和监控后续 |
 | `notification-event` | `bluenote-notification` | `NotificationCreated` / `NotificationAggregated` / `NotificationRead` / `NotificationReadBatch` / `NotificationDeleted` | 通知生命周期 |
 | `im-message-event` | `bluenote-im` | `ImMessageSent` / `ImMessageAcked` / `ImMessageRead` | IM 消息生命周期 |
 | `push-request-event` | `bluenote-notification` / `bluenote-im` / `bluenote-order` | `PushSendRequested` | 推送服务消费 |
@@ -386,7 +387,52 @@ Topic：`feed-event`
 }
 ```
 
-## 13. NotificationCreated / NotificationAggregated
+## 13. RankChanged / RankFrozen
+
+Topic：`rank-event`
+
+`RankChanged` 在榜单 Top 100 明显变化、手动重建完成或快照生成后可发布。第一阶段下游不强依赖该事件。
+
+```json
+{
+  "eventId": "evt_rank_changed_WEEKLY_HOT_NOTE_2026W23_1781166600000",
+  "eventType": "RankChanged",
+  "eventVersion": 1,
+  "occurredAt": "2026-06-11T11:10:00+08:00",
+  "traceId": "trace-id",
+  "producer": "bluenote-rank",
+  "bizKey": "WEEKLY_HOT_NOTE:2026W23",
+  "payload": {
+    "rankCode": "WEEKLY_HOT_NOTE",
+    "periodId": "2026W23",
+    "changeType": "SCORE_UPDATED",
+    "changedMemberCount": 1,
+    "topChanged": true
+  }
+}
+```
+
+`RankFrozen` 在周期冻结完成时发布：
+
+```json
+{
+  "eventId": "evt_rank_frozen_YEARLY_CREATOR_GROWTH_2026",
+  "eventType": "RankFrozen",
+  "eventVersion": 1,
+  "occurredAt": "2027-01-01T00:10:00+08:00",
+  "traceId": "trace-id",
+  "producer": "bluenote-rank",
+  "bizKey": "YEARLY_CREATOR_GROWTH:2026",
+  "payload": {
+    "rankCode": "YEARLY_CREATOR_GROWTH",
+    "periodId": "2026",
+    "snapshotId": "900001",
+    "frozenAt": "2027-01-01T00:10:00+08:00"
+  }
+}
+```
+
+## 14. NotificationCreated / NotificationAggregated
 
 Topic：`notification-event`
 
@@ -415,7 +461,7 @@ Topic：`notification-event`
 
 `NotificationAggregated` 使用相同结构，并额外携带 `actorCount` 和 `lastEventAt`。
 
-## 14. NotificationRead / NotificationReadBatch / NotificationDeleted
+## 15. NotificationRead / NotificationReadBatch / NotificationDeleted
 
 Topic：`notification-event`
 
@@ -441,7 +487,7 @@ Topic：`notification-event`
 
 批量已读和删除事件必须携带 `receiverId`，不能让消费者根据通知 ID 反查跨服务数据。
 
-## 15. PushSendRequested
+## 16. PushSendRequested
 
 Topic：`push-request-event`
 
@@ -513,7 +559,7 @@ IM 消息提醒示例：
 
 推送服务消费后必须按 `requestId` 幂等，记录投递请求和通道尝试。第一阶段 `NOOP` 通道的 `DELIVERED` 只表示请求已被推送服务接收并记录。
 
-## 16. ImMessageSent / ImMessageAcked / ImMessageRead
+## 17. ImMessageSent / ImMessageAcked / ImMessageRead
 
 Topic：`im-message-event`
 
@@ -564,7 +610,7 @@ Topic：`im-message-event`
 
 `ImMessageAcked` 使用相同结构，将 `readSeq` 改为 `receivedSeq`，时间字段改为 `receivedAt`。
 
-## 17. PushDelivered / PushFiltered / PushFailed
+## 18. PushDelivered / PushFiltered / PushFailed
 
 Topic：`push-event`
 
@@ -593,7 +639,7 @@ Topic：`push-event`
 
 `PushFiltered` 必须携带 `filteredReason`。`PushFailed` 必须携带不超过 512 字符的 `errorMessage`。
 
-## 18. 消费组建议
+## 19. 消费组建议
 
 | consumerGroup | 消费 Topic | 所属服务 |
 |---|---|---|
@@ -604,6 +650,8 @@ Topic：`push-event`
 | `bluenote-feed-note-consumer` | `note-event` | feed |
 | `bluenote-feed-relation-consumer` | `relation-event` | feed |
 | `bluenote-feed-fanout-executor` | `feed-fanout-task-event` | feed |
+| `bluenote-rank-note-consumer` | `note-event` | rank |
+| `bluenote-rank-counter-consumer` | `counter-event` | rank |
 | `bluenote-notification-interaction-consumer` | `interaction-event` | notification |
 | `bluenote-notification-comment-consumer` | `comment-event` | notification |
 | `bluenote-notification-relation-consumer` | `relation-event` | notification |
@@ -611,7 +659,7 @@ Topic：`push-event`
 | `bluenote-im-push-result-consumer` | `push-event` | im，后续 |
 | `bluenote-push-request-consumer` | `push-request-event` | push |
 
-## 19. 幂等和变更规则
+## 20. 幂等和变更规则
 
 1. 消费幂等统一使用 `consumer_group + event_id`。
 2. 业务重复判断不能只依赖 Redis，必须有 MySQL 唯一约束或消费记录兜底。

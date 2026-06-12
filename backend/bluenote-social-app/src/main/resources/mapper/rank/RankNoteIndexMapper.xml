@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.rank.infrastructure.mapper.RankNoteIndexMapper">
+
+    <resultMap id="RankNoteIndexResultMap" type="com.bluenote.social.rank.infrastructure.entity.RankEntities$RankNoteIndexEntity">
+        <id column="note_id" property="noteId"/>
+        <result column="author_id" property="authorId"/>
+        <result column="title_snapshot" property="titleSnapshot"/>
+        <result column="cover_url_snapshot" property="coverUrlSnapshot"/>
+        <result column="visibility" property="visibility"/>
+        <result column="note_status" property="noteStatus"/>
+        <result column="eligible_status" property="eligibleStatus"/>
+        <result column="published_at" property="publishedAt"/>
+        <result column="last_event_id" property="lastEventId"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="RankNoteColumns">
+        note_id, author_id, title_snapshot, cover_url_snapshot, visibility, note_status,
+        eligible_status, published_at, last_event_id, created_at, updated_at
+    </sql>
+
+    <insert id="upsert" parameterType="com.bluenote.social.rank.infrastructure.entity.RankEntities$RankNoteIndexEntity">
+        INSERT INTO bluenote_rank.rank_note_index (
+            note_id, author_id, title_snapshot, cover_url_snapshot, visibility, note_status,
+            eligible_status, published_at, last_event_id, created_at, updated_at
+        ) VALUES (
+            #{noteId}, #{authorId}, #{titleSnapshot}, #{coverUrlSnapshot}, #{visibility}, #{noteStatus},
+            #{eligibleStatus}, #{publishedAt}, #{lastEventId}, #{createdAt}, #{updatedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            author_id = VALUES(author_id),
+            title_snapshot = VALUES(title_snapshot),
+            cover_url_snapshot = VALUES(cover_url_snapshot),
+            visibility = VALUES(visibility),
+            note_status = VALUES(note_status),
+            eligible_status = VALUES(eligible_status),
+            published_at = VALUES(published_at),
+            last_event_id = VALUES(last_event_id),
+            updated_at = VALUES(updated_at)
+    </insert>
+
+    <select id="selectByNoteId" resultMap="RankNoteIndexResultMap">
+        SELECT <include refid="RankNoteColumns"/>
+        FROM bluenote_rank.rank_note_index
+        WHERE note_id = #{noteId}
+    </select>
+
+    <update id="markStatus">
+        UPDATE bluenote_rank.rank_note_index
+        SET visibility = #{visibility},
+            note_status = #{noteStatus},
+            eligible_status = #{eligibleStatus},
+            last_event_id = #{lastEventId},
+            updated_at = #{updatedAt}
+        WHERE note_id = #{noteId}
+    </update>
+
+    <select id="selectEligibleByPublishedYear" resultMap="RankNoteIndexResultMap">
+        SELECT <include refid="RankNoteColumns"/>
+        FROM bluenote_rank.rank_note_index
+        WHERE eligible_status = 'ELIGIBLE'
+          AND visibility = 'PUBLIC'
+          AND note_status = 'PUBLISHED'
+          AND published_at &gt;= #{startAt}
+          AND published_at &lt; #{endAt}
+        ORDER BY published_at ASC, note_id ASC
+        LIMIT #{limit}
+    </select>
+</mapper>

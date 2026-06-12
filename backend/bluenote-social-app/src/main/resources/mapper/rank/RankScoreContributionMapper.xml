@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.rank.infrastructure.mapper.RankScoreContributionMapper">
+
+    <resultMap id="RankScoreContributionResultMap" type="com.bluenote.social.rank.infrastructure.entity.RankEntities$RankScoreContributionEntity">
+        <id column="id" property="id"/>
+        <result column="rank_code" property="rankCode"/>
+        <result column="period_id" property="periodId"/>
+        <result column="member_type" property="memberType"/>
+        <result column="member_id" property="memberId"/>
+        <result column="source_type" property="sourceType"/>
+        <result column="source_id" property="sourceId"/>
+        <result column="score" property="score"/>
+        <result column="contribution_status" property="contributionStatus"/>
+        <result column="last_event_id" property="lastEventId"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="RankContributionColumns">
+        id, rank_code, period_id, member_type, member_id, source_type, source_id,
+        score, contribution_status, last_event_id, created_at, updated_at
+    </sql>
+
+    <insert id="insertIgnore" parameterType="com.bluenote.social.rank.infrastructure.entity.RankEntities$RankScoreContributionEntity">
+        INSERT IGNORE INTO bluenote_rank.rank_score_contribution (
+            id, rank_code, period_id, member_type, member_id, source_type, source_id,
+            score, contribution_status, last_event_id, created_at, updated_at
+        ) VALUES (
+            #{id}, #{rankCode}, #{periodId}, #{memberType}, #{memberId}, #{sourceType}, #{sourceId},
+            #{score}, #{contributionStatus}, #{lastEventId}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectForUpdate" resultMap="RankScoreContributionResultMap">
+        SELECT <include refid="RankContributionColumns"/>
+        FROM bluenote_rank.rank_score_contribution
+        WHERE rank_code = #{rankCode}
+          AND period_id = #{periodId}
+          AND member_type = #{memberType}
+          AND member_id = #{memberId}
+          AND source_type = #{sourceType}
+          AND source_id = #{sourceId}
+        FOR UPDATE
+    </select>
+
+    <update id="updateScore" parameterType="com.bluenote.social.rank.infrastructure.entity.RankEntities$RankScoreContributionEntity">
+        UPDATE bluenote_rank.rank_score_contribution
+        SET score = #{score},
+            contribution_status = #{contributionStatus},
+            last_event_id = #{lastEventId},
+            updated_at = #{updatedAt}
+        WHERE rank_code = #{rankCode}
+          AND period_id = #{periodId}
+          AND member_type = #{memberType}
+          AND member_id = #{memberId}
+          AND source_type = #{sourceType}
+          AND source_id = #{sourceId}
+    </update>
+
+    <select id="selectBySource" resultMap="RankScoreContributionResultMap">
+        SELECT <include refid="RankContributionColumns"/>
+        FROM bluenote_rank.rank_score_contribution
+        WHERE source_type = #{sourceType}
+          AND source_id = #{sourceId}
+          AND score &gt; 0
+    </select>
+</mapper>
