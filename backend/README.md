@@ -14,6 +14,7 @@ BlueNote 后端采用 Java 21、Spring Boot 3.5.x、Spring Cloud 2025.0.x 和 Ma
 关注用户 -> 关系事实落库 -> relation-event outbox
 评论/回复 -> 评论事实落库 -> comment-event outbox
 outbox dispatcher -> RocketMQ -> counter 自动消费 -> counter-event outbox
+NotePublished/UserFollowed -> feed 自动消费 -> 收件箱/重建/feed-event outbox
 ```
 
 ## 1. 模块
@@ -179,7 +180,7 @@ comment 内部接口：
 7. 评论发布/删除/点赞写 comment outbox。
 8. 评论列表聚合作者、正文、计数快照和 viewerAction。
 
-限制：note/comment/file outbox 已可由通用 dispatcher 投递 RocketMQ；feed/notification 还没有消费这些事件生成完整读模型或通知。
+限制：note/comment/file outbox 已可由通用 dispatcher 投递 RocketMQ；feed 已消费 note/relation 事件生成关注页读模型，notification 还没有消费这些事件生成通知。
 
 ### 2.4 Social App
 
@@ -215,6 +216,21 @@ counter 内部接口：
 | `GET /internal/counters/rebuild-tasks/{taskId}` | 查询重建任务 |
 | `POST /internal/counters/warmup` | 批量预热计数 |
 
+feed 外部接口：
+
+| 接口 | 说明 |
+|---|---|
+| `GET /api/feed/following` | 关注页 Feed，优先读取 Redis/MySQL 收件箱，降级时回源关注作者近期公开笔记 |
+
+feed 内部接口：
+
+| 接口 | 说明 |
+|---|---|
+| `POST /internal/feed/users/{userId}/rebuild` | 触发用户 Feed 收件箱重建 |
+| `GET /internal/feed/rebuild-tasks/{taskId}` | 查询 Feed 重建任务 |
+| `GET /internal/feed/fanout-tasks/{taskId}` | 查询笔记 Feed 投递任务 |
+| `POST /internal/feed/fanout-tasks/{taskId}/retry` | 手动重试 Feed 投递任务 |
+
 已接入能力：
 
 1. `relation_following` 关注事实落库。
@@ -226,6 +242,12 @@ counter 内部接口：
 7. counter 查询聚合 relation、note、comment 的 `counter-source`，供用户主页等接口使用。
 8. counter 已有快照表、delta 流水、消费幂等、Redis 在线计数、重建任务和 `CounterChanged` outbox。
 9. social-app 已启动 RocketMQ counter consumer，自动消费 `note-event`、`interaction-event`、`comment-event`、`relation-event`。
+10. feed 已落 `bluenote_feed.feed_note_index`、`feed_inbox_item`、`feed_fanout_task`、`feed_fanout_sub_task`、`feed_rebuild_task`、`feed_consume_record`、`feed_outbox_event`。
+11. feed 已启动 RocketMQ consumer，自动消费：
+   - `bluenote-feed-note-consumer`：`note-event`
+   - `bluenote-feed-relation-consumer`：`relation-event`
+   - `bluenote-feed-fanout-executor`：`feed-fanout-task-event`
+12. Feed 读取优先级为 Redis 收件箱 -> MySQL 收件箱 -> 关注作者近期公开笔记回源，并在读取时过滤已取关作者和不可见笔记。
 
 ### 2.5 MQ 与 Outbox
 
@@ -244,7 +266,7 @@ counter 内部接口：
 |---|---|
 | member | `bluenote_auth.auth_outbox_event`、`bluenote_user.user_outbox_event` |
 | content | `bluenote_file.file_outbox_event`、`bluenote_note.note_outbox_event`、`bluenote_comment.comment_outbox_event` |
-| social | `bluenote_relation.relation_outbox_event`、`bluenote_counter.counter_outbox_event` |
+| social | `bluenote_relation.relation_outbox_event`、`bluenote_counter.counter_outbox_event`、`bluenote_feed.feed_outbox_event` |
 
 本地默认启用 MQ/outbox，可通过环境变量关闭：
 
@@ -324,7 +346,7 @@ mvn -pl bluenote-gateway-app spring-boot:run
 | Gateway content URI | `http://127.0.0.1:8082` |
 | Gateway social URI | `http://127.0.0.1:8083` |
 
-注意：member/content/social 当前各自只配置一个 datasource URL，但 DDL 中按逻辑 schema 拆分为 `bluenote_auth`、`bluenote_user`、`bluenote_file`、`bluenote_note`、`bluenote_comment`、`bluenote_relation`。应用内 SQL 使用显式 schema 名访问本应用拥有的逻辑 schema。
+注意：member/content/social 当前各自只配置一个 datasource URL，但 DDL 中按逻辑 schema 拆分为 `bluenote_auth`、`bluenote_user`、`bluenote_file`、`bluenote_note`、`bluenote_comment`、`bluenote_relation`、`bluenote_counter`、`bluenote_feed`。应用内 SQL 使用显式 schema 名访问本应用拥有的逻辑 schema。
 
 ## 6. 检查入口
 
@@ -353,6 +375,6 @@ http://127.0.0.1:{port}/swagger-ui.html
 
 1. 补后端自动化测试和接口集成测试。
 2. 补 RocketMQ 死信告警和更完整的人工重放审计。
-3. 补 feed 发布事件投递、收件箱快照、Redis 读模型和重建任务。
-4. 补 notification 第二条社交链路。
+3. 补 notification 第二条社交链路。
+4. 补 feed 大 V 推拉结合策略、清理任务后台化和更完整的补偿审计。
 5. 补生产部署、备份恢复、监控告警配置。

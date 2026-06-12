@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.feed.infrastructure.mapper.FeedFanoutSubTaskMapper">
+
+    <resultMap id="FeedFanoutSubTaskResultMap" type="com.bluenote.social.feed.infrastructure.entity.FeedFanoutSubTaskEntity">
+        <id column="sub_task_id" property="subTaskId"/>
+        <result column="task_id" property="taskId"/>
+        <result column="note_id" property="noteId"/>
+        <result column="author_id" property="authorId"/>
+        <result column="published_at" property="publishedAt"/>
+        <result column="target_user_ids_json" property="targetUserIdsJson"/>
+        <result column="progress_user_id" property="progressUserId"/>
+        <result column="sub_task_status" property="subTaskStatus"/>
+        <result column="message_status" property="messageStatus"/>
+        <result column="retry_count" property="retryCount"/>
+        <result column="next_retry_at" property="nextRetryAt"/>
+        <result column="last_error" property="lastError"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="FeedFanoutSubTaskColumns">
+        sub_task_id, task_id, note_id, author_id, published_at, target_user_ids_json,
+        progress_user_id, sub_task_status, message_status, retry_count, next_retry_at,
+        last_error, created_at, updated_at
+    </sql>
+
+    <insert id="insertIgnore" parameterType="com.bluenote.social.feed.infrastructure.entity.FeedFanoutSubTaskEntity">
+        INSERT IGNORE INTO bluenote_feed.feed_fanout_sub_task (
+            sub_task_id, task_id, note_id, author_id, published_at, target_user_ids_json,
+            progress_user_id, sub_task_status, message_status, retry_count, next_retry_at,
+            last_error, created_at, updated_at
+        ) VALUES (
+            #{subTaskId}, #{taskId}, #{noteId}, #{authorId}, #{publishedAt}, #{targetUserIdsJson},
+            #{progressUserId}, #{subTaskStatus}, #{messageStatus}, #{retryCount}, #{nextRetryAt},
+            #{lastError}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectBySubTaskId" resultMap="FeedFanoutSubTaskResultMap">
+        SELECT <include refid="FeedFanoutSubTaskColumns"/>
+        FROM bluenote_feed.feed_fanout_sub_task
+        WHERE sub_task_id = #{subTaskId}
+    </select>
+
+    <select id="selectRetryableMessages" resultMap="FeedFanoutSubTaskResultMap">
+        SELECT <include refid="FeedFanoutSubTaskColumns"/>
+        FROM bluenote_feed.feed_fanout_sub_task
+        WHERE message_status IN ('PENDING', 'FAILED')
+          AND (next_retry_at IS NULL OR next_retry_at &lt;= #{now})
+        ORDER BY updated_at ASC
+        LIMIT #{size}
+    </select>
+
+    <select id="selectByTaskId" resultMap="FeedFanoutSubTaskResultMap">
+        SELECT <include refid="FeedFanoutSubTaskColumns"/>
+        FROM bluenote_feed.feed_fanout_sub_task
+        WHERE task_id = #{taskId}
+        ORDER BY sub_task_id ASC
+    </select>
+
+    <update id="markMessageSent">
+        UPDATE bluenote_feed.feed_fanout_sub_task
+        SET message_status = 'SENT',
+            updated_at = NOW(3)
+        WHERE sub_task_id = #{subTaskId}
+    </update>
+
+    <update id="markMessageFailed">
+        UPDATE bluenote_feed.feed_fanout_sub_task
+        SET message_status = 'FAILED',
+            retry_count = retry_count + 1,
+            next_retry_at = #{nextRetryAt},
+            last_error = #{lastError},
+            updated_at = NOW(3)
+        WHERE sub_task_id = #{subTaskId}
+    </update>
+
+    <update id="markRunning">
+        UPDATE bluenote_feed.feed_fanout_sub_task
+        SET sub_task_status = 'RUNNING',
+            updated_at = NOW(3)
+        WHERE sub_task_id = #{subTaskId}
+          AND sub_task_status IN ('PENDING', 'FAILED')
+    </update>
+
+    <update id="markProgress">
+        UPDATE bluenote_feed.feed_fanout_sub_task
+        SET progress_user_id = #{progressUserId},
+            updated_at = NOW(3)
+        WHERE sub_task_id = #{subTaskId}
+    </update>
+
+    <update id="markSuccess">
+        UPDATE bluenote_feed.feed_fanout_sub_task
+        SET sub_task_status = 'SUCCESS',
+            last_error = NULL,
+            updated_at = NOW(3)
+        WHERE sub_task_id = #{subTaskId}
+    </update>
+
+    <update id="markFailed">
+        UPDATE bluenote_feed.feed_fanout_sub_task
+        SET sub_task_status = 'FAILED',
+            last_error = #{lastError},
+            updated_at = NOW(3)
+        WHERE sub_task_id = #{subTaskId}
+    </update>
+</mapper>

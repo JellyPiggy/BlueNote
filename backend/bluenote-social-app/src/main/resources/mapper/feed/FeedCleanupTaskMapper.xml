@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.feed.infrastructure.mapper.FeedCleanupTaskMapper">
+
+    <insert id="insert" parameterType="com.bluenote.social.feed.infrastructure.entity.FeedCleanupTaskEntity">
+        INSERT INTO bluenote_feed.feed_cleanup_task (
+            task_id, cleanup_type, user_id, author_id, note_id, task_status,
+            progress_json, last_error, created_at, updated_at
+        ) VALUES (
+            #{taskId}, #{cleanupType}, #{userId}, #{authorId}, #{noteId}, #{taskStatus},
+            #{progressJson}, #{lastError}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+</mapper>

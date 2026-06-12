@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.feed.infrastructure.mapper.FeedRebuildTaskMapper">
+
+    <resultMap id="FeedRebuildTaskResultMap" type="com.bluenote.social.feed.infrastructure.entity.FeedRebuildTaskEntity">
+        <id column="task_id" property="taskId"/>
+        <result column="user_id" property="userId"/>
+        <result column="reason" property="reason"/>
+        <result column="task_status" property="taskStatus"/>
+        <result column="progress_json" property="progressJson"/>
+        <result column="last_error" property="lastError"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.bluenote.social.feed.infrastructure.entity.FeedRebuildTaskEntity">
+        INSERT INTO bluenote_feed.feed_rebuild_task (
+            task_id, user_id, reason, task_status, progress_json, last_error, created_at, updated_at
+        ) VALUES (
+            #{taskId}, #{userId}, #{reason}, #{taskStatus}, #{progressJson}, #{lastError}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectByTaskId" resultMap="FeedRebuildTaskResultMap">
+        SELECT task_id, user_id, reason, task_status, progress_json, last_error, created_at, updated_at
+        FROM bluenote_feed.feed_rebuild_task
+        WHERE task_id = #{taskId}
+    </select>
+
+    <update id="markRunning">
+        UPDATE bluenote_feed.feed_rebuild_task
+        SET task_status = 'RUNNING',
+            updated_at = NOW(3)
+        WHERE task_id = #{taskId}
+    </update>
+
+    <update id="markSuccess">
+        UPDATE bluenote_feed.feed_rebuild_task
+        SET task_status = 'SUCCESS',
+            progress_json = #{progressJson},
+            last_error = NULL,
+            updated_at = NOW(3)
+        WHERE task_id = #{taskId}
+    </update>
+
+    <update id="markFailed">
+        UPDATE bluenote_feed.feed_rebuild_task
+        SET task_status = 'FAILED',
+            progress_json = #{progressJson},
+            last_error = #{lastError},
+            updated_at = NOW(3)
+        WHERE task_id = #{taskId}
+    </update>
+</mapper>

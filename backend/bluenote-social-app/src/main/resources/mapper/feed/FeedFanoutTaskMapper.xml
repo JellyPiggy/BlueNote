@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.feed.infrastructure.mapper.FeedFanoutTaskMapper">
+
+    <resultMap id="FeedFanoutTaskResultMap" type="com.bluenote.social.feed.infrastructure.entity.FeedFanoutTaskEntity">
+        <id column="task_id" property="taskId"/>
+        <result column="note_id" property="noteId"/>
+        <result column="author_id" property="authorId"/>
+        <result column="source_event_id" property="sourceEventId"/>
+        <result column="task_status" property="taskStatus"/>
+        <result column="target_count" property="targetCount"/>
+        <result column="success_count" property="successCount"/>
+        <result column="failed_count" property="failedCount"/>
+        <result column="last_error" property="lastError"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insertIgnore" parameterType="com.bluenote.social.feed.infrastructure.entity.FeedFanoutTaskEntity">
+        INSERT IGNORE INTO bluenote_feed.feed_fanout_task (
+            task_id, note_id, author_id, source_event_id, task_status,
+            target_count, success_count, failed_count, last_error, created_at, updated_at
+        ) VALUES (
+            #{taskId}, #{noteId}, #{authorId}, #{sourceEventId}, #{taskStatus},
+            #{targetCount}, #{successCount}, #{failedCount}, #{lastError}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectByTaskId" resultMap="FeedFanoutTaskResultMap">
+        SELECT task_id, note_id, author_id, source_event_id, task_status,
+               target_count, success_count, failed_count, last_error, created_at, updated_at
+        FROM bluenote_feed.feed_fanout_task
+        WHERE task_id = #{taskId}
+    </select>
+
+    <update id="markRunning">
+        UPDATE bluenote_feed.feed_fanout_task
+        SET task_status = 'RUNNING',
+            updated_at = NOW(3)
+        WHERE task_id = #{taskId}
+          AND task_status IN ('PENDING', 'FAILED')
+    </update>
+
+    <update id="markSuccess">
+        UPDATE bluenote_feed.feed_fanout_task
+        SET task_status = 'SUCCESS',
+            success_count = #{successCount},
+            failed_count = #{failedCount},
+            last_error = NULL,
+            updated_at = NOW(3)
+        WHERE task_id = #{taskId}
+    </update>
+
+    <update id="markFailed">
+        UPDATE bluenote_feed.feed_fanout_task
+        SET task_status = 'FAILED',
+            last_error = #{lastError},
+            updated_at = NOW(3)
+        WHERE task_id = #{taskId}
+    </update>
+</mapper>

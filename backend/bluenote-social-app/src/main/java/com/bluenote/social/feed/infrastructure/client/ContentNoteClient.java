@@ -89,6 +89,50 @@ public class ContentNoteClient {
         }
     }
 
+    public List<NoteSummary> batchSummary(List<String> noteIds, String viewerId, boolean includeInvisible) {
+        if (noteIds.isEmpty()) {
+            return List.of();
+        }
+        try {
+            Map<String, Object> request = new LinkedHashMap<>();
+            request.put("noteIds", noteIds);
+            request.put("viewerId", viewerId);
+            request.put("includeInvisible", includeInvisible);
+            String response = restClient.post()
+                    .uri(contentUri + "/internal/notes/batch-summary")
+                    .header(TraceConstants.TRACE_ID_HEADER, TraceIdHolder.currentOrNew())
+                    .body(request)
+                    .retrieve()
+                    .body(String.class);
+            JsonNode root = objectMapper.readTree(response);
+            if (root.path("code").asInt(-1) != 0) {
+                throw new BusinessException(ApiErrorCode.FEED_INTERNAL_DEPENDENCY_FAILED);
+            }
+            JsonNode notesNode = root.path("data").path("notes");
+            if (!notesNode.isArray()) {
+                return List.of();
+            }
+            List<NoteSummary> notes = new ArrayList<>();
+            for (JsonNode noteNode : notesNode) {
+                notes.add(new NoteSummary(
+                        noteNode.path("noteId").asText(),
+                        noteNode.path("authorId").asText(),
+                        textOrNull(noteNode, "title"),
+                        textOrNull(noteNode, "contentPreview"),
+                        textOrNull(noteNode, "coverUrl"),
+                        textOrNull(noteNode, "noteStatus"),
+                        textOrNull(noteNode, "visibility"),
+                        textOrNull(noteNode, "publishedAt")
+                ));
+            }
+            return notes;
+        } catch (BusinessException exception) {
+            throw exception;
+        } catch (RestClientException | java.io.IOException exception) {
+            throw new BusinessException(ApiErrorCode.FEED_INTERNAL_DEPENDENCY_FAILED);
+        }
+    }
+
     private String textOrNull(JsonNode node, String field) {
         JsonNode value = node.get(field);
         return value == null || value.isNull() ? null : value.asText();
