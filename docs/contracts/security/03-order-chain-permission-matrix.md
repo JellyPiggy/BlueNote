@@ -26,6 +26,10 @@
 | POST | `/internal/order/coupon-activities/{activityId}/resume` | ops / admin | order | 内部管理权限，状态 CAS |
 | POST | `/internal/order/coupon-activities/{activityId}/end` | ops / admin | order | 内部管理权限，状态 CAS |
 | POST | `/internal/order/timeout-tasks/scan-once` | ops / scheduler | order | 内部运维权限，触发一次超时关单扫描 |
+| GET | `/internal/order/coupon-activities/{activityId}/ops-summary` | ops / admin | order | 内部运维权限，查询活动库存、请求、订单和 Redis 摘要 |
+| POST | `/internal/order/coupon-activities/{activityId}/redis-rebuild` | ops / admin | order | 内部运维权限，按 MySQL 事实重建 Redis 库存和参与集合 |
+| POST | `/internal/order/coupon-activities/{activityId}/stock-reconcile` | ops / admin | order | 内部运维权限，库存一致性检查，可选修复 |
+| POST | `/internal/order/seckill-requests/sweep-stuck` | ops / scheduler | order | 内部运维权限，收敛长时间处理中请求 |
 
 网关不得暴露 `/internal/**` 到公网。
 

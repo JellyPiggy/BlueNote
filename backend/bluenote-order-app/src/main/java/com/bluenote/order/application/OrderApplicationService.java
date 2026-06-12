@@ -6,6 +6,7 @@ import com.bluenote.common.observability.TraceIdHolder;
 import com.bluenote.order.api.dto.OrderDtos.ActivityCurrentResponse;
 import com.bluenote.order.api.dto.OrderDtos.ActivityStatusResponse;
 import com.bluenote.order.api.dto.OrderDtos.InternalActivityResponse;
+import com.bluenote.order.api.dto.OrderDtos.InternalActivityOpsSummaryResponse;
 import com.bluenote.order.api.dto.OrderDtos.InternalCreateActivityRequest;
 import com.bluenote.order.api.dto.OrderDtos.OrderActivityItem;
 import com.bluenote.order.api.dto.OrderDtos.OrderCancelResponse;
@@ -14,6 +15,12 @@ import com.bluenote.order.api.dto.OrderDtos.OrderCouponListResponse;
 import com.bluenote.order.api.dto.OrderDtos.OrderDetailResponse;
 import com.bluenote.order.api.dto.OrderDtos.OrderPayRequest;
 import com.bluenote.order.api.dto.OrderDtos.OrderPayResponse;
+import com.bluenote.order.api.dto.OrderDtos.OrderRedisRebuildResponse;
+import com.bluenote.order.api.dto.OrderDtos.OrderRedisSnapshot;
+import com.bluenote.order.api.dto.OrderDtos.OrderStockReconcileRequest;
+import com.bluenote.order.api.dto.OrderDtos.OrderStockReconcileResponse;
+import com.bluenote.order.api.dto.OrderDtos.OrderSweepStuckRequest;
+import com.bluenote.order.api.dto.OrderDtos.OrderSweepStuckResponse;
 import com.bluenote.order.api.dto.OrderDtos.OrderTimeoutScanResponse;
 import com.bluenote.order.api.dto.OrderDtos.SeckillResultResponse;
 import com.bluenote.order.api.dto.OrderDtos.SeckillSubmitRequest;
@@ -34,7 +41,9 @@ import com.bluenote.order.infrastructure.entity.OrderEntities.SeckillRequest;
 import com.bluenote.order.infrastructure.entity.OrderEntities.UserCoupon;
 import com.bluenote.order.infrastructure.entity.OrderEntities.VoucherOrder;
 import com.bluenote.order.infrastructure.mapper.OrderMapper;
+import com.bluenote.order.infrastructure.mapper.OrderMapper.StatusCountRow;
 import com.bluenote.order.infrastructure.redis.OrderRedisStore;
+import com.bluenote.order.infrastructure.redis.OrderRedisStore.RedisActivitySnapshot;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -44,9 +53,11 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -405,6 +416,80 @@ public class OrderApplicationService {
         return new OrderTimeoutScanResponse(tasks.size(), closedCount, failedCount);
     }
 
+    @Transactional(readOnly = true)
+    public InternalActivityOpsSummaryResponse opsSummary(String activityId) {
+        Long parsedActivityId = parseId(activityId, ApiErrorCode.ORDER_ACTIVITY_NOT_FOUND);
+        CouponActivity activity = requireActivity(parsedActivityId);
+        CouponTemplate template = orderMapper.selectTemplateById(activity.getTemplateId());
+        StockExpectation stock = stockExpectation(activity);
+        LocalDateTime now = now();
+        return new InternalActivityOpsSummaryResponse(
+                String.valueOf(activity.getActivityId()),
+                activity.getActivityName(),
+                String.valueOf(activity.getTemplateId()),
+                template == null ? "" : template.getTemplateName(),
+                activity.getActivityStatus(),
+                displayStatus(activity, now),
+                safeInt(activity.getTotalStock()),
+                safeInt(activity.getAvailableStock()),
+                safeInt(activity.getSoldStock()),
+                stock.availableStock(),
+                stock.soldStock(),
+                stock.consistent(activity),
+                toRedisSnapshot(redisStore.snapshot(parsedActivityId)),
+                statusCounts(orderMapper.countRequestsByActivity(parsedActivityId)),
+                statusCounts(orderMapper.countOrdersByActivity(parsedActivityId)),
+                statusCounts(orderMapper.countCouponsByActivity(parsedActivityId)),
+                toOffsetString(now)
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public OrderRedisRebuildResponse rebuildRedis(String activityId) {
+        Long parsedActivityId = parseId(activityId, ApiErrorCode.ORDER_ACTIVITY_NOT_FOUND);
+        CouponActivity activity = requireActivity(parsedActivityId);
+        RedisActivitySnapshot before = redisStore.snapshot(parsedActivityId);
+        Set<Long> participantUserIds = new LinkedHashSet<>(orderMapper.selectActiveParticipantUserIds(parsedActivityId));
+        redisStore.rebuild(parsedActivityId, safeInt(activity.getAvailableStock()), participantUserIds, redisTtl(activity, now()));
+        RedisActivitySnapshot after = redisStore.snapshot(parsedActivityId);
+        return new OrderRedisRebuildResponse(
+                String.valueOf(parsedActivityId),
+                safeInt(activity.getAvailableStock()),
+                participantUserIds.size(),
+                toRedisSnapshot(before),
+                toRedisSnapshot(after),
+                true
+        );
+    }
+
+    public OrderStockReconcileResponse reconcileStock(String activityId, OrderStockReconcileRequest request) {
+        Long parsedActivityId = parseId(activityId, ApiErrorCode.ORDER_ACTIVITY_NOT_FOUND);
+        boolean repair = request != null && Boolean.TRUE.equals(request.repair());
+        return transactionTemplate.execute(status -> reconcileStockInTransaction(parsedActivityId, repair));
+    }
+
+    public OrderSweepStuckResponse sweepStuckRequests(OrderSweepStuckRequest request) {
+        int stuckSeconds = Math.max(10, request == null || request.stuckSeconds() == null ? 60 : request.stuckSeconds());
+        int limit = Math.min(100, Math.max(1, request == null || request.limit() == null ? timeoutScanBatchSize : request.limit()));
+        LocalDateTime deadline = now().minusSeconds(stuckSeconds);
+        List<SeckillRequest> requests = orderMapper.selectStuckProcessingRequests(deadline, limit);
+        int retriedCount = 0;
+        int syncedCount = 0;
+        int skippedCount = 0;
+        List<String> requestIds = requests.stream().map(item -> String.valueOf(item.getRequestId())).toList();
+        for (SeckillRequest requestItem : requests) {
+            SweepResult result = transactionTemplate.execute(status -> sweepOneStuckRequest(requestItem.getRequestId()));
+            if (result == SweepResult.RETRIED) {
+                retriedCount++;
+            } else if (result == SweepResult.SYNCED) {
+                syncedCount++;
+            } else {
+                skippedCount++;
+            }
+        }
+        return new OrderSweepStuckResponse(requests.size(), retriedCount, syncedCount, skippedCount, requestIds);
+    }
+
     private SeckillSubmitResponse insertTerminalRequest(
             Long userId,
             Long activityId,
@@ -445,6 +530,61 @@ public class OrderApplicationService {
             throw exception;
         }
         return new SeckillSubmitResponse(String.valueOf(requestId), requestStatus, message);
+    }
+
+    private OrderStockReconcileResponse reconcileStockInTransaction(Long activityId, boolean repair) {
+        CouponActivity activity = orderMapper.selectActivityByIdForUpdate(activityId);
+        if (activity == null) {
+            throw new BusinessException(ApiErrorCode.ORDER_ACTIVITY_NOT_FOUND);
+        }
+        StockExpectation stock = stockExpectation(activity);
+        int beforeAvailable = safeInt(activity.getAvailableStock());
+        int beforeSold = safeInt(activity.getSoldStock());
+        boolean consistent = stock.consistent(activity);
+        boolean repaired = false;
+        if (!consistent && repair) {
+            orderMapper.repairActivityStock(activityId, stock.availableStock(), stock.soldStock(), now());
+            repaired = true;
+            activity = orderMapper.selectActivityById(activityId);
+        }
+        int afterAvailable = activity == null ? beforeAvailable : safeInt(activity.getAvailableStock());
+        int afterSold = activity == null ? beforeSold : safeInt(activity.getSoldStock());
+        return new OrderStockReconcileResponse(
+                String.valueOf(activityId),
+                activity == null ? 0 : safeInt(activity.getTotalStock()),
+                beforeAvailable,
+                beforeSold,
+                stock.availableStock(),
+                stock.soldStock(),
+                afterAvailable,
+                afterSold,
+                consistent,
+                repaired,
+                consistent ? "stock consistent" : (repaired ? "stock repaired" : "stock inconsistent")
+        );
+    }
+
+    private SweepResult sweepOneStuckRequest(Long requestId) {
+        SeckillRequest request = orderMapper.selectRequestByIdForUpdate(requestId);
+        if (request == null || !REQUEST_PROCESSING.equals(request.getRequestStatus())) {
+            return SweepResult.SKIPPED;
+        }
+        LocalDateTime now = now();
+        VoucherOrder existingOrder = orderMapper.selectOrderByUserActivity(request.getUserId(), request.getActivityId());
+        if (existingOrder != null) {
+            UserCoupon coupon = orderMapper.selectCouponBySourceOrder(existingOrder.getOrderId());
+            updateRequestFromOrder(request, existingOrder, coupon, now);
+            return SweepResult.SYNCED;
+        }
+        CouponActivity activity = orderMapper.selectActivityById(request.getActivityId());
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("requestId", String.valueOf(request.getRequestId()));
+        payload.put("clientRequestId", request.getClientRequestId());
+        payload.put("userId", String.valueOf(request.getUserId()));
+        payload.put("activityId", String.valueOf(request.getActivityId()));
+        payload.put("expectedPayAmount", activity == null ? safeInt(request.getPayAmount()) : safeInt(activity.getPayAmount()));
+        insertOutbox("CouponSeckillAccepted", String.valueOf(request.getRequestId()), payload, now);
+        return SweepResult.RETRIED;
     }
 
     private void consumeEventInTransaction(OrderConsumeEventRequest request) {
@@ -940,6 +1080,36 @@ public class OrderApplicationService {
         );
     }
 
+    private StockExpectation stockExpectation(CouponActivity activity) {
+        int occupied = safeInt(orderMapper.countSuccessfulOrdersByActivity(activity.getActivityId()));
+        int soldStock = Math.min(safeInt(activity.getTotalStock()), Math.max(0, occupied));
+        int availableStock = Math.max(0, safeInt(activity.getTotalStock()) - soldStock);
+        return new StockExpectation(availableStock, soldStock);
+    }
+
+    private Map<String, Integer> statusCounts(List<StatusCountRow> rows) {
+        Map<String, Integer> result = new LinkedHashMap<>();
+        if (rows == null) {
+            return result;
+        }
+        for (StatusCountRow row : rows) {
+            if (row != null && !isBlank(row.getStatus())) {
+                result.put(row.getStatus(), safeInt(row.getCount()));
+            }
+        }
+        return result;
+    }
+
+    private OrderRedisSnapshot toRedisSnapshot(RedisActivitySnapshot snapshot) {
+        return new OrderRedisSnapshot(
+                snapshot.stockKeyExists(),
+                snapshot.stock(),
+                snapshot.participantCount(),
+                snapshot.soldOut(),
+                snapshot.rebuilding()
+        );
+    }
+
     private String displayStatus(CouponActivity activity, LocalDateTime now) {
         if (ACTIVITY_PAUSED.equals(activity.getActivityStatus())) {
             return ACTIVITY_PAUSED;
@@ -1152,5 +1322,22 @@ public class OrderApplicationService {
     }
 
     private record CouponCursor(LocalDateTime issuedAt, Long userCouponId) {
+    }
+
+    private record StockExpectation(Integer availableStock, Integer soldStock) {
+        private boolean consistent(CouponActivity activity) {
+            return availableStock.equals(safe(activity.getAvailableStock()))
+                    && soldStock.equals(safe(activity.getSoldStock()));
+        }
+
+        private static Integer safe(Integer value) {
+            return value == null ? 0 : value;
+        }
+    }
+
+    private enum SweepResult {
+        RETRIED,
+        SYNCED,
+        SKIPPED
     }
 }

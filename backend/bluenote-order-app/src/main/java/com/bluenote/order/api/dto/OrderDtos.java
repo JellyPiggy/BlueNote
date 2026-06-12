@@ -118,6 +118,76 @@ public final class OrderDtos {
     public record OrderTimeoutScanResponse(Integer scannedCount, Integer closedCount, Integer failedCount) {
     }
 
+    public record InternalActivityOpsSummaryResponse(
+            String activityId,
+            String activityName,
+            String templateId,
+            String templateName,
+            String status,
+            String displayStatus,
+            Integer totalStock,
+            Integer availableStock,
+            Integer soldStock,
+            Integer expectedAvailableStock,
+            Integer expectedSoldStock,
+            Boolean stockConsistent,
+            OrderRedisSnapshot redis,
+            Map<String, Integer> requestCounts,
+            Map<String, Integer> orderCounts,
+            Map<String, Integer> couponCounts,
+            String serverTime
+    ) {
+    }
+
+    public record OrderRedisSnapshot(
+            Boolean stockKeyExists,
+            Integer stock,
+            Integer participantCount,
+            Boolean soldOut,
+            Boolean rebuilding
+    ) {
+    }
+
+    public record OrderRedisRebuildResponse(
+            String activityId,
+            Integer mysqlAvailableStock,
+            Integer participantCount,
+            OrderRedisSnapshot before,
+            OrderRedisSnapshot after,
+            Boolean rebuilt
+    ) {
+    }
+
+    public record OrderStockReconcileRequest(Boolean repair) {
+    }
+
+    public record OrderStockReconcileResponse(
+            String activityId,
+            Integer totalStock,
+            Integer beforeAvailableStock,
+            Integer beforeSoldStock,
+            Integer expectedAvailableStock,
+            Integer expectedSoldStock,
+            Integer afterAvailableStock,
+            Integer afterSoldStock,
+            Boolean consistent,
+            Boolean repaired,
+            String message
+    ) {
+    }
+
+    public record OrderSweepStuckRequest(Integer stuckSeconds, Integer limit) {
+    }
+
+    public record OrderSweepStuckResponse(
+            Integer scannedCount,
+            Integer retriedCount,
+            Integer syncedCount,
+            Integer skippedCount,
+            List<String> requestIds
+    ) {
+    }
+
     public record OrderConsumeEventRequest(
             String topic,
             String consumerGroup,

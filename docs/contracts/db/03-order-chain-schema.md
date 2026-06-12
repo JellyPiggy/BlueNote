@@ -39,6 +39,7 @@
 6. `payment_record.uk_payment_channel_trade(channel, channel_trade_no)` 防止重复支付回调。
 7. `order_consume_record.uk_order_consumer_event(consumer_group, event_id)` 保证 MQ 消费幂等。
 8. `order_consume_record.event_id` 和 `order_outbox_event.event_id` 长度为 128，容纳 `evt_{eventType}_{bizKey}_{uuid}` 格式事件 ID。
+9. 订单库存对账以 `voucher_order` 中 `WAIT_PAY`、`SUCCESS` 订单为已占用事实，`coupon_activity.available_stock` / `sold_stock` 必须能由订单事实重算修复。
 
 ## 4. 游标和状态
 

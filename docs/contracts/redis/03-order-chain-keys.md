@@ -37,3 +37,5 @@ Redis 库存丢失时：
 3. 从 `voucher_order` 里 `WAIT_PAY`、`SUCCESS` 订单重建用户集合。
 4. 删除错误售罄标识。
 5. 移除 rebuilding 标识后恢复活动。
+
+内部运维接口 `POST /internal/order/coupon-activities/{activityId}/redis-rebuild` 必须遵守以上顺序。重建期间秒杀 token 和提交接口必须因为 rebuilding 标识拒绝继续放行，避免 Redis 与 MySQL 再次分叉。
