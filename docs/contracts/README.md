@@ -1,14 +1,14 @@
 # BlueNote 契约目录
 
-版本：v0.2
-状态：第一、第二条主链路开发基线
-更新时间：2026-06-11
+版本：v0.3
+状态：第一、第二、第三条主链路完成基线，第四条订单链路 foundation 开发基线
+更新时间：2026-06-12
 
 ## 1. 目录目标
 
 `docs/contracts/` 用来保存前后端、服务间、数据库、Redis、MQ 和安全权限的共享契约。它不是方案讨论文档，而是编码、mock、OpenAPI、DDL、联调和验收时共同对照的基线。
 
-当前已冻结两条主链路的开发基线。
+当前已冻结第一、第二、第三条主链路基线，并新增第四条订单链路 foundation 契约。
 
 第一条主链路：
 
@@ -20,6 +20,18 @@
 
 ```text
 关注用户 -> 发布笔记事件 -> Feed 投递 -> 关注页拉取 -> 点赞/收藏/评论 -> 计数更新 -> 通知生成
+```
+
+第三条主链路：
+
+```text
+设备注册 -> WebSocket 连接 -> IM 发送消息 -> 消息入库 -> 在线下发 -> 离线 Push 请求
+```
+
+第四条主链路：
+
+```text
+活动预热 -> 秒杀令牌 -> Redis Lua 预扣库存 -> RocketMQ 异步下单 -> 订单查询 -> 支付/发券 -> 超时关单
 ```
 
 涉及逻辑服务：
@@ -35,6 +47,7 @@
 9. `bluenote-notification`
 10. `bluenote-push`
 11. `bluenote-im`
+12. `bluenote-order`
 
 ## 2. 目录结构
 
@@ -56,18 +69,23 @@ docs/contracts/
     11-mq-admin-api.md
     12-push-api.md
     13-im-api.md
+    14-order-api.md
   db/
     01-main-chain-schema.md
     02-social-chain-schema.md
+    03-order-chain-schema.md
   redis/
     01-main-chain-keys.md
     02-social-chain-keys.md
+    03-order-chain-keys.md
   mq/
     01-main-chain-events.md
     02-social-chain-events.md
+    03-order-chain-events.md
   security/
     01-permission-matrix.md
     02-social-chain-permission-matrix.md
+    03-order-chain-permission-matrix.md
 ```
 
 ## 3. 权威来源
@@ -88,6 +106,7 @@ docs/contracts/
 12. `方案/services/11-通知服务设计.md`
 13. `方案/services/10-推送与实时投递服务设计.md`
 14. `方案/services/12-IM服务设计.md`
+15. `方案/services/13-订单服务设计.md`
 
 如果本目录与旧方案示例冲突，以本目录为开发契约。典型例子：旧方案中部分响应示例使用字符串型 `"code": "OK"`，本目录统一改为数字型 `"code": 0`。
 
@@ -130,9 +149,9 @@ docs/contracts/
 4. 内部接口只暴露 `/internal/**`，不得给移动端调用。
 5. OpenAPI / Knife4j 输出与本目录一致。
 6. 关键写接口支持幂等。
-7. 数据表、唯一约束和索引符合 `db/01-main-chain-schema.md` 和 `db/02-social-chain-schema.md`。
-8. Redis Key 符合 `redis/01-main-chain-keys.md` 和 `redis/02-social-chain-keys.md`。
-9. Outbox 和 MQ envelope 符合 `mq/01-main-chain-events.md` 和 `mq/02-social-chain-events.md`。
+7. 数据表、唯一约束和索引符合 `db/01-main-chain-schema.md`、`db/02-social-chain-schema.md` 和 `db/03-order-chain-schema.md`。
+8. Redis Key 符合 `redis/01-main-chain-keys.md`、`redis/02-social-chain-keys.md` 和 `redis/03-order-chain-keys.md`。
+9. Outbox 和 MQ envelope 符合 `mq/01-main-chain-events.md`、`mq/02-social-chain-events.md` 和 `mq/03-order-chain-events.md`。
 
 ## 6. 移动端实现要求
 
@@ -168,3 +187,13 @@ docs/contracts/
 5. 通知服务可以根据关注、点赞、收藏、评论、回复事件生成站内通知和未读数。
 6. 取关、笔记删除、私密、下架后 Feed 读取必须过滤不可见内容。
 7. 所有第二链路外部接口必须经过网关鉴权，内部接口不得暴露给移动端。
+
+第四条订单链路 foundation 联调必须通过：
+
+1. 内部接口可以创建活动，并将活动库存预热到 Redis。
+2. 登录用户可以获取秒杀 token，并提交抢券请求。
+3. Redis Lua 预扣成功后写出 `CouponSeckillAccepted`，订单消费者异步创建订单。
+4. 免费券订单直接 `SUCCESS` 并生成 `user_coupon`；付费券订单进入 `WAIT_PAY`。
+5. `MOCK` 支付可以把待支付订单推进到 `SUCCESS` 并发券。
+6. 超时关单任务可以关闭过期 `WAIT_PAY` 订单并回补库存。
+7. 所有订单外部接口必须经过网关鉴权，内部活动配置接口不得暴露给移动端。

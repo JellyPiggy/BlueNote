@@ -19,6 +19,7 @@
         <module>bluenote-member-app</module>
         <module>bluenote-content-app</module>
         <module>bluenote-social-app</module>
+        <module>bluenote-order-app</module>
     </modules>
 
     <properties>

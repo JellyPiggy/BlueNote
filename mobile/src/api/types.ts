@@ -401,3 +401,102 @@ export interface ImReceivedResponse {
 export interface ImUnreadCountResponse {
   totalUnread: number
 }
+
+export type OrderActivityStatus = 'NOT_STARTED' | 'PREHEATED' | 'ONLINE' | 'SOLD_OUT' | 'PAUSED' | 'ENDED' | string
+export type OrderSeckillStatus =
+  | 'PROCESSING'
+  | 'SUCCESS'
+  | 'WAIT_PAY'
+  | 'SOLD_OUT'
+  | 'DUPLICATE'
+  | 'CANCELLED'
+  | 'CLOSED'
+  | 'FAILED'
+  | string
+
+export interface OrderActivityItem {
+  activityId: string
+  activityName: string
+  templateName: string
+  faceValue: number
+  thresholdAmount: number
+  payAmount: number
+  status: OrderActivityStatus
+  startAt: string
+  endAt: string
+  userJoined: boolean
+  description: string | null
+  serverTime: string
+}
+
+export interface OrderActivityCurrentResponse {
+  activity: OrderActivityItem | null
+}
+
+export interface OrderSeckillTokenResponse {
+  seckillToken: string
+  expiresInSeconds: number
+}
+
+export interface OrderSeckillSubmitResponse {
+  requestId: string
+  status: OrderSeckillStatus
+  message: string
+}
+
+export interface OrderSeckillResultResponse {
+  requestId: string
+  status: OrderSeckillStatus
+  orderId: string | null
+  userCouponId: string | null
+  payRequired: boolean
+  payAmount: number
+  expireAt: string | null
+  message: string | null
+}
+
+export interface OrderDetailResponse {
+  orderId: string
+  orderNo: string
+  activityId: string
+  activityName: string
+  templateName: string
+  faceValue: number
+  thresholdAmount: number
+  payAmount: number
+  orderStatus: string
+  expireAt: string | null
+  paidAt: string | null
+  successAt: string | null
+  closedAt: string | null
+  userCouponId: string | null
+  createdAt: string
+}
+
+export interface OrderPayResponse {
+  orderId: string
+  orderStatus: string
+  paid: boolean
+  userCouponId: string | null
+}
+
+export interface OrderCancelResponse {
+  orderId: string
+  orderStatus: string
+  cancelled: boolean
+}
+
+export interface UserCouponItem {
+  userCouponId: string
+  templateId: string
+  templateName: string
+  activityName: string
+  faceValue: number
+  thresholdAmount: number
+  couponStatus: 'UNUSED' | 'USED' | 'EXPIRED' | string
+  validStartAt: string
+  validEndAt: string
+  issuedAt: string
+}
+
+export interface OrderCouponListResponse extends CursorPage<UserCouponItem> {}
