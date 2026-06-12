@@ -193,9 +193,67 @@
         FOR UPDATE
     </select>
 
+    <select id="countRequestsByActivity" resultType="com.bluenote.order.infrastructure.mapper.OrderMapper$StatusCountRow">
+        SELECT request_status AS status, COUNT(*) AS count
+        FROM bluenote_order.coupon_seckill_request
+        WHERE activity_id = #{activityId}
+        GROUP BY request_status
+    </select>
+
+    <select id="countOrdersByActivity" resultType="com.bluenote.order.infrastructure.mapper.OrderMapper$StatusCountRow">
+        SELECT order_status AS status, COUNT(*) AS count
+        FROM bluenote_order.voucher_order
+        WHERE activity_id = #{activityId}
+        GROUP BY order_status
+    </select>
+
+    <select id="countCouponsByActivity" resultType="com.bluenote.order.infrastructure.mapper.OrderMapper$StatusCountRow">
+        SELECT coupon_status AS status, COUNT(*) AS count
+        FROM bluenote_order.user_coupon
+        WHERE activity_id = #{activityId}
+        GROUP BY coupon_status
+    </select>
+
+    <select id="selectActiveParticipantUserIds" resultType="long">
+        SELECT user_id
+        FROM bluenote_order.voucher_order
+        WHERE activity_id = #{activityId}
+          AND order_status IN ('WAIT_PAY', 'SUCCESS')
+    </select>
+
+    <select id="countSuccessfulOrdersByActivity" resultType="int">
+        SELECT COUNT(*)
+        FROM bluenote_order.voucher_order
+        WHERE activity_id = #{activityId}
+          AND order_status IN ('WAIT_PAY', 'SUCCESS')
+    </select>
+
+    <select id="selectStuckProcessingRequests" resultMap="RequestMap">
+        SELECT <include refid="RequestColumns"/>
+        FROM bluenote_order.coupon_seckill_request
+        WHERE request_status = 'PROCESSING'
+          AND updated_at &lt;= #{deadline}
+        ORDER BY updated_at ASC
+        LIMIT #{limit}
+    </select>
+
     <update id="updateActivityStatus">
         UPDATE bluenote_order.coupon_activity
         SET activity_status = #{status},
+            updated_at = #{updatedAt},
+            version = version + 1
+        WHERE activity_id = #{activityId}
+    </update>
+
+    <update id="repairActivityStock">
+        UPDATE bluenote_order.coupon_activity
+        SET available_stock = #{availableStock},
+            sold_stock = #{soldStock},
+            activity_status = CASE
+                WHEN activity_status = 'SOLD_OUT' AND #{availableStock} &gt; 0 THEN 'PREHEATED'
+                WHEN activity_status IN ('PREHEATED', 'ONLINE') AND #{availableStock} = 0 THEN 'SOLD_OUT'
+                ELSE activity_status
+            END,
             updated_at = #{updatedAt},
             version = version + 1
         WHERE activity_id = #{activityId}

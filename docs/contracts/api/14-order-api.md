@@ -299,6 +299,10 @@ POST /internal/order/coupon-activities/{activityId}/pause
 POST /internal/order/coupon-activities/{activityId}/resume
 POST /internal/order/coupon-activities/{activityId}/end
 POST /internal/order/timeout-tasks/scan-once
+GET /internal/order/coupon-activities/{activityId}/ops-summary
+POST /internal/order/coupon-activities/{activityId}/redis-rebuild
+POST /internal/order/coupon-activities/{activityId}/stock-reconcile
+POST /internal/order/seckill-requests/sweep-stuck
 ```
 
 创建活动请求：
@@ -348,3 +352,115 @@ POST /internal/order/timeout-tasks/scan-once
   "failedCount": 0
 }
 ```
+
+活动运维摘要响应：
+
+```json
+{
+  "activityId": "10001",
+  "activityName": "BlueNote 周末神券",
+  "templateId": "50001",
+  "templateName": "满30减10神券",
+  "status": "PREHEATED",
+  "displayStatus": "ONLINE",
+  "totalStock": 100,
+  "availableStock": 80,
+  "soldStock": 20,
+  "expectedAvailableStock": 80,
+  "expectedSoldStock": 20,
+  "stockConsistent": true,
+  "redis": {
+    "stockKeyExists": true,
+    "stock": 80,
+    "participantCount": 20,
+    "soldOut": false,
+    "rebuilding": false
+  },
+  "requestCounts": {
+    "SUCCESS": 10,
+    "WAIT_PAY": 10
+  },
+  "orderCounts": {
+    "SUCCESS": 10,
+    "WAIT_PAY": 10
+  },
+  "couponCounts": {
+    "UNUSED": 10
+  },
+  "serverTime": "2026-06-12T20:01:00+08:00"
+}
+```
+
+Redis 重建响应：
+
+```json
+{
+  "activityId": "10001",
+  "mysqlAvailableStock": 80,
+  "participantCount": 20,
+  "before": {
+    "stockKeyExists": false,
+    "stock": null,
+    "participantCount": 0,
+    "soldOut": false,
+    "rebuilding": false
+  },
+  "after": {
+    "stockKeyExists": true,
+    "stock": 80,
+    "participantCount": 20,
+    "soldOut": false,
+    "rebuilding": false
+  },
+  "rebuilt": true
+}
+```
+
+库存对账请求：
+
+```json
+{
+  "repair": true
+}
+```
+
+库存对账响应：
+
+```json
+{
+  "activityId": "10001",
+  "totalStock": 100,
+  "beforeAvailableStock": 79,
+  "beforeSoldStock": 21,
+  "expectedAvailableStock": 80,
+  "expectedSoldStock": 20,
+  "afterAvailableStock": 80,
+  "afterSoldStock": 20,
+  "consistent": false,
+  "repaired": true,
+  "message": "stock repaired"
+}
+```
+
+卡住请求收敛请求：
+
+```json
+{
+  "stuckSeconds": 30,
+  "limit": 50
+}
+```
+
+卡住请求收敛响应：
+
+```json
+{
+  "scannedCount": 2,
+  "retriedCount": 1,
+  "syncedCount": 1,
+  "skippedCount": 0,
+  "requestIds": ["20001", "20002"]
+}
+```
+
+`sweep-stuck` 会优先按已有订单同步请求结果；没有订单且仍为 `PROCESSING` 时重新写出 `CouponSeckillAccepted` outbox，由现有异步下单消费者继续处理。

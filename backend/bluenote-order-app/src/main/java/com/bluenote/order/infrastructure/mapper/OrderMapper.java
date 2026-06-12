@@ -27,7 +27,26 @@ public interface OrderMapper {
 
     CouponActivity selectActivityByIdForUpdate(@Param("activityId") Long activityId);
 
+    List<StatusCountRow> countRequestsByActivity(@Param("activityId") Long activityId);
+
+    List<StatusCountRow> countOrdersByActivity(@Param("activityId") Long activityId);
+
+    List<StatusCountRow> countCouponsByActivity(@Param("activityId") Long activityId);
+
+    List<Long> selectActiveParticipantUserIds(@Param("activityId") Long activityId);
+
+    Integer countSuccessfulOrdersByActivity(@Param("activityId") Long activityId);
+
+    List<SeckillRequest> selectStuckProcessingRequests(@Param("deadline") LocalDateTime deadline, @Param("limit") int limit);
+
     int updateActivityStatus(@Param("activityId") Long activityId, @Param("status") String status, @Param("updatedAt") LocalDateTime updatedAt);
+
+    int repairActivityStock(
+            @Param("activityId") Long activityId,
+            @Param("availableStock") Integer availableStock,
+            @Param("soldStock") Integer soldStock,
+            @Param("updatedAt") LocalDateTime updatedAt
+    );
 
     int markActivityPreheated(@Param("activityId") Long activityId, @Param("preheatedAt") LocalDateTime preheatedAt);
 
@@ -132,4 +151,25 @@ public interface OrderMapper {
     int updateConsumeRecordSuccess(@Param("id") Long id, @Param("consumedAt") LocalDateTime consumedAt, @Param("updatedAt") LocalDateTime updatedAt);
 
     int insertOutbox(OrderOutboxEvent entity);
+
+    class StatusCountRow {
+        private String status;
+        private Integer count;
+
+        public String getStatus() {
+            return status;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+        }
+
+        public Integer getCount() {
+            return count;
+        }
+
+        public void setCount(Integer count) {
+            this.count = count;
+        }
+    }
 }

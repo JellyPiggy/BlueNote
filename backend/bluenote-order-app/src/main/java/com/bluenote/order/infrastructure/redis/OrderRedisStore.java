@@ -3,6 +3,7 @@ package com.bluenote.order.infrastructure.redis;
 import com.bluenote.common.redis.RedisKeyBuilder;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -72,6 +73,40 @@ public class OrderRedisStore {
         redisTemplate.delete(soldOutKey(activityId));
     }
 
+    public void rebuild(Long activityId, int stock, Set<Long> userIds, Duration ttl) {
+        Duration safeTtl = ttl.isNegative() || ttl.isZero() ? Duration.ofMinutes(redisRetainMinutes) : ttl;
+        String usersKey = usersKey(activityId);
+        String requestKey = requestKey(activityId);
+        redisTemplate.opsForValue().set(rebuildingKey(activityId), "1", Duration.ofMinutes(5));
+        try {
+            redisTemplate.opsForValue().set(stockKey(activityId), String.valueOf(Math.max(0, stock)), safeTtl);
+            redisTemplate.delete(usersKey);
+            if (userIds != null && !userIds.isEmpty()) {
+                String[] members = userIds.stream().map(String::valueOf).toArray(String[]::new);
+                redisTemplate.opsForSet().add(usersKey, members);
+                redisTemplate.expire(usersKey, safeTtl);
+            }
+            redisTemplate.delete(requestKey);
+            redisTemplate.delete(soldOutKey(activityId));
+        } finally {
+            redisTemplate.delete(rebuildingKey(activityId));
+        }
+    }
+
+    public RedisActivitySnapshot snapshot(Long activityId) {
+        String stockValue = redisTemplate.opsForValue().get(stockKey(activityId));
+        Boolean stockExists = redisTemplate.hasKey(stockKey(activityId));
+        Long participantCount = redisTemplate.opsForSet().size(usersKey(activityId));
+        Boolean soldOut = redisTemplate.hasKey(soldOutKey(activityId));
+        return new RedisActivitySnapshot(
+                Boolean.TRUE.equals(stockExists),
+                parseInt(stockValue),
+                participantCount == null ? 0 : participantCount.intValue(),
+                Boolean.TRUE.equals(soldOut),
+                rebuilding(activityId)
+        );
+    }
+
     public String issueToken(Long activityId, Long userId, Duration ttl) {
         String token = UUID.randomUUID().toString().replace("-", "");
         redisTemplate.opsForValue().set(tokenKey(activityId, userId, token), "1", ttl);
@@ -104,8 +139,19 @@ public class OrderRedisStore {
     }
 
     public boolean rebuilding(Long activityId) {
-        Boolean exists = redisTemplate.hasKey(RedisKeyBuilder.build(env, "order", "activity:rebuilding", activityId));
+        Boolean exists = redisTemplate.hasKey(rebuildingKey(activityId));
         return Boolean.TRUE.equals(exists);
+    }
+
+    private Integer parseInt(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     private String stockKey(Long activityId) {
@@ -126,5 +172,18 @@ public class OrderRedisStore {
 
     private String soldOutKey(Long activityId) {
         return RedisKeyBuilder.build(env, "order", "seckill:soldout", activityId);
+    }
+
+    private String rebuildingKey(Long activityId) {
+        return RedisKeyBuilder.build(env, "order", "activity:rebuilding", activityId);
+    }
+
+    public record RedisActivitySnapshot(
+            Boolean stockKeyExists,
+            Integer stock,
+            Integer participantCount,
+            Boolean soldOut,
+            Boolean rebuilding
+    ) {
     }
 }
