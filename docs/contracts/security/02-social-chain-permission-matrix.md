@@ -115,6 +115,7 @@
 | `pushProvider` | `UNI_PUSH` / `APNS` / `FCM` / `VENDOR_PUSH` / `NOOP` |
 | 推送标题 | 不超过 128 字符 |
 | 推送正文 | 不超过 512 字符 |
+| WebSocket 握手 | 必须同时提供有效 access token 和已绑定 ACTIVE 的 `deviceId` |
 
 ## 5. 可见性和归属规则
 
@@ -125,7 +126,8 @@
 5. 通知查询、已读和删除必须校验 `receiverId == currentUserId`。
 6. 关注和评论写操作必须校验当前用户状态为 `NORMAL`。
 7. 设备解绑、点击回传必须校验设备属于当前用户或已经是当前用户最近绑定设备。
-8. Push 内部接口不得让移动端指定操作其他用户设备。
+8. Push WebSocket 握手必须校验 token 中的 `userId`、`deviceId` 与设备事实表一致。
+9. Push 内部接口不得让移动端指定操作其他用户设备。
 
 ## 6. 限流建议
 

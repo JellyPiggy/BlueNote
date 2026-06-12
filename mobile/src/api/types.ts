@@ -30,6 +30,38 @@ export interface DeviceInfo {
   appVersion: string
 }
 
+export interface PushDeviceRegisterRequest {
+  deviceId: string
+  platform: DeviceInfo['platform']
+  pushProvider: 'UNI_PUSH' | 'APNS' | 'FCM' | 'VENDOR_PUSH' | 'NOOP'
+  providerClientId: string | null
+  appVersion: string
+  osVersion: string | null
+  deviceModel: string | null
+}
+
+export interface PushDeviceRegisterResponse {
+  deviceId: string
+  userId: string
+  platform: DeviceInfo['platform']
+  pushProvider: string
+  deviceStatus: 'ACTIVE' | 'UNBOUND' | string
+  realtimeEnabled: boolean
+  websocketUrl: string | null
+  registeredAt: string
+  lastActiveAt: string
+}
+
+export interface RealtimePushMessage {
+  type: 'PUSH_MESSAGE'
+  requestId: string
+  scene: string
+  title: string
+  body: string
+  data: Record<string, unknown>
+  sentAt: string
+}
+
 export interface UserProfile {
   userId: string
   bluenoteNo: string

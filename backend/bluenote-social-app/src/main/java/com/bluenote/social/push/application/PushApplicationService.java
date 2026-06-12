@@ -15,6 +15,9 @@ import com.bluenote.social.push.api.dto.PushDeviceListResponse;
 import com.bluenote.social.push.api.dto.PushDeviceRegisterRequest;
 import com.bluenote.social.push.api.dto.PushDeviceRegisterResponse;
 import com.bluenote.social.push.api.dto.PushDeviceUnbindResponse;
+import com.bluenote.social.push.api.dto.PushKickRequest;
+import com.bluenote.social.push.api.dto.PushKickResponse;
+import com.bluenote.social.push.api.dto.PushOnlineStateResponse;
 import com.bluenote.social.push.api.dto.PushPreferenceResponse;
 import com.bluenote.social.push.api.dto.PushPreferenceUpdateRequest;
 import com.bluenote.social.push.api.dto.PushReplayRequest;
@@ -35,6 +38,9 @@ import com.bluenote.social.push.infrastructure.mapper.PushDeliveryRequestMapper;
 import com.bluenote.social.push.infrastructure.mapper.PushDeviceMapper;
 import com.bluenote.social.push.infrastructure.mapper.PushOutboxEventMapper;
 import com.bluenote.social.push.infrastructure.mapper.PushPreferenceMapper;
+import com.bluenote.social.push.infrastructure.realtime.RealtimeDeliveryResult;
+import com.bluenote.social.push.infrastructure.realtime.RealtimeMessageSender;
+import com.bluenote.social.push.infrastructure.realtime.RealtimeSessionRegistry;
 import com.bluenote.social.push.infrastructure.redis.PushRedisStore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -51,6 +57,7 @@ import java.util.Objects;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,6 +81,13 @@ public class PushApplicationService {
     private static final String CONSUME_SUCCESS = "SUCCESS";
     private static final String CONSUME_SKIPPED = "SKIPPED";
     private static final String CONSUMER_GROUP = "bluenote-push-request-consumer";
+    private static final String CHANNEL_WEBSOCKET = "WEBSOCKET";
+    private static final String CHANNEL_UNI_PUSH = "UNI_PUSH";
+    private static final String CHANNEL_NOOP = "NOOP";
+    private static final String ATTEMPT_SENT_TO_CONNECTION = "SENT_TO_CONNECTION";
+    private static final String ATTEMPT_SENT_TO_PROVIDER = "SENT_TO_PROVIDER";
+    private static final String ATTEMPT_SKIPPED = "SKIPPED";
+    private static final String ATTEMPT_FAILED = "FAILED";
 
     private final PushDeviceMapper deviceMapper;
     private final PushPreferenceMapper preferenceMapper;
@@ -83,9 +97,13 @@ public class PushApplicationService {
     private final PushConsumeRecordMapper consumeRecordMapper;
     private final PushOutboxEventMapper outboxEventMapper;
     private final PushRedisStore redisStore;
+    private final RealtimeMessageSender realtimeMessageSender;
+    private final RealtimeSessionRegistry realtimeSessionRegistry;
     private final SocialIdGenerator idGenerator;
     private final JsonPayloads jsonPayloads;
     private final ObjectMapper objectMapper;
+    private final String websocketUrl;
+    private final boolean offlinePushEnabled;
 
     public PushApplicationService(
             PushDeviceMapper deviceMapper,
@@ -96,9 +114,13 @@ public class PushApplicationService {
             PushConsumeRecordMapper consumeRecordMapper,
             PushOutboxEventMapper outboxEventMapper,
             PushRedisStore redisStore,
+            RealtimeMessageSender realtimeMessageSender,
+            RealtimeSessionRegistry realtimeSessionRegistry,
             SocialIdGenerator idGenerator,
             JsonPayloads jsonPayloads,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            @Value("${bluenote.push.realtime.websocket-url:/ws/realtime}") String websocketUrl,
+            @Value("${bluenote.push.offline.enabled:false}") boolean offlinePushEnabled
     ) {
         this.deviceMapper = deviceMapper;
         this.preferenceMapper = preferenceMapper;
@@ -108,9 +130,13 @@ public class PushApplicationService {
         this.consumeRecordMapper = consumeRecordMapper;
         this.outboxEventMapper = outboxEventMapper;
         this.redisStore = redisStore;
+        this.realtimeMessageSender = realtimeMessageSender;
+        this.realtimeSessionRegistry = realtimeSessionRegistry;
         this.idGenerator = idGenerator;
         this.jsonPayloads = jsonPayloads;
         this.objectMapper = objectMapper;
+        this.websocketUrl = websocketUrl;
+        this.offlinePushEnabled = offlinePushEnabled;
     }
 
     @Transactional
@@ -146,8 +172,8 @@ public class PushApplicationService {
                 platform,
                 provider,
                 DEVICE_ACTIVE,
-                false,
-                null,
+                true,
+                websocketUrl,
                 toOffsetString(now),
                 toOffsetString(now)
         );
@@ -183,8 +209,29 @@ public class PushApplicationService {
         if (!DEVICE_UNBOUND.equals(existing.getDeviceStatus())) {
             deviceMapper.unbind(normalizedDeviceId, parsedUserId, now, now);
         }
+        realtimeSessionRegistry.kick(parsedUserId, normalizedDeviceId, "UNBOUND");
         redisStore.removeDevice(parsedUserId, normalizedDeviceId);
         return new PushDeviceUnbindResponse(normalizedDeviceId, DEVICE_UNBOUND, toOffsetString(now));
+    }
+
+    @Transactional(readOnly = true)
+    public PushOnlineStateResponse onlineState(String userId) {
+        Long parsedUserId = parseId(userId, ApiErrorCode.ACCESS_TOKEN_INVALID);
+        return realtimeSessionRegistry.onlineState(parsedUserId);
+    }
+
+    public PushKickResponse kickUserDevice(String userId, PushKickRequest request) {
+        Long parsedUserId = parseId(userId, ApiErrorCode.PARAM_INVALID);
+        String deviceId = request == null ? null : request.deviceId();
+        boolean kicked = false;
+        if (!isBlank(deviceId)) {
+            kicked = realtimeSessionRegistry.kick(parsedUserId, normalizeDeviceId(deviceId), request.reason());
+        } else {
+            for (var connection : realtimeSessionRegistry.onlineConnections(parsedUserId)) {
+                kicked = realtimeSessionRegistry.kick(parsedUserId, connection.deviceId(), request == null ? null : request.reason()) || kicked;
+            }
+        }
+        return new PushKickResponse(String.valueOf(parsedUserId), deviceId, kicked);
     }
 
     @Transactional
@@ -360,7 +407,7 @@ public class PushApplicationService {
         }
         if ("NO_PUSH".equals(request.getDeliveryStrategy())) {
             requestMapper.updateStatus(requestId, STATUS_FILTERED, "NO_PUSH", 0, now, now);
-            insertAttempt(request, null, "NOOP", "SKIPPED", "NO_PUSH", null, now);
+            insertAttempt(request, null, "NOOP", "SKIPPED", "NO_PUSH", null, null, now);
             insertResultOutbox("PushFiltered", request, STATUS_FILTERED, 0, "NO_PUSH", null, now);
             return new PushSendResponse(requestId, STATUS_FILTERED, 0, "NO_PUSH");
         }
@@ -369,7 +416,7 @@ public class PushApplicationService {
         String filteredReason = filterReason(request, preference, now);
         if (filteredReason != null) {
             requestMapper.updateStatus(requestId, STATUS_FILTERED, filteredReason, 0, now, now);
-            insertAttempt(request, null, "NOOP", "SKIPPED", filteredReason, null, now);
+            insertAttempt(request, null, "NOOP", "SKIPPED", filteredReason, null, null, now);
             insertResultOutbox("PushFiltered", request, STATUS_FILTERED, 0, filteredReason, null, now);
             return new PushSendResponse(requestId, STATUS_FILTERED, 0, filteredReason);
         }
@@ -377,19 +424,72 @@ public class PushApplicationService {
         List<PushDeviceEntity> devices = deviceMapper.selectActiveByUser(request.getTargetUserId());
         if (devices.isEmpty()) {
             requestMapper.updateStatus(requestId, STATUS_FILTERED, "NO_ACTIVE_DEVICE", 0, now, now);
-            insertAttempt(request, null, "NOOP", "SKIPPED", "NO_ACTIVE_DEVICE", null, now);
+            insertAttempt(request, null, "NOOP", "SKIPPED", "NO_ACTIVE_DEVICE", null, null, now);
             insertResultOutbox("PushFiltered", request, STATUS_FILTERED, 0, "NO_ACTIVE_DEVICE", null, now);
             return new PushSendResponse(requestId, STATUS_FILTERED, 0, "NO_ACTIVE_DEVICE");
         }
 
+        Map<String, Object> data = parseJsonMap(request.getDataJson());
         int deliveredCount = 0;
         for (PushDeviceEntity device : devices) {
-            insertAttempt(request, device.getDeviceId(), channelFor(device), "SUCCESS", null, null, now);
-            deliveredCount++;
+            DeliveryAttemptResult result = deliverToDevice(request, device, data, now);
+            deliveredCount += result.delivered() ? 1 : 0;
         }
-        requestMapper.updateStatus(requestId, STATUS_DELIVERED, null, deliveredCount, now, now);
-        insertResultOutbox("PushDelivered", request, STATUS_DELIVERED, deliveredCount, null, null, now);
-        return new PushSendResponse(requestId, STATUS_DELIVERED, deliveredCount, null);
+        if (deliveredCount > 0) {
+            requestMapper.updateStatus(requestId, STATUS_DELIVERED, null, deliveredCount, now, now);
+            insertResultOutbox("PushDelivered", request, STATUS_DELIVERED, deliveredCount, null, null, now);
+            return new PushSendResponse(requestId, STATUS_DELIVERED, deliveredCount, null);
+        }
+        requestMapper.updateStatus(requestId, STATUS_FAILED, "NO_CHANNEL_AVAILABLE", 0, now, now);
+        insertResultOutbox("PushFailed", request, STATUS_FAILED, 0, null, "NO_CHANNEL_AVAILABLE", now);
+        return new PushSendResponse(requestId, STATUS_FAILED, 0, "NO_CHANNEL_AVAILABLE");
+    }
+
+    private DeliveryAttemptResult deliverToDevice(
+            PushDeliveryRequestEntity request,
+            PushDeviceEntity device,
+            Map<String, Object> data,
+            LocalDateTime now
+    ) {
+        String strategy = request.getDeliveryStrategy();
+        boolean tryOnline = "ONLINE_ONLY".equals(strategy)
+                || "ONLINE_THEN_OFFLINE".equals(strategy)
+                || "ONLINE_AND_OFFLINE".equals(strategy);
+        boolean tryOffline = "OFFLINE_PUSH_ONLY".equals(strategy)
+                || "ONLINE_THEN_OFFLINE".equals(strategy)
+                || "ONLINE_AND_OFFLINE".equals(strategy);
+
+        boolean delivered = false;
+        if (tryOnline) {
+            if (realtimeMessageSender.isOnline(request.getTargetUserId(), device.getDeviceId())) {
+                RealtimeDeliveryResult result = realtimeMessageSender.send(request, device.getDeviceId(), data);
+                if (result.delivered()) {
+                    insertAttempt(request, device.getDeviceId(), CHANNEL_WEBSOCKET, ATTEMPT_SENT_TO_CONNECTION, null,
+                            result.connectionId(), null, now);
+                    delivered = true;
+                } else {
+                    insertAttempt(request, device.getDeviceId(), CHANNEL_WEBSOCKET, ATTEMPT_FAILED, null,
+                            null, result.errorMessage(), now);
+                }
+            } else {
+                insertAttempt(request, device.getDeviceId(), CHANNEL_WEBSOCKET, ATTEMPT_SKIPPED, "DEVICE_OFFLINE", null, null, now);
+            }
+        }
+
+        if (tryOffline && (!delivered || "ONLINE_AND_OFFLINE".equals(strategy))) {
+            DeliveryAttemptResult offline = deliverOffline(request, device, now);
+            delivered = offline.delivered() || delivered;
+        }
+        return new DeliveryAttemptResult(delivered);
+    }
+
+    private DeliveryAttemptResult deliverOffline(PushDeliveryRequestEntity request, PushDeviceEntity device, LocalDateTime now) {
+        if (!offlinePushEnabled || "NOOP".equals(device.getPushProvider()) || isBlank(device.getProviderClientId())) {
+            insertAttempt(request, device.getDeviceId(), channelFor(device), ATTEMPT_SKIPPED, "OFFLINE_CHANNEL_UNAVAILABLE", null, null, now);
+            return new DeliveryAttemptResult(false);
+        }
+        insertAttempt(request, device.getDeviceId(), channelFor(device), ATTEMPT_SENT_TO_PROVIDER, null, null, null, now);
+        return new DeliveryAttemptResult(true);
     }
 
     private PushConsumeRecordEntity reserveConsumeRecord(PushConsumeEventRequest request, LocalDateTime now) {
@@ -543,6 +643,7 @@ public class PushApplicationService {
             String channel,
             String attemptStatus,
             String skipReason,
+            String providerMessageId,
             String errorMessage,
             LocalDateTime now
     ) {
@@ -554,8 +655,9 @@ public class PushApplicationService {
         attempt.setChannel(channel);
         attempt.setAttemptStatus(attemptStatus);
         attempt.setSkipReason(skipReason);
-        attempt.setProviderMessageId(null);
+        attempt.setProviderMessageId(providerMessageId);
         attempt.setErrorMessage(truncate(errorMessage, 512));
+        attempt.setAckedAt(null);
         attempt.setAttemptedAt(now);
         attempt.setCreatedAt(now);
         attempt.setUpdatedAt(now);
@@ -660,12 +762,16 @@ public class PushApplicationService {
                 attempt.getAttemptStatus(),
                 attempt.getSkipReason(),
                 attempt.getErrorMessage(),
-                toOffsetString(attempt.getAttemptedAt())
+                toOffsetString(attempt.getAttemptedAt()),
+                toOffsetString(attempt.getAckedAt())
         );
     }
 
     private String channelFor(PushDeviceEntity device) {
-        return "NOOP".equals(device.getPushProvider()) ? "NOOP" : device.getPushProvider();
+        if ("UNI_PUSH".equals(device.getPushProvider())) {
+            return CHANNEL_UNI_PUSH;
+        }
+        return "NOOP".equals(device.getPushProvider()) ? CHANNEL_NOOP : device.getPushProvider();
     }
 
     private void validateSendRequest(PushSendRequest request) {
@@ -844,5 +950,8 @@ public class PushApplicationService {
 
     private LocalDateTime now() {
         return LocalDateTime.now(ZONE);
+    }
+
+    private record DeliveryAttemptResult(boolean delivered) {
     }
 }

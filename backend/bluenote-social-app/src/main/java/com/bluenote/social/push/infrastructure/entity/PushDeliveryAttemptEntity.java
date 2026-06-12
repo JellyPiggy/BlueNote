@@ -14,6 +14,7 @@ public class PushDeliveryAttemptEntity {
     private String providerMessageId;
     private String errorMessage;
     private LocalDateTime attemptedAt;
+    private LocalDateTime ackedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -95,6 +96,14 @@ public class PushDeliveryAttemptEntity {
 
     public void setAttemptedAt(LocalDateTime attemptedAt) {
         this.attemptedAt = attemptedAt;
+    }
+
+    public LocalDateTime getAckedAt() {
+        return ackedAt;
+    }
+
+    public void setAckedAt(LocalDateTime ackedAt) {
+        this.ackedAt = ackedAt;
     }
 
     public LocalDateTime getCreatedAt() {
