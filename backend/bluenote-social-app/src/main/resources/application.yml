@@ -12,6 +12,12 @@ spring:
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
+  data:
+    redis:
+      host: ${BLUENOTE_REDIS_HOST:127.0.0.1}
+      port: ${BLUENOTE_REDIS_PORT:6379}
+      password: ${BLUENOTE_REDIS_PASSWORD:bluenote_redis_local}
+      timeout: 2s
 
 mybatis-plus:
   mapper-locations: classpath*:mapper/**/*.xml
@@ -19,6 +25,7 @@ mybatis-plus:
     map-underscore-to-camel-case: true
 
 bluenote:
+  env: ${BLUENOTE_ENV:local}
   internal:
     member-uri: ${BLUENOTE_MEMBER_INTERNAL_URI:http://127.0.0.1:8081}
     content-uri: ${BLUENOTE_CONTENT_INTERNAL_URI:http://127.0.0.1:8082}

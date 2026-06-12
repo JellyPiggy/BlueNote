@@ -207,6 +207,8 @@ payload：
 {
   "noteId": "800001",
   "authorId": "10001",
+  "visibility": "PUBLIC",
+  "noteStatus": "PUBLISHED",
   "deletedAt": "2026-06-05T10:12:00+08:00"
 }
 ```
@@ -291,7 +293,7 @@ event_id + consumer_group
 | `consumer_group` | 消费组 |
 | `event_type` | 事件类型 |
 | `biz_key` | 业务键 |
-| `consume_status` | `SUCCESS` / `FAIL` |
+| `consume_status` | `PROCESSING` / `SUCCESS` / `FAIL` |
 | `retry_count` | 重试次数 |
 | `error_message` | 失败原因 |
 | `consumed_at` | 消费成功时间 |

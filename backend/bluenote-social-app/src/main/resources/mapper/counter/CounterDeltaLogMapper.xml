@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.counter.infrastructure.mapper.CounterDeltaLogMapper">
+
+    <resultMap id="CounterDeltaLogResultMap" type="com.bluenote.social.counter.infrastructure.entity.CounterDeltaLogEntity">
+        <id column="delta_id" property="deltaId"/>
+        <result column="source_event_id" property="sourceEventId"/>
+        <result column="source_event_type" property="sourceEventType"/>
+        <result column="target_type" property="targetType"/>
+        <result column="target_id" property="targetId"/>
+        <result column="counter_field" property="counterField"/>
+        <result column="delta_value" property="deltaValue"/>
+        <result column="apply_status" property="applyStatus"/>
+        <result column="occurred_at" property="occurredAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insertIgnore" parameterType="com.bluenote.social.counter.infrastructure.entity.CounterDeltaLogEntity">
+        INSERT IGNORE INTO bluenote_counter.counter_delta_log (
+            delta_id, source_event_id, source_event_type, target_type, target_id,
+            counter_field, delta_value, apply_status, occurred_at, created_at, updated_at
+        ) VALUES (
+            #{deltaId}, #{sourceEventId}, #{sourceEventType}, #{targetType}, #{targetId},
+            #{counterField}, #{deltaValue}, #{applyStatus}, #{occurredAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectByDeltaId" resultMap="CounterDeltaLogResultMap">
+        SELECT delta_id, source_event_id, source_event_type, target_type, target_id,
+               counter_field, delta_value, apply_status, occurred_at, created_at, updated_at
+        FROM bluenote_counter.counter_delta_log
+        WHERE delta_id = #{deltaId}
+    </select>
+
+    <select id="selectByDeltaIdForUpdate" resultMap="CounterDeltaLogResultMap">
+        SELECT delta_id, source_event_id, source_event_type, target_type, target_id,
+               counter_field, delta_value, apply_status, occurred_at, created_at, updated_at
+        FROM bluenote_counter.counter_delta_log
+        WHERE delta_id = #{deltaId}
+        FOR UPDATE
+    </select>
+
+    <update id="markApplied">
+        UPDATE bluenote_counter.counter_delta_log
+        SET apply_status = 'APPLIED',
+            updated_at = NOW(3)
+        WHERE delta_id = #{deltaId}
+    </update>
+
+    <update id="markFailed">
+        UPDATE bluenote_counter.counter_delta_log
+        SET apply_status = 'FAILED',
+            updated_at = NOW(3)
+        WHERE delta_id = #{deltaId}
+    </update>
+</mapper>

@@ -108,7 +108,60 @@ POST /internal/counters/batch
 4. 不存在的计数默认返回 0。
 5. Redis 不可用时可查 MySQL 快照并返回 `degraded=true`。
 
-## 3. 内部接口：触发计数校准
+## 3. 内部接口：消费业务事件
+
+```text
+POST /internal/counters/events/consume
+```
+
+调用方：计数服务 MQ listener、补偿脚本或本地联调工具。
+
+说明：该接口是计数事件消费核心入口。自动 RocketMQ listener 可以复用同一入口逻辑，移动端不得调用。
+
+请求：
+
+```json
+{
+  "topic": "interaction-event",
+  "consumerGroup": "bluenote-counter-note-consumer",
+  "eventId": "uuid",
+  "eventType": "NoteLiked",
+  "eventVersion": 1,
+  "occurredAt": "2026-06-11T11:00:00+08:00",
+  "traceId": "trace-id",
+  "producer": "bluenote-note",
+  "bizKey": "800001",
+  "payload": {
+    "noteId": "800001",
+    "authorId": "10001",
+    "userId": "10002",
+    "occurredAt": "2026-06-11T11:00:00+08:00"
+  }
+}
+```
+
+成功响应：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "eventId": "uuid",
+    "consumeStatus": "SUCCESS",
+    "deltaCount": 2
+  },
+  "traceId": "trace-id"
+}
+```
+
+约束：
+
+1. 幂等键为 `consumerGroup + eventId`。
+2. 同一来源事件生成多条 delta 时必须在同一事务内整体成功或整体重试。
+3. 已成功消费的重复事件返回 `deltaCount=0`。
+
+## 4. 内部接口：触发计数校准
 
 ```text
 POST /internal/counters/reconcile
@@ -141,7 +194,7 @@ POST /internal/counters/reconcile
 }
 ```
 
-## 4. 内部接口：查询重建任务
+## 5. 内部接口：查询重建任务
 
 ```text
 GET /internal/counters/rebuild-tasks/{taskId}
@@ -169,7 +222,7 @@ GET /internal/counters/rebuild-tasks/{taskId}
 }
 ```
 
-## 5. 内部接口：批量预热计数
+## 6. 内部接口：批量预热计数
 
 ```text
 POST /internal/counters/warmup
@@ -201,7 +254,7 @@ POST /internal/counters/warmup
 }
 ```
 
-## 6. 错误码
+## 7. 错误码
 
 | code | reason |
 |---|---|
@@ -214,7 +267,7 @@ POST /internal/counters/warmup
 | `26007` | `COUNTER_REBUILD_TOO_FREQUENT` |
 | `26008` | `COUNTER_SOURCE_UNAVAILABLE` |
 
-## 7. 事件处理要求
+## 8. 事件处理要求
 
 1. 计数服务消费 `note-event`、`interaction-event`、`comment-event`、`relation-event` 后生成内部 `CounterDeltaCreated`。
 2. 上游业务服务不直接生产 `counter-delta-event`。

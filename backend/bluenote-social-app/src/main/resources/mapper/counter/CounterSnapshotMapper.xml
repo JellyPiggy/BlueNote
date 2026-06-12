@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.counter.infrastructure.mapper.CounterSnapshotMapper">
+
+    <resultMap id="CounterSnapshotResultMap" type="com.bluenote.social.counter.infrastructure.entity.CounterSnapshotEntity">
+        <id column="id" property="id"/>
+        <result column="target_type" property="targetType"/>
+        <result column="target_id" property="targetId"/>
+        <result column="counter_field" property="counterField"/>
+        <result column="counter_value" property="counterValue"/>
+        <result column="snapshot_version" property="snapshotVersion"/>
+        <result column="flushed_at" property="flushedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="upsert" parameterType="com.bluenote.social.counter.infrastructure.entity.CounterSnapshotEntity">
+        INSERT INTO bluenote_counter.counter_snapshot (
+            id, target_type, target_id, counter_field, counter_value, snapshot_version,
+            flushed_at, created_at, updated_at
+        ) VALUES (
+            #{id}, #{targetType}, #{targetId}, #{counterField}, #{counterValue}, #{snapshotVersion},
+            #{flushedAt}, #{createdAt}, #{updatedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            counter_value = VALUES(counter_value),
+            snapshot_version = snapshot_version + 1,
+            flushed_at = VALUES(flushed_at),
+            updated_at = VALUES(updated_at)
+    </insert>
+
+    <insert id="insertIgnore" parameterType="com.bluenote.social.counter.infrastructure.entity.CounterSnapshotEntity">
+        INSERT IGNORE INTO bluenote_counter.counter_snapshot (
+            id, target_type, target_id, counter_field, counter_value, snapshot_version,
+            flushed_at, created_at, updated_at
+        ) VALUES (
+            #{id}, #{targetType}, #{targetId}, #{counterField}, #{counterValue}, #{snapshotVersion},
+            #{flushedAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <update id="increment">
+        UPDATE bluenote_counter.counter_snapshot
+        SET counter_value = GREATEST(0, counter_value + #{deltaValue}),
+            snapshot_version = snapshot_version + 1,
+            flushed_at = #{updatedAt},
+            updated_at = #{updatedAt}
+        WHERE target_type = #{targetType}
+          AND target_id = #{targetId}
+          AND counter_field = #{counterField}
+    </update>
+
+    <select id="selectByTargetAndFields" resultMap="CounterSnapshotResultMap">
+        SELECT id, target_type, target_id, counter_field, counter_value, snapshot_version,
+               flushed_at, created_at, updated_at
+        FROM bluenote_counter.counter_snapshot
+        WHERE target_type = #{targetType}
+          AND target_id = #{targetId}
+          AND counter_field IN
+        <foreach collection="fields" item="field" open="(" separator="," close=")">
+            #{field}
+        </foreach>
+    </select>
+</mapper>

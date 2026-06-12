@@ -920,6 +920,8 @@ public class NoteApplicationService {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("noteId", String.valueOf(note.getNoteId()));
         payload.put("authorId", String.valueOf(note.getAuthorId()));
+        payload.put("visibility", note.getVisibility());
+        payload.put("noteStatus", note.getNoteStatus());
         payload.put("deletedAt", toOffsetString(now));
         insertOutbox("NoteDeleted", note.getNoteId(), payload, now);
     }
