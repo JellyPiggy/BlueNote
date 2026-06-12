@@ -9,6 +9,9 @@ import com.bluenote.content.common.JsonPayloads;
 import com.bluenote.content.file.api.dto.InternalBatchBindFileRequest;
 import com.bluenote.content.file.api.dto.InternalBatchValidateFileRequest;
 import com.bluenote.content.file.application.FileApplicationService;
+import com.bluenote.content.note.api.dto.AuthorRecentNotesItem;
+import com.bluenote.content.note.api.dto.AuthorRecentNotesRequest;
+import com.bluenote.content.note.api.dto.AuthorRecentNotesResponse;
 import com.bluenote.content.note.api.dto.BatchNoteSummaryRequest;
 import com.bluenote.content.note.api.dto.BatchNoteSummaryResponse;
 import com.bluenote.content.note.api.dto.CommentCheckRequest;
@@ -458,20 +461,44 @@ public class NoteApplicationService {
             if (note == null || (!includeInvisible && !canView(note, viewerId))) {
                 continue;
             }
-            NoteVersionEntity version = requireVersion(note.getNoteId(), note.getCurrentVersion());
-            summaries.add(new NoteSummaryItem(
-                    String.valueOf(note.getNoteId()),
-                    String.valueOf(note.getAuthorId()),
-                    version.getTitle(),
-                    version.getContentPreview(),
-                    stringValue(note.getCoverFileId()),
-                    fileAccessUrl(note.getCoverFileId()),
-                    note.getNoteStatus(),
-                    note.getVisibility(),
-                    toOffsetString(note.getPublishedAt())
-            ));
+            summaries.add(toSummaryItem(note));
         }
         return new BatchNoteSummaryResponse(summaries);
+    }
+
+    @Transactional(readOnly = true)
+    public AuthorRecentNotesResponse authorRecentNotes(AuthorRecentNotesRequest request) {
+        int limitPerAuthor = normalizeLimitPerAuthor(request.limitPerAuthor());
+        LocalDateTime publishedAfter = parseOptionalOffsetDateTime(request.publishedAfter(), ApiErrorCode.PARAM_INVALID);
+        List<Long> authorIds = request.authorIds().stream()
+                .map(authorId -> parseId(authorId, ApiErrorCode.USER_NOT_FOUND))
+                .distinct()
+                .toList();
+        if (authorIds.isEmpty()) {
+            return new AuthorRecentNotesResponse(List.of());
+        }
+
+        List<NoteEntity> notes = noteMapper.selectRecentPublicByAuthors(
+                authorIds,
+                publishedAfter,
+                limitPerAuthor
+        );
+        Map<Long, List<NoteEntity>> notesByAuthor = notes.stream()
+                .collect(Collectors.groupingBy(
+                        NoteEntity::getAuthorId,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+        List<AuthorRecentNotesItem> authors = authorIds.stream()
+                .map(authorId -> new AuthorRecentNotesItem(
+                        String.valueOf(authorId),
+                        notesByAuthor.getOrDefault(authorId, List.of()).stream()
+                                .limit(limitPerAuthor)
+                                .map(this::toSummaryItem)
+                                .toList()
+                ))
+                .toList();
+        return new AuthorRecentNotesResponse(authors);
     }
 
     @Transactional(readOnly = true)
@@ -775,6 +802,21 @@ public class NoteApplicationService {
         );
     }
 
+    private NoteSummaryItem toSummaryItem(NoteEntity note) {
+        NoteVersionEntity version = requireVersion(note.getNoteId(), note.getCurrentVersion());
+        return new NoteSummaryItem(
+                String.valueOf(note.getNoteId()),
+                String.valueOf(note.getAuthorId()),
+                version.getTitle(),
+                version.getContentPreview(),
+                stringValue(note.getCoverFileId()),
+                fileAccessUrl(note.getCoverFileId()),
+                note.getNoteStatus(),
+                note.getVisibility(),
+                toOffsetString(note.getPublishedAt())
+        );
+    }
+
     private List<NoteMediaResponse> noteMediaResponses(Long noteId, Integer versionNo) {
         return noteMediaMapper.selectByNoteAndVersion(noteId, versionNo).stream()
                 .map(media -> new NoteMediaResponse(
@@ -1045,6 +1087,13 @@ public class NoteApplicationService {
         return Math.max(1, Math.min(size, 50));
     }
 
+    private int normalizeLimitPerAuthor(Integer limitPerAuthor) {
+        if (limitPerAuthor == null) {
+            return 20;
+        }
+        return Math.max(1, Math.min(limitPerAuthor, 50));
+    }
+
     private String normalizeOptionalNoteStatus(String status) {
         if (status == null || status.isBlank()) {
             return null;
@@ -1064,6 +1113,17 @@ public class NoteApplicationService {
 
     private LocalDateTime sortAt(NoteEntity note) {
         return note.getPublishedAt() == null ? note.getUpdatedAt() : note.getPublishedAt();
+    }
+
+    private LocalDateTime parseOptionalOffsetDateTime(String value, ApiErrorCode errorCode) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return OffsetDateTime.parse(value).atZoneSameInstant(CHINA_ZONE).toLocalDateTime();
+        } catch (RuntimeException exception) {
+            throw new BusinessException(errorCode);
+        }
     }
 
     private Long parseId(String value, ApiErrorCode errorCode) {

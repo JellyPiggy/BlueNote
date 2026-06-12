@@ -23,6 +23,7 @@ public class GatewayRouteConfiguration {
                 .route("content-note", route -> route.path("/api/notes/**").uri(contentUri))
                 .route("content-comment", route -> route.path("/api/comments/**").uri(contentUri))
                 .route("social-relation", route -> route.path("/api/relations/**").uri(socialUri))
+                .route("social-feed", route -> route.path("/api/feed/**").uri(socialUri))
                 .build();
     }
 }

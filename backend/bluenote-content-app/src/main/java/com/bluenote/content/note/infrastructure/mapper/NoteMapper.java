@@ -44,5 +44,11 @@ public interface NoteMapper {
             @Param("size") int size
     );
 
+    List<NoteEntity> selectRecentPublicByAuthors(
+            @Param("authorIds") List<Long> authorIds,
+            @Param("publishedAfter") LocalDateTime publishedAfter,
+            @Param("size") int size
+    );
+
     long countPublicPublishedByAuthor(@Param("authorId") Long authorId);
 }

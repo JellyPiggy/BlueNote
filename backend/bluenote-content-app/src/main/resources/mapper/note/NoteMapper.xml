@@ -117,6 +117,29 @@
         LIMIT #{size}
     </select>
 
+    <select id="selectRecentPublicByAuthors" resultMap="NoteResultMap">
+        SELECT note_id, author_id, note_type, note_status, visibility, current_version, latest_version,
+               cover_file_id, comment_enabled, published_at, last_edited_at, offline_reason,
+               deleted_at, created_at, updated_at, deleted
+        FROM (
+          SELECT <include refid="NoteColumns"/>,
+                 ROW_NUMBER() OVER (PARTITION BY author_id ORDER BY published_at DESC, note_id DESC) AS row_no
+          FROM bluenote_note.note
+          WHERE deleted = 0
+            AND note_status = 'PUBLISHED'
+            AND visibility = 'PUBLIC'
+            AND author_id IN
+          <foreach collection="authorIds" item="authorId" open="(" separator="," close=")">
+              #{authorId}
+          </foreach>
+          <if test="publishedAfter != null">
+            AND published_at &gt;= #{publishedAfter}
+          </if>
+        ) recent_notes
+        WHERE row_no &lt;= #{size}
+        ORDER BY published_at DESC, note_id DESC
+    </select>
+
     <select id="countPublicPublishedByAuthor" resultType="long">
         SELECT COUNT(*)
         FROM bluenote_note.note
