@@ -158,7 +158,7 @@ npm run dev:h5
 1. `/api/notes/{noteId}` 返回作者、媒体、标题、正文、计数结构。
 2. 笔记详情页图片、作者和底部操作区显示正常。
 3. `/api/notes/me` 能在我的页面展示已发布笔记。
-4. `/api/users/{userId}/home` 能返回主页头部结构。
+4. `/api/users/{userId}/home` 能返回主页头部结构，并通过 counter 聚合返回关注数、粉丝数、作品数和获赞数。
 
 ### 7.4 验证关注、笔记互动和评论接口
 
@@ -173,6 +173,7 @@ npm run dev:h5
 7. `GET /api/comments/notes/{noteId}` 能查询一级评论。
 8. `GET /api/comments/{rootCommentId}/replies` 能查询回复。
 9. `POST /api/comments/{commentId}/like` 和 `DELETE /api/comments/{commentId}/like` 能切换评论点赞状态。
+10. `POST /internal/counters/batch` 能批量返回 NOTE / USER / COMMENT 计数。
 
 如果 MySQL 是旧数据卷，新增的 `V005__relation.sql`、`V006__comment.sql` 可能不会自动执行，需要手动执行 SQL 或重建本地数据卷。
 
@@ -207,9 +208,14 @@ npm run dev:h5
 3. member 和 gateway 的 `BLUENOTE_ACCESS_TOKEN_SECRET` 是否一致。
 4. 请求是否携带 `Authorization: Bearer ...`。
 
-### 8.4 主页计数一直是 0
+### 8.4 主页计数一直是 0 或降级
 
-这是当前阶段已知限制。关注关系已落库，但用户主页头部还没有接入 counter 聚合。
+优先检查：
+
+1. social-app 是否启动在 `8083`。
+2. member-app 的 `BLUENOTE_COUNTER_INTERNAL_URI` 是否指向 social-app。
+3. content-app 是否启动在 `8082`，因为作品数、获赞数和评论数会从 content 来源接口聚合。
+4. MySQL 是否可连接；来源接口失败时用户主页会返回 `degraded=true` 并降级为 0。
 
 ## 9. 当前未覆盖
 

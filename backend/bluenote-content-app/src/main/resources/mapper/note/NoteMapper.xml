@@ -116,5 +116,13 @@
         ORDER BY COALESCE(published_at, updated_at) DESC, note_id DESC
         LIMIT #{size}
     </select>
-</mapper>
 
+    <select id="countPublicPublishedByAuthor" resultType="long">
+        SELECT COUNT(*)
+        FROM bluenote_note.note
+        WHERE author_id = #{authorId}
+          AND note_status = 'PUBLISHED'
+          AND visibility = 'PUBLIC'
+          AND deleted = 0
+    </select>
+</mapper>

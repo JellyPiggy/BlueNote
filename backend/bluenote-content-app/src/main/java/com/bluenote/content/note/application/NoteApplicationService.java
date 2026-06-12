@@ -19,6 +19,9 @@ import com.bluenote.content.note.api.dto.NoteCollectResponse;
 import com.bluenote.content.note.api.dto.NoteAuthorResponse;
 import com.bluenote.content.note.api.dto.NoteCardResponse;
 import com.bluenote.content.note.api.dto.NoteCountsResponse;
+import com.bluenote.content.note.api.dto.NoteCounterSourceItem;
+import com.bluenote.content.note.api.dto.NoteCounterSourceRequest;
+import com.bluenote.content.note.api.dto.NoteCounterSourceResponse;
 import com.bluenote.content.note.api.dto.NoteDetailResponse;
 import com.bluenote.content.note.api.dto.NoteLikeResponse;
 import com.bluenote.content.note.api.dto.NoteMediaInput;
@@ -486,6 +489,37 @@ public class NoteApplicationService {
                 note.getNoteStatus(),
                 note.getVisibility()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public NoteCounterSourceResponse counterSource(NoteCounterSourceRequest request) {
+        List<NoteCounterSourceItem> items = request.targets().stream()
+                .map(target -> {
+                    Long targetId = parseId(target.targetId(), ApiErrorCode.PARAM_INVALID);
+                    Map<String, Long> counts = new LinkedHashMap<>();
+                    if ("NOTE".equals(target.targetType())) {
+                        for (String field : target.fields()) {
+                            if ("like_count".equals(field)) {
+                                counts.put(field, noteInteractionMapper.countLikes(targetId));
+                            } else if ("collect_count".equals(field)) {
+                                counts.put(field, noteInteractionMapper.countCollections(targetId));
+                            }
+                        }
+                    } else if ("USER".equals(target.targetType())) {
+                        for (String field : target.fields()) {
+                            if ("note_count".equals(field)) {
+                                counts.put(field, noteMapper.countPublicPublishedByAuthor(targetId));
+                            } else if ("liked_count".equals(field)) {
+                                counts.put(field, noteInteractionMapper.countActiveLikesByAuthor(targetId));
+                            }
+                        }
+                    } else {
+                        throw new BusinessException(ApiErrorCode.PARAM_INVALID);
+                    }
+                    return new NoteCounterSourceItem(target.targetType(), target.targetId(), counts);
+                })
+                .toList();
+        return new NoteCounterSourceResponse(items);
     }
 
     private NoteEntity insertNote(

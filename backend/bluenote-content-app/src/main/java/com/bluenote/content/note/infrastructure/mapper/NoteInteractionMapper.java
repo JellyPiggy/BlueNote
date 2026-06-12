@@ -43,6 +43,8 @@ public interface NoteInteractionMapper {
 
     long countCollections(@Param("noteId") Long noteId);
 
+    long countActiveLikesByAuthor(@Param("authorId") Long authorId);
+
     boolean likedByViewer(@Param("noteId") Long noteId, @Param("userId") Long userId);
 
     boolean collectedByViewer(@Param("noteId") Long noteId, @Param("userId") Long userId);

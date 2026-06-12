@@ -115,6 +115,19 @@
           AND collection_status = 'ACTIVE'
     </select>
 
+    <select id="countActiveLikesByAuthor" resultType="long">
+        SELECT COUNT(*)
+        FROM bluenote_note.note_like note_like
+        INNER JOIN bluenote_note.note note
+          ON note.note_id = note_like.note_id
+        WHERE note_like.author_id = #{authorId}
+          AND note_like.like_status = 'ACTIVE'
+          AND note.author_id = #{authorId}
+          AND note.note_status = 'PUBLISHED'
+          AND note.visibility = 'PUBLIC'
+          AND note.deleted = 0
+    </select>
+
     <select id="likedByViewer" resultType="boolean">
         SELECT COUNT(*) > 0
         FROM bluenote_note.note_like

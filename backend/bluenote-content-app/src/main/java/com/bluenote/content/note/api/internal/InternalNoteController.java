@@ -6,6 +6,8 @@ import com.bluenote.content.note.api.dto.BatchNoteSummaryRequest;
 import com.bluenote.content.note.api.dto.BatchNoteSummaryResponse;
 import com.bluenote.content.note.api.dto.CommentCheckRequest;
 import com.bluenote.content.note.api.dto.CommentCheckResponse;
+import com.bluenote.content.note.api.dto.NoteCounterSourceRequest;
+import com.bluenote.content.note.api.dto.NoteCounterSourceResponse;
 import com.bluenote.content.note.application.NoteApplicationService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,5 +34,9 @@ public class InternalNoteController {
     public ApiResponse<CommentCheckResponse> commentCheck(@Valid @RequestBody CommentCheckRequest request) {
         return ApiResponse.success(noteApplicationService.commentCheck(request), TraceIdHolder.currentOrNew());
     }
-}
 
+    @PostMapping("/counter-source")
+    public ApiResponse<NoteCounterSourceResponse> counterSource(@Valid @RequestBody NoteCounterSourceRequest request) {
+        return ApiResponse.success(noteApplicationService.counterSource(request), TraceIdHolder.currentOrNew());
+    }
+}

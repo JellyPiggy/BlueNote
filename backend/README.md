@@ -42,7 +42,7 @@ backend/
 | `bluenote-gateway-app` | 8080 | 网关、JWT 校验、路由、用户上下文 Header 注入 |
 | `bluenote-member-app` | 8081 | auth、user |
 | `bluenote-content-app` | 8082 | file、note、comment |
-| `bluenote-social-app` | 8083 | relation，后续承载 counter、feed、rank、notification |
+| `bluenote-social-app` | 8083 | relation、counter，后续承载 feed、rank、notification |
 
 ## 2. 当前实现状态
 
@@ -100,8 +100,7 @@ user 内部接口：
 5. 登录审计。
 6. 用户资料审计。
 7. auth/user outbox 写库。
-
-限制：用户主页头部的关注数、粉丝数、获赞数当前仍是占位值，后续由 relation/counter/social 链路补齐。
+8. 用户主页头部计数通过 counter 聚合 relation/note 来源返回，异常时降级展示。
 
 ### 2.3 Content App
 
@@ -146,6 +145,7 @@ note 内部接口：
 |---|---|
 | `POST /internal/notes/batch-summary` | 批量笔记摘要 |
 | `POST /internal/notes/comment-check` | 评论前校验 |
+| `POST /internal/notes/counter-source` | 笔记和用户作品计数来源 |
 
 comment 外部接口：
 
@@ -204,6 +204,12 @@ relation 内部接口：
 | `GET /internal/relations/users/{userId}/following/page` | Feed 查询和重建分页查询关注 |
 | `POST /internal/relations/counter-source` | 计数服务校准来源 |
 
+counter 内部接口：
+
+| 接口 | 说明 |
+|---|---|
+| `POST /internal/counters/batch` | 批量聚合 NOTE / USER / COMMENT 计数 |
+
 已接入能力：
 
 1. `relation_following` 关注事实落库。
@@ -212,6 +218,7 @@ relation 内部接口：
 4. `relation_outbox_event` 写出 `UserFollowed` / `UserUnfollowed`。
 5. 关注列表、粉丝列表和关注状态走 MySQL 查询。
 6. 通过 member 内部接口校验用户状态和补全用户摘要。
+7. counter 查询聚合 relation、note、comment 的 `counter-source`，供用户主页等接口使用。
 
 ## 3. 本地要求
 
@@ -303,6 +310,6 @@ http://127.0.0.1:{port}/swagger-ui.html
 
 1. 补后端自动化测试和接口集成测试。
 2. 补 outbox dispatcher、RocketMQ 投递、消费幂等和重试闭环。
-3. 把用户主页头部计数接到 relation/counter。
-4. 补 counter/feed/notification 第二条社交链路。
+3. 补 counter 事件消费、快照、Redis 回填和重建任务。
+4. 补 feed/notification 第二条社交链路。
 5. 补生产部署、备份恢复、监控告警配置。

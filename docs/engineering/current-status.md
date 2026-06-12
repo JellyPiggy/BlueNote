@@ -184,8 +184,7 @@ user 已完成：
 6. 内部批量用户摘要：`POST /internal/users/batch-summary`
 7. 内部用户状态校验：`POST /internal/users/status-check`
 8. 用户资料修改审计和 user outbox。
-
-限制：`/api/users/{userId}/home` 的计数结构已对齐契约，但关注数、粉丝数、获赞数仍是占位值，后续需要 counter/relation/social 链路补齐。
+9. 用户主页头部计数通过 counter 聚合 relation/note 来源返回，异常时降级展示。
 
 ### 3.6 Content App
 
@@ -217,8 +216,9 @@ note 已完成：
 9. 笔记收藏/取消收藏：`POST /api/notes/{noteId}/collect`、`DELETE /api/notes/{noteId}/collect`
 10. 内部批量笔记摘要：`POST /internal/notes/batch-summary`
 11. 内部评论前校验：`POST /internal/notes/comment-check`
-12. 笔记、媒体、版本、话题、幂等请求、互动明细等表结构已接入。
-13. 发布、删除、点赞、取消点赞、收藏、取消收藏写 note outbox。
+12. 内部计数来源：`POST /internal/notes/counter-source`
+13. 笔记、媒体、版本、话题、幂等请求、互动明细等表结构已接入。
+14. 发布、删除、点赞、取消点赞、收藏、取消收藏写 note outbox。
 
 comment 已完成：
 
@@ -234,9 +234,33 @@ comment 已完成：
 10. 内部评论计数来源：`POST /internal/comments/counter-source`
 11. 评论事实、个人评论读模型、评论正文、评论点赞、幂等、操作日志、outbox 已落 MySQL。
 
-限制：笔记详情页点赞数、收藏数当前直接从互动明细聚合；完整 counter/feed/notification 链路还没有落地。
+限制：笔记详情页点赞数、收藏数当前直接从互动明细聚合；完整 counter 事件消费、快照、feed、notification 链路还没有落地。
 
-### 3.7 移动端
+### 3.7 Social App
+
+`bluenote-social-app` 当前包含 relation/counter 第二条主链路起步能力。
+
+relation 已完成：
+
+1. 关注用户：`POST /api/relations/following/{followeeId}`
+2. 取消关注：`DELETE /api/relations/following/{followeeId}`
+3. 关注列表：`GET /api/relations/users/{userId}/following`
+4. 粉丝列表：`GET /api/relations/users/{userId}/followers`
+5. 关注状态：`GET /api/relations/following/{targetUserId}/status`
+6. 批量关注状态：`POST /api/relations/following/status/batch`
+7. 内部计数来源：`POST /internal/relations/counter-source`
+
+counter 已完成：
+
+1. 内部批量计数：`POST /internal/counters/batch`
+2. 支持 `NOTE.like_count`、`NOTE.collect_count`、`NOTE.comment_count`
+3. 支持 `USER.following_count`、`USER.follower_count`、`USER.note_count`、`USER.liked_count`
+4. 支持 `COMMENT.like_count`、`COMMENT.reply_count`
+5. 当前查询从 relation/note/comment 来源服务实时聚合，失败时按 target 返回 `degraded=true`。
+
+限制：counter 还没有消费 MQ 事件，也没有落 `counter_snapshot`、Redis 在线计数、重建任务和 `CounterChanged` outbox。
+
+### 3.8 移动端
 
 移动端技术栈：
 
@@ -333,8 +357,9 @@ npm run dev:h5
 3. H5 页面通过浏览器验收过首页、发布、详情、我的页关键视觉。
 4. `build:h5` 当前会输出 Dart Sass legacy JS API deprecation warning，暂不影响构建。
 5. 后端 `mvn compile` 已通过，覆盖 gateway/member/content/social 模块。
-
-本文更新时没有重新执行端到端接口联调。后续继续联调任务前，建议启动服务后补一次网关到 member/content/social 的接口验证。
+6. `POST /internal/notes/counter-source`、`POST /internal/comments/counter-source`、`POST /internal/relations/counter-source` 已通过本地依赖验证。
+7. `POST /internal/counters/batch` 已能聚合 NOTE / USER / COMMENT 计数并返回 `degraded=false`。
+8. `GET /api/users/{userId}/home` 已通过 gateway 验证，可返回真实 `followingCount`、`followerCount`、`noteCount`、`likedCount`。
 
 ## 6. 待完成事项
 
@@ -369,13 +394,12 @@ npm run dev:h5
 
 待落地：
 
-1. 把用户主页头部计数接到 relation/counter。
-2. counter 服务：关注数、粉丝数、获赞数、点赞数、收藏数、评论数。
-3. 我的收藏列表和赞过列表。
-4. feed 服务：关注页 Feed 拉取和发布事件投递。
-5. notification 服务：互动通知和未读数。
-6. RocketMQ outbox dispatcher 和消费幂等记录。
-7. Redis 计数、Feed key 的真实读写和重建策略。
+1. counter 事件消费、快照、Redis 回填和重建任务。
+2. 我的收藏列表和赞过列表。
+3. feed 服务：关注页 Feed 拉取和发布事件投递。
+4. notification 服务：互动通知和未读数。
+5. RocketMQ outbox dispatcher 和消费幂等记录。
+6. Redis 计数、Feed key 的真实读写和重建策略。
 
 ### 6.4 后续链路
 
@@ -396,10 +420,10 @@ npm run dev:h5
 ## 7. 已知风险与注意事项
 
 1. Outbox 当前主要是写库记录，还没有完整 MQ dispatcher、重试、死信和消费幂等闭环。
-2. 用户主页计数目前未接真实 counter/relation 数据。
+2. 用户主页计数已接 counter 查询聚合，但 counter 还没有事件消费和快照闭环。
 3. 笔记点赞、收藏已落库并写 outbox，但 counter、feed、notification 仍未消费这些事件。
 4. 自动化测试基本还没建立，后续改动风险会越来越高。
-5. social-app 当前只完成 relation 最小纵切面，counter/feed/notification 仍未接入。
+5. social-app 当前只完成 relation 和 counter 查询聚合纵切面，feed/notification 仍未接入。
 6. MySQL 初始化依赖 Docker 首次建卷行为，重建本地环境时要注意数据卷状态。
 7. 当前工作区存在未归属本轮任务的改动或临时目录时，不要误提交。
 8. 正式部署、备份恢复、监控告警、Nginx/Caddy HTTPS 还没有落地。

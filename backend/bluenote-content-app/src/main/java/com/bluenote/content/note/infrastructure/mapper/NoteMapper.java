@@ -43,5 +43,6 @@ public interface NoteMapper {
             @Param("cursorNoteId") Long cursorNoteId,
             @Param("size") int size
     );
-}
 
+    long countPublicPublishedByAuthor(@Param("authorId") Long authorId);
+}

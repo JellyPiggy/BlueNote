@@ -23,6 +23,8 @@ import com.bluenote.member.user.api.dto.UserSummaryResponse;
 import com.bluenote.member.user.infrastructure.entity.UserOutboxEventEntity;
 import com.bluenote.member.user.infrastructure.entity.UserProfileAuditEntity;
 import com.bluenote.member.user.infrastructure.entity.UserProfileEntity;
+import com.bluenote.member.user.infrastructure.client.UserCounterClient;
+import com.bluenote.member.user.infrastructure.client.UserCounterClient.UserCounterResult;
 import com.bluenote.member.user.infrastructure.mapper.UserOutboxEventMapper;
 import com.bluenote.member.user.infrastructure.mapper.UserProfileAuditMapper;
 import com.bluenote.member.user.infrastructure.mapper.UserProfileMapper;
@@ -54,19 +56,22 @@ public class UserApplicationService {
     private final UserOutboxEventMapper outboxEventMapper;
     private final MemberIdGenerator idGenerator;
     private final JsonPayloads jsonPayloads;
+    private final UserCounterClient userCounterClient;
 
     public UserApplicationService(
             UserProfileMapper profileMapper,
             UserProfileAuditMapper profileAuditMapper,
             UserOutboxEventMapper outboxEventMapper,
             MemberIdGenerator idGenerator,
-            JsonPayloads jsonPayloads
+            JsonPayloads jsonPayloads,
+            UserCounterClient userCounterClient
     ) {
         this.profileMapper = profileMapper;
         this.profileAuditMapper = profileAuditMapper;
         this.outboxEventMapper = outboxEventMapper;
         this.idGenerator = idGenerator;
         this.jsonPayloads = jsonPayloads;
+        this.userCounterClient = userCounterClient;
     }
 
     @Transactional(readOnly = true)
@@ -114,12 +119,23 @@ public class UserApplicationService {
 
     @Transactional(readOnly = true)
     public UserHomeResponse home(String userId) {
-        return new UserHomeResponse(
-                publicProfile(userId),
-                new UserCountsResponse(0, 0, 0, 0),
-                new UserRelationResponse("UNKNOWN"),
-                false
-        );
+        UserSummaryResponse user = publicProfile(userId);
+        try {
+            UserCounterResult result = userCounterClient.userCounts(userId);
+            return new UserHomeResponse(
+                    user,
+                    result.counts(),
+                    new UserRelationResponse("UNKNOWN"),
+                    result.degraded()
+            );
+        } catch (RuntimeException exception) {
+            return new UserHomeResponse(
+                    user,
+                    new UserCountsResponse(0, 0, 0, 0),
+                    new UserRelationResponse("UNKNOWN"),
+                    true
+            );
+        }
     }
 
     @Transactional
