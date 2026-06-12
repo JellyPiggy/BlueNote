@@ -2,13 +2,17 @@
 import type { NoteCard } from '@/api/types'
 import { formatCount, formatTime } from '@/utils/format'
 
-defineProps<{
+const props = defineProps<{
   note: NoteCard
 }>()
 
 const emit = defineEmits<{
   open: [noteId: string]
 }>()
+
+function avatarInitial() {
+  return props.note.authorNickname?.trim().slice(0, 1) || 'BN'
+}
 </script>
 
 <template>
@@ -23,8 +27,9 @@ const emit = defineEmits<{
     <view class="note-body">
       <view class="note-title">{{ note.title }}</view>
       <view class="author-row">
-        <view class="mini-avatar">BN</view>
-        <text class="author-name">BlueNote</text>
+        <image v-if="note.authorAvatarUrl" class="mini-avatar image-avatar" :src="note.authorAvatarUrl" mode="aspectFill" />
+        <view v-else class="mini-avatar">{{ avatarInitial() }}</view>
+        <text class="author-name">{{ note.authorNickname || 'BlueNote' }}</text>
         <text class="like-count">♡ {{ formatCount(note.likeCount) }}</text>
       </view>
     </view>
@@ -108,9 +113,11 @@ const emit = defineEmits<{
 }
 
 .mini-avatar {
+  flex: 0 0 auto;
   width: 34rpx;
   height: 34rpx;
   border-radius: 50%;
+  overflow: hidden;
   background: linear-gradient(135deg, var(--bn-coral), var(--bn-blue));
   color: #fff;
   display: flex;
@@ -118,6 +125,10 @@ const emit = defineEmits<{
   justify-content: center;
   font-size: 14rpx;
   font-weight: 800;
+}
+
+.image-avatar {
+  background: #eef1f2;
 }
 
 .author-name {

@@ -165,9 +165,36 @@ export interface NoteCard {
   title: string
   coverUrl: string | null
   authorId: string
+  authorNickname?: string | null
+  authorAvatarUrl?: string | null
   likeCount: number
   collectCount: number
   publishedAt: string | null
+}
+
+export interface FeedCounts {
+  likeCount: number
+  collectCount: number
+  commentCount: number
+}
+
+export interface FeedCard {
+  feedId: string
+  noteId: string
+  author: UserSummary
+  title: string
+  contentPreview: string
+  coverUrl: string | null
+  noteType: 'IMAGE_TEXT' | 'VIDEO' | string
+  counts: FeedCounts
+  viewerAction: null | Record<string, unknown>
+  publishedAt: string
+  sourceType: 'PUSH' | 'PULL' | 'FOLLOW_BACKFILL' | string
+  degraded: boolean
+}
+
+export interface FollowingFeedResponse extends CursorPage<FeedCard> {
+  degraded: boolean
 }
 
 export interface RankCounts {
