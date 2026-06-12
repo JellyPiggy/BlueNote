@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.feed.infrastructure.mapper.FeedInboxItemMapper">
+
+    <resultMap id="FeedInboxItemResultMap" type="com.bluenote.social.feed.infrastructure.entity.FeedInboxItemEntity">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="note_id" property="noteId"/>
+        <result column="author_id" property="authorId"/>
+        <result column="published_at" property="publishedAt"/>
+        <result column="source_type" property="sourceType"/>
+        <result column="item_status" property="itemStatus"/>
+        <result column="delivered_at" property="deliveredAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="FeedInboxItemColumns">
+        id, user_id, note_id, author_id, published_at, source_type, item_status,
+        delivered_at, created_at, updated_at
+    </sql>
+
+    <insert id="upsert" parameterType="com.bluenote.social.feed.infrastructure.entity.FeedInboxItemEntity">
+        INSERT INTO bluenote_feed.feed_inbox_item (
+            id, user_id, note_id, author_id, published_at, source_type, item_status,
+            delivered_at, created_at, updated_at
+        ) VALUES (
+            #{id}, #{userId}, #{noteId}, #{authorId}, #{publishedAt}, #{sourceType}, #{itemStatus},
+            #{deliveredAt}, #{createdAt}, #{updatedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            author_id = VALUES(author_id),
+            published_at = VALUES(published_at),
+            source_type = VALUES(source_type),
+            item_status = VALUES(item_status),
+            delivered_at = VALUES(delivered_at),
+            updated_at = VALUES(updated_at)
+    </insert>
+
+    <select id="selectUserPage" resultMap="FeedInboxItemResultMap">
+        SELECT <include refid="FeedInboxItemColumns"/>
+        FROM bluenote_feed.feed_inbox_item
+        WHERE user_id = #{userId}
+          AND item_status = 'VISIBLE'
+        <if test="cursorPublishedAt != null and cursorNoteId != null">
+          AND (
+            published_at &lt; #{cursorPublishedAt}
+            OR (published_at = #{cursorPublishedAt} AND note_id &lt; #{cursorNoteId})
+          )
+        </if>
+        ORDER BY published_at DESC, note_id DESC
+        LIMIT #{size}
+    </select>
+
+    <select id="selectUserItemsByNoteIds" resultMap="FeedInboxItemResultMap">
+        SELECT <include refid="FeedInboxItemColumns"/>
+        FROM bluenote_feed.feed_inbox_item
+        WHERE user_id = #{userId}
+          AND item_status = 'VISIBLE'
+          AND note_id IN
+        <foreach collection="noteIds" item="noteId" open="(" separator="," close=")">
+            #{noteId}
+        </foreach>
+    </select>
+
+    <select id="selectUserSnapshot" resultMap="FeedInboxItemResultMap">
+        SELECT <include refid="FeedInboxItemColumns"/>
+        FROM bluenote_feed.feed_inbox_item
+        WHERE user_id = #{userId}
+          AND item_status = 'VISIBLE'
+        ORDER BY published_at DESC, note_id DESC
+        LIMIT #{size}
+    </select>
+
+    <update id="hideByUserAndAuthor">
+        UPDATE bluenote_feed.feed_inbox_item
+        SET item_status = 'HIDDEN',
+            updated_at = #{updatedAt}
+        WHERE user_id = #{userId}
+          AND author_id = #{authorId}
+          AND item_status = 'VISIBLE'
+    </update>
+
+    <update id="markByNote">
+        UPDATE bluenote_feed.feed_inbox_item
+        SET item_status = #{itemStatus},
+            updated_at = #{updatedAt}
+        WHERE note_id = #{noteId}
+    </update>
+</mapper>

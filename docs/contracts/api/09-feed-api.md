@@ -172,10 +172,62 @@ POST /internal/feed/users/{userId}/rebuild
 GET /internal/feed/rebuild-tasks/{taskId}
 ```
 
+成功响应：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "taskId": "feed_rebuild_10001_20260611",
+    "userId": "10001",
+    "reason": "REDIS_LOST",
+    "taskStatus": "SUCCESS",
+    "progress": {
+      "total": 200,
+      "success": 200,
+      "failed": 0
+    }
+  },
+  "traceId": "trace-id"
+}
+```
+
+第一阶段实现允许同步执行重建；因此 `taskStatus` 可以直接返回 `SUCCESS` 或 `FAILED`，也可以在异步化后返回 `PENDING` / `RUNNING`。
+
 ### 5.3 查询 Feed 投递任务
 
 ```text
 GET /internal/feed/fanout-tasks/{taskId}
+```
+
+成功响应：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "taskId": "feed_fanout_800001",
+    "noteId": "800001",
+    "authorId": "10001",
+    "taskStatus": "SUCCESS",
+    "targetCount": 128,
+    "successCount": 128,
+    "failedCount": 0,
+    "subTasks": [
+      {
+        "subTaskId": "feed_fanout_800001_1",
+        "subTaskStatus": "SUCCESS",
+        "messageStatus": "SENT",
+        "targetCount": 128,
+        "progressUserId": "20002",
+        "retryCount": 0
+      }
+    ]
+  },
+  "traceId": "trace-id"
+}
 ```
 
 ### 5.4 手动重试 Fanout 任务
@@ -183,6 +235,8 @@ GET /internal/feed/fanout-tasks/{taskId}
 ```text
 POST /internal/feed/fanout-tasks/{taskId}/retry
 ```
+
+成功响应同 `GET /internal/feed/fanout-tasks/{taskId}`。
 
 内部接口只能由运维任务或管理端调用，不允许网关暴露给移动端。
 

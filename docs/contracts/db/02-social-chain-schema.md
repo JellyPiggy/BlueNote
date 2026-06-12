@@ -308,11 +308,22 @@ Feed 服务的笔记轻量索引。
 | `feed_fanout_sub_task` | `idx_feed_sub_task_status(task_id, sub_task_status)` |
 | `feed_fanout_sub_task` | `idx_feed_sub_message_status(message_status, next_retry_at)` |
 
-### 6.5 feed_rebuild_task / feed_cleanup_task / feed_consume_record
+### 6.5 feed_rebuild_task / feed_cleanup_task / feed_consume_record / feed_outbox_event
 
 重建、清理和消费幂等表。
 
-索引：`idx_status(task_status, updated_at)`、`uk_feed_consumer_event(consumer_group, event_id)`。
+`feed_rebuild_task` 字段：`task_id`、`user_id`、`reason`、`task_status`、`progress_json`、`last_error`、`created_at`、`updated_at`。
+
+`feed_cleanup_task` 字段：`task_id`、`cleanup_type`、`user_id`、`author_id`、`note_id`、`task_status`、`progress_json`、`last_error`、`created_at`、`updated_at`。
+
+`feed_consume_record` 字段：`id`、`consumer_group`、`event_id`、`topic`、`event_type`、`biz_key`、`consume_status`、`retry_count`、`error_message`、`consumed_at`、`created_at`、`updated_at`。
+
+`feed_outbox_event` 必须支持：
+
+1. `FeedDelivered`
+2. `FeedRebuilt`
+
+索引：`idx_status(task_status, updated_at)`、`uk_feed_consumer_event(consumer_group, event_id)`、`idx_feed_outbox_status_retry(send_status, next_retry_at)`。
 
 ## 7. bluenote_notification
 

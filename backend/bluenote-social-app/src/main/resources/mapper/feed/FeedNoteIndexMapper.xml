@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.feed.infrastructure.mapper.FeedNoteIndexMapper">
+
+    <resultMap id="FeedNoteIndexResultMap" type="com.bluenote.social.feed.infrastructure.entity.FeedNoteIndexEntity">
+        <id column="note_id" property="noteId"/>
+        <result column="author_id" property="authorId"/>
+        <result column="title_snapshot" property="titleSnapshot"/>
+        <result column="content_preview_snapshot" property="contentPreviewSnapshot"/>
+        <result column="cover_url_snapshot" property="coverUrlSnapshot"/>
+        <result column="visibility" property="visibility"/>
+        <result column="note_status" property="noteStatus"/>
+        <result column="item_status" property="itemStatus"/>
+        <result column="published_at" property="publishedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="FeedNoteIndexColumns">
+        note_id, author_id, title_snapshot, content_preview_snapshot, cover_url_snapshot,
+        visibility, note_status, item_status, published_at, created_at, updated_at
+    </sql>
+
+    <insert id="upsert" parameterType="com.bluenote.social.feed.infrastructure.entity.FeedNoteIndexEntity">
+        INSERT INTO bluenote_feed.feed_note_index (
+            note_id, author_id, title_snapshot, content_preview_snapshot, cover_url_snapshot,
+            visibility, note_status, item_status, published_at, created_at, updated_at
+        ) VALUES (
+            #{noteId}, #{authorId}, #{titleSnapshot}, #{contentPreviewSnapshot}, #{coverUrlSnapshot},
+            #{visibility}, #{noteStatus}, #{itemStatus}, #{publishedAt}, #{createdAt}, #{updatedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            author_id = VALUES(author_id),
+            title_snapshot = VALUES(title_snapshot),
+            content_preview_snapshot = VALUES(content_preview_snapshot),
+            cover_url_snapshot = VALUES(cover_url_snapshot),
+            visibility = VALUES(visibility),
+            note_status = VALUES(note_status),
+            item_status = VALUES(item_status),
+            published_at = VALUES(published_at),
+            updated_at = VALUES(updated_at)
+    </insert>
+
+    <select id="selectByNoteId" resultMap="FeedNoteIndexResultMap">
+        SELECT <include refid="FeedNoteIndexColumns"/>
+        FROM bluenote_feed.feed_note_index
+        WHERE note_id = #{noteId}
+    </select>
+
+    <select id="selectByNoteIds" resultMap="FeedNoteIndexResultMap">
+        SELECT <include refid="FeedNoteIndexColumns"/>
+        FROM bluenote_feed.feed_note_index
+        WHERE note_id IN
+        <foreach collection="noteIds" item="noteId" open="(" separator="," close=")">
+            #{noteId}
+        </foreach>
+    </select>
+
+    <select id="selectRecentVisibleByAuthor" resultMap="FeedNoteIndexResultMap">
+        SELECT <include refid="FeedNoteIndexColumns"/>
+        FROM bluenote_feed.feed_note_index
+        WHERE author_id = #{authorId}
+          AND item_status = 'VISIBLE'
+          AND visibility = 'PUBLIC'
+          AND note_status = 'PUBLISHED'
+        ORDER BY published_at DESC, note_id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectVisibleByAuthors" resultMap="FeedNoteIndexResultMap">
+        SELECT <include refid="FeedNoteIndexColumns"/>
+        FROM bluenote_feed.feed_note_index
+        WHERE item_status = 'VISIBLE'
+          AND visibility = 'PUBLIC'
+          AND note_status = 'PUBLISHED'
+          AND author_id IN
+        <foreach collection="authorIds" item="authorId" open="(" separator="," close=")">
+            #{authorId}
+        </foreach>
+        ORDER BY author_id ASC, published_at DESC, note_id DESC
+        LIMIT #{limitPerAuthor}
+    </select>
+
+    <update id="markStatus">
+        UPDATE bluenote_feed.feed_note_index
+        SET visibility = #{visibility},
+            note_status = #{noteStatus},
+            item_status = #{itemStatus},
+            updated_at = #{updatedAt}
+        WHERE note_id = #{noteId}
+    </update>
+</mapper>

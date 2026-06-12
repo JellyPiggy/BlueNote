@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.feed.infrastructure.mapper.FeedConsumeRecordMapper">
+
+    <resultMap id="FeedConsumeRecordResultMap" type="com.bluenote.social.feed.infrastructure.entity.FeedConsumeRecordEntity">
+        <id column="id" property="id"/>
+        <result column="consumer_group" property="consumerGroup"/>
+        <result column="event_id" property="eventId"/>
+        <result column="topic" property="topic"/>
+        <result column="event_type" property="eventType"/>
+        <result column="biz_key" property="bizKey"/>
+        <result column="consume_status" property="consumeStatus"/>
+        <result column="retry_count" property="retryCount"/>
+        <result column="error_message" property="errorMessage"/>
+        <result column="consumed_at" property="consumedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insertIgnore" parameterType="com.bluenote.social.feed.infrastructure.entity.FeedConsumeRecordEntity">
+        INSERT IGNORE INTO bluenote_feed.feed_consume_record (
+            id, consumer_group, event_id, topic, event_type, biz_key, consume_status,
+            retry_count, error_message, consumed_at, created_at, updated_at
+        ) VALUES (
+            #{id}, #{consumerGroup}, #{eventId}, #{topic}, #{eventType}, #{bizKey}, #{consumeStatus},
+            #{retryCount}, #{errorMessage}, #{consumedAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectByGroupAndEvent" resultMap="FeedConsumeRecordResultMap">
+        SELECT id, consumer_group, event_id, topic, event_type, biz_key, consume_status,
+               retry_count, error_message, consumed_at, created_at, updated_at
+        FROM bluenote_feed.feed_consume_record
+        WHERE consumer_group = #{consumerGroup}
+          AND event_id = #{eventId}
+    </select>
+
+    <update id="markSuccess">
+        UPDATE bluenote_feed.feed_consume_record
+        SET consume_status = 'SUCCESS',
+            consumed_at = NOW(3),
+            updated_at = NOW(3)
+        WHERE consumer_group = #{consumerGroup}
+          AND event_id = #{eventId}
+    </update>
+
+    <update id="markFail">
+        UPDATE bluenote_feed.feed_consume_record
+        SET consume_status = 'FAIL',
+            retry_count = retry_count + 1,
+            error_message = #{errorMessage},
+            updated_at = NOW(3)
+        WHERE consumer_group = #{consumerGroup}
+          AND event_id = #{eventId}
+    </update>
+</mapper>
