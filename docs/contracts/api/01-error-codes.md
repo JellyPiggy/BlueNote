@@ -18,7 +18,7 @@
 | `26xxx` | 计数服务错误 |
 | `27xxx` | Feed / 排行错误 |
 | `28xxx` | 推送 / 通知错误 |
-| `29xxx` | IM 错误，后续补充 |
+| `29xxx` | IM 错误 |
 | `30xxx` | 订单错误，后续补充 |
 
 ## 2. 通用错误码
@@ -174,7 +174,22 @@
 | `28013` | `PUSH_REQUEST_INVALID` | 推送请求不正确 | 移动端不应直接收到 |
 | `28014` | `PUSH_DELIVERY_UNAVAILABLE` | 推送暂时不可用 | 稍后重试 |
 
-## 12. 新增错误码规则
+## 12. IM 服务错误码
+
+| code | reason | message | 移动端处理 |
+|---|---|---|---|
+| `29001` | `IM_CONVERSATION_NOT_FOUND` | 会话不存在 | 刷新会话列表 |
+| `29002` | `IM_CONVERSATION_FORBIDDEN` | 无权访问该会话 | toast 并返回会话列表 |
+| `29003` | `IM_TARGET_INVALID` | 私信对象不正确 | toast |
+| `29004` | `IM_MESSAGE_INVALID` | 消息内容不正确 | 输入框提示 |
+| `29005` | `IM_MESSAGE_TYPE_UNSUPPORTED` | 暂不支持该消息类型 | toast |
+| `29006` | `IM_CLIENT_MSG_ID_INVALID` | 消息幂等标识不正确 | 重新生成消息 ID 后重试 |
+| `29007` | `IM_MESSAGE_SIZE_EXCEEDED` | 消息内容过长 | 输入框提示 |
+| `29008` | `IM_CURSOR_INVALID` | 分页游标不正确 | 重新刷新列表 |
+| `29009` | `IM_RATE_LIMITED` | 发送太频繁，请稍后再试 | toast，发送按钮短暂禁用 |
+| `29010` | `IM_SEND_FORBIDDEN` | 暂时无法发送私信 | toast |
+
+## 13. 新增错误码规则
 
 新增错误码必须：
 

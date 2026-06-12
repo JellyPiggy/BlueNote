@@ -16,6 +16,7 @@
 | `feed-fanout-task-event` | `bluenote-feed` | `FeedFanoutSubTaskCreated` | Feed 服务内部扩散任务 |
 | `feed-event` | `bluenote-feed` | `FeedDelivered` / `FeedRebuilt` | 运维监控、后续读模型 |
 | `notification-event` | `bluenote-notification` | `NotificationCreated` / `NotificationAggregated` / `NotificationRead` / `NotificationReadBatch` / `NotificationDeleted` | 通知生命周期 |
+| `im-message-event` | `bluenote-im` | `ImMessageSent` / `ImMessageAcked` / `ImMessageRead` | IM 消息生命周期 |
 | `push-request-event` | `bluenote-notification` / `bluenote-im` / `bluenote-order` | `PushSendRequested` | 推送服务消费 |
 | `push-event` | `bluenote-push` | `PushDelivered` / `PushFiltered` / `PushFailed` | 推送结果事件，供通知、IM、运维后续消费 |
 
@@ -475,9 +476,95 @@ Topic：`push-request-event`
 }
 ```
 
+IM 消息提醒示例：
+
+```json
+{
+  "eventId": "evt_push_im_910001",
+  "eventType": "PushSendRequested",
+  "eventVersion": 1,
+  "occurredAt": "2026-06-12T10:00:00+08:00",
+  "traceId": "trace-id",
+  "producer": "bluenote-im",
+  "bizKey": "push_req_im_910001",
+  "payload": {
+    "requestId": "push_req_im_910001",
+    "sourceService": "bluenote-im",
+    "sourceBizType": "IM_MESSAGE",
+    "sourceBizId": "910001",
+    "scene": "IM_MESSAGE",
+    "targetUserId": "10002",
+    "targetDevicePolicy": "ALL_ACTIVE_DEVICES",
+    "deliveryStrategy": "ONLINE_THEN_OFFLINE",
+    "priority": 8,
+    "title": "小蓝",
+    "body": "晚上一起吃饭吗",
+    "data": {
+      "conversationId": "900001",
+      "messageId": "910001",
+      "conversationSeq": 8,
+      "senderId": "10001",
+      "messageType": "TEXT"
+    },
+    "expireAt": "2026-06-12T10:10:00+08:00"
+  }
+}
+```
+
 推送服务消费后必须按 `requestId` 幂等，记录投递请求和通道尝试。第一阶段 `NOOP` 通道的 `DELIVERED` 只表示请求已被推送服务接收并记录。
 
-## 16. PushDelivered / PushFiltered / PushFailed
+## 16. ImMessageSent / ImMessageAcked / ImMessageRead
+
+Topic：`im-message-event`
+
+消息发送：
+
+```json
+{
+  "eventId": "evt_im_message_sent_910001",
+  "eventType": "ImMessageSent",
+  "eventVersion": 1,
+  "occurredAt": "2026-06-12T10:00:00+08:00",
+  "traceId": "trace-id",
+  "producer": "bluenote-im",
+  "bizKey": "900001:8",
+  "payload": {
+    "messageId": "910001",
+    "conversationId": "900001",
+    "conversationType": "SINGLE",
+    "conversationSeq": 8,
+    "senderId": "10001",
+    "receiverId": "10002",
+    "messageType": "TEXT",
+    "summary": "晚上一起吃饭吗",
+    "sentAt": "2026-06-12T10:00:00+08:00"
+  }
+}
+```
+
+送达和已读事件：
+
+```json
+{
+  "eventId": "evt_im_message_read_900001_10002_8",
+  "eventType": "ImMessageRead",
+  "eventVersion": 1,
+  "occurredAt": "2026-06-12T10:01:00+08:00",
+  "traceId": "trace-id",
+  "producer": "bluenote-im",
+  "bizKey": "900001:10002",
+  "payload": {
+    "conversationId": "900001",
+    "userId": "10002",
+    "readSeq": 8,
+    "readAt": "2026-06-12T10:01:00+08:00"
+  }
+}
+```
+
+`ImMessageAcked` 使用相同结构，将 `readSeq` 改为 `receivedSeq`，时间字段改为 `receivedAt`。
+
+## 17. PushDelivered / PushFiltered / PushFailed
 
 Topic：`push-event`
 
@@ -506,7 +593,7 @@ Topic：`push-event`
 
 `PushFiltered` 必须携带 `filteredReason`。`PushFailed` 必须携带不超过 512 字符的 `errorMessage`。
 
-## 17. 消费组建议
+## 18. 消费组建议
 
 | consumerGroup | 消费 Topic | 所属服务 |
 |---|---|---|
@@ -521,9 +608,10 @@ Topic：`push-event`
 | `bluenote-notification-comment-consumer` | `comment-event` | notification |
 | `bluenote-notification-relation-consumer` | `relation-event` | notification |
 | `bluenote-notification-note-consumer` | `note-event` | notification |
+| `bluenote-im-push-result-consumer` | `push-event` | im，后续 |
 | `bluenote-push-request-consumer` | `push-request-event` | push |
 
-## 18. 幂等和变更规则
+## 19. 幂等和变更规则
 
 1. 消费幂等统一使用 `consumer_group + event_id`。
 2. 业务重复判断不能只依赖 Redis，必须有 MySQL 唯一约束或消费记录兜底。

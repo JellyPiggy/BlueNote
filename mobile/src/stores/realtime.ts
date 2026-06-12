@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { registerPushDevice } from '@/api/push'
 import type { RealtimePushMessage } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
+import { useImStore } from '@/stores/im'
 import { useNotificationStore } from '@/stores/notification'
 import { getPushDeviceRegistration } from '@/utils/device'
 
@@ -135,8 +136,13 @@ export const useRealtimeStore = defineStore('realtime', {
         const message = payload as unknown as RealtimePushMessage
         this.lastMessageAt = message.sentAt
         this.send({ type: 'ACK', requestId: message.requestId, receivedAt: new Date().toISOString() })
-        const notifications = useNotificationStore()
-        void notifications.refreshUnread()
+        if (message.scene === 'IM_MESSAGE') {
+          const im = useImStore()
+          void im.refreshUnread()
+        } else {
+          const notifications = useNotificationStore()
+          void notifications.refreshUnread()
+        }
       }
     },
     scheduleReconnect() {

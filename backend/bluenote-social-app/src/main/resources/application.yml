@@ -52,6 +52,7 @@ bluenote:
         - table-name: bluenote_feed.feed_outbox_event
         - table-name: bluenote_notification.notification_outbox_event
         - table-name: bluenote_push.push_outbox_event
+        - table-name: bluenote_im.im_outbox_event
 
 management:
   endpoints:

@@ -3,7 +3,7 @@
 版本：v0.2
 状态：第二条主链路开发基线
 
-本文定义关系、评论、计数、Feed、通知、Push 逻辑服务第一阶段必须落地的 schema、核心表、唯一约束和索引。本文不是最终可执行 SQL，后续 `backend/sql/` 的 DDL 必须以本文为基线生成。
+本文定义关系、评论、计数、Feed、通知、Push、IM 逻辑服务第一阶段必须落地的 schema、核心表、唯一约束和索引。本文不是最终可执行 SQL，后续 `backend/sql/` 的 DDL 必须以本文为基线生成。
 
 ## 1. 通用表规则
 
@@ -25,6 +25,7 @@
 | `bluenote_feed` | `bluenote-feed` | Feed 轻量索引、收件箱快照、fanout 任务 |
 | `bluenote_notification` | `bluenote-notification` | 站内通知、聚合、未读数、通知事件 |
 | `bluenote_push` | `bluenote-push` | 推送设备、偏好、投递请求、通道尝试 |
+| `bluenote_im` | `bluenote-im` | 会话、消息、用户消息链、未读和 IM 事件 |
 
 说明：笔记点赞和收藏事实表仍在 `bluenote_note.note_like`、`bluenote_note.note_collection`，见 `01-main-chain-schema.md`。
 
@@ -471,7 +472,68 @@ Push 第一阶段物理部署在 `bluenote-social-app`，但使用独立 schema 
 
 索引同通用 outbox 和消费记录要求。
 
-## 9. DDL 生成要求
+## 9. bluenote_im
+
+IM 第一阶段物理部署在 `bluenote-social-app`，但使用独立 schema 和包结构。
+
+### 9.1 im_conversation
+
+会话事实表。第一阶段只创建 `SINGLE` 会话。
+
+| 字段 | 类型 | 约束 | 说明 |
+|---|---|---|---|
+| `conversation_id` | BIGINT | PK | 会话 ID |
+| `conversation_type` | VARCHAR(32) | NOT NULL | `SINGLE` / `GROUP` |
+| `single_key` | VARCHAR(64) | NULL | 单聊唯一键：`minUserId:maxUserId` |
+| `current_seq` | BIGINT | NOT NULL DEFAULT 0 | 当前会话最大消息序号 |
+| `last_message_id` | BIGINT | NULL | 最近消息 ID |
+| `last_message_at` | DATETIME(3) | NULL | 最近消息时间 |
+| `conversation_status` | VARCHAR(32) | NOT NULL | `NORMAL` |
+| `created_at` | DATETIME(3) | NOT NULL | 创建时间 |
+| `updated_at` | DATETIME(3) | NOT NULL | 更新时间 |
+
+索引：`PRIMARY KEY(conversation_id)`、`uk_im_single_key(single_key)`、`idx_im_conversation_updated(updated_at)`。
+
+### 9.2 im_conversation_member
+
+会话成员和当前用户侧状态表。
+
+字段：`id`、`conversation_id`、`user_id`、`peer_user_id`、`member_role`、`member_status`、`last_read_seq`、`last_received_seq`、`unread_count`、`pinned`、`mute`、`hidden`、`last_visible_seq`、`created_at`、`updated_at`。
+
+索引：`uk_im_member(conversation_id,user_id)`、`idx_im_member_user_list(user_id, hidden, pinned, updated_at)`、`idx_im_member_peer(user_id, peer_user_id)`。
+
+### 9.3 im_message / im_conversation_message
+
+`im_message` 是消息事实表，字段：`message_id`、`conversation_id`、`conversation_seq`、`sender_id`、`receiver_id`、`client_msg_id`、`message_type`、`content_json`、`summary`、`message_status`、`sent_at`、`created_at`、`updated_at`。
+
+索引：`PRIMARY KEY(message_id)`、`uk_im_message_client(sender_id, client_msg_id)`、`uk_im_message_conversation_seq(conversation_id, conversation_seq)`、`idx_im_message_sender_time(sender_id, sent_at)`。
+
+`im_conversation_message` 是会话消息链，字段：`id`、`conversation_id`、`conversation_seq`、`message_id`、`sender_id`、`sent_at`、`created_at`。
+
+索引：`uk_im_conversation_seq(conversation_id, conversation_seq)`、`idx_im_conversation_message_time(conversation_id, sent_at, message_id)`。
+
+### 9.4 im_user_sequence / im_user_message
+
+`im_user_sequence` 记录用户消息序列号分配，字段：`user_id`、`current_seq`、`created_at`、`updated_at`。
+
+`im_user_message` 是用户侧消息链，字段：`id`、`user_id`、`user_seq`、`conversation_id`、`conversation_seq`、`message_id`、`sender_id`、`read_status`、`received_status`、`sent_at`、`created_at`、`updated_at`。
+
+索引：`uk_im_user_seq(user_id,user_seq)`、`uk_im_user_conversation_message(user_id,conversation_id,message_id)`、`idx_im_user_conversation_seq(user_id,conversation_id,conversation_seq)`。
+
+### 9.5 im_outbox_event / im_consume_record
+
+`im_outbox_event` 支持：
+
+1. `ImMessageSent`
+2. `ImMessageAcked`
+3. `ImMessageRead`
+4. `PushSendRequested`
+
+`im_consume_record` 预留给后续消费 `push-event` 回执和事件重放，允许保存 `envelope_json`。
+
+索引同通用 outbox 和消费记录要求。
+
+## 10. DDL 生成要求
 
 后续生成 `backend/sql/` 时：
 

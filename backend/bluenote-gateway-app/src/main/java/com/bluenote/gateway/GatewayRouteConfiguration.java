@@ -27,6 +27,7 @@ public class GatewayRouteConfiguration {
                 .route("social-feed", route -> route.path("/api/feed/**").uri(socialUri))
                 .route("social-notification", route -> route.path("/api/notifications/**").uri(socialUri))
                 .route("social-push", route -> route.path("/api/push/**").uri(socialUri))
+                .route("social-im", route -> route.path("/api/im/**").uri(socialUri))
                 .route("social-realtime", route -> route.path("/ws/realtime").uri(socialWsUri))
                 .build();
     }
