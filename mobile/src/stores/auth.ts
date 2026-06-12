@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { login, logout, refreshToken, register, type AuthPayload } from '@/api/auth'
 import { getCurrentUser } from '@/api/user'
 import type { TokenPair, UserProfile } from '@/api/types'
+import { useRealtimeStore } from '@/stores/realtime'
 import { getDeviceInfo } from '@/utils/device'
 
 const SESSION_KEY = 'bluenote.session'
@@ -67,6 +68,7 @@ export const useAuthStore = defineStore('auth', {
         } satisfies AuthPayload)
         this.applyTokenPair(tokenPair)
         await this.fetchCurrentUser()
+        void useRealtimeStore().start()
       } finally {
         this.submitting = false
       }
@@ -81,6 +83,7 @@ export const useAuthStore = defineStore('auth', {
         } satisfies AuthPayload)
         this.applyTokenPair(tokenPair)
         await this.fetchCurrentUser()
+        void useRealtimeStore().start()
       } finally {
         this.submitting = false
       }
@@ -111,6 +114,7 @@ export const useAuthStore = defineStore('auth', {
     },
     async logoutCurrentDevice() {
       const refresh = this.refreshTokenValue
+      useRealtimeStore().stop()
       this.clearSession()
       if (!refresh) {
         return
@@ -131,6 +135,7 @@ export const useAuthStore = defineStore('auth', {
       this.persistSession()
     },
     clearSession() {
+      useRealtimeStore().stop()
       this.userId = null
       this.accessToken = null
       this.refreshTokenValue = null
@@ -154,4 +159,3 @@ export const useAuthStore = defineStore('auth', {
     }
   }
 })
-

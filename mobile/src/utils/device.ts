@@ -14,6 +14,20 @@ export function getDeviceInfo(): DeviceInfo {
   }
 }
 
+export function getPushDeviceRegistration() {
+  const system = uni.getSystemInfoSync()
+  const device = getDeviceInfo()
+  return {
+    deviceId: device.deviceId,
+    platform: device.platform,
+    pushProvider: 'NOOP' as const,
+    providerClientId: null,
+    appVersion: device.appVersion,
+    osVersion: system.osName || system.osVersion || null,
+    deviceModel: system.model || system.deviceModel || null
+  }
+}
+
 function getOrCreateDeviceId() {
   const cached = uni.getStorageSync(DEVICE_ID_KEY)
   if (cached) {
@@ -34,4 +48,3 @@ function platformOf(platform?: string): DeviceInfo['platform'] {
   }
   return 'H5'
 }
-

@@ -7,6 +7,7 @@ public record PushAttemptItem(
         String attemptStatus,
         String skipReason,
         String errorMessage,
-        String attemptedAt
+        String attemptedAt,
+        String ackedAt
 ) {
 }

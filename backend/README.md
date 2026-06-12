@@ -16,7 +16,7 @@ BlueNote 后端采用 Java 21、Spring Boot 3.5.x、Spring Cloud 2025.0.x 和 Ma
 outbox dispatcher -> RocketMQ -> counter 自动消费 -> counter-event outbox
 NotePublished/UserFollowed -> feed 自动消费 -> 收件箱/重建/feed-event outbox
 点赞/收藏/评论/关注/笔记状态事件 -> notification 自动消费 -> 站内通知/未读数/notification-event/push-request-event outbox
-PushSendRequested -> push 自动消费 -> 设备/偏好过滤 -> 投递请求/尝试日志/push-event outbox
+PushSendRequested -> push 自动消费 -> WebSocket 在线投递/离线通道降级 -> 投递请求/尝试日志/push-event outbox
 ```
 
 ## 1. 模块
@@ -43,7 +43,7 @@ backend/
 
 | 应用 | 端口 | 当前职责 |
 |---|---:|---|
-| `bluenote-gateway-app` | 8080 | 网关、JWT 校验、路由、用户上下文 Header 注入 |
+| `bluenote-gateway-app` | 8080 | 网关、JWT 校验、路由、用户上下文 Header 注入、WebSocket 转发 |
 | `bluenote-member-app` | 8081 | auth、user |
 | `bluenote-content-app` | 8082 | file、note、comment |
 | `bluenote-social-app` | 8083 | relation、counter、feed、notification、push，后续承载 rank |
@@ -275,6 +275,8 @@ push 内部接口：
 | `GET /internal/push/requests/{requestId}` | 查询推送请求和尝试日志 |
 | `POST /internal/push/requests/{requestId}/retry` | 重试推送请求 |
 | `POST /internal/push/events/replay` | 基于消费记录重放 Push 事件 |
+| `GET /internal/push/users/{userId}/online-state` | 查询当前实例内用户在线设备 |
+| `POST /internal/push/users/{userId}/kick` | 踢下线用户设备连接 |
 
 已接入能力：
 
@@ -302,7 +304,8 @@ push 内部接口：
    - `bluenote-notification-note-consumer`：`note-event`
 16. push 已落 `bluenote_push.push_device`、`push_preference`、`push_delivery_request`、`push_delivery_attempt`、`push_click_log`、`push_consume_record`、`push_outbox_event`。
 17. push 已启动 `bluenote-push-request-consumer`，自动消费 `push-request-event` 中的 `PushSendRequested`。
-18. push 当前投递通道为 `NOOP` 基座，可完成幂等、偏好过滤、免打扰过滤、活跃设备过滤、投递尝试日志和 `PushDelivered` / `PushFiltered` outbox；真实 WebSocket / uni-push / 厂商 Push 后续接入。
+18. push 已支持 `/ws/realtime`，完成 token + deviceId 握手校验、在线设备 Redis 路由、`PING` / `PONG`、`PUSH_MESSAGE` 下行和客户端 `ACK` 落库。
+19. push 投递策略当前为 WebSocket 在线优先；离线 uni-push / 厂商 Push 通道仍为配置关闭的扩展点。
 
 ### 2.5 MQ 与 Outbox
 
@@ -400,6 +403,7 @@ mvn -pl bluenote-gateway-app spring-boot:run
 | Gateway member URI | `http://127.0.0.1:8081` |
 | Gateway content URI | `http://127.0.0.1:8082` |
 | Gateway social URI | `http://127.0.0.1:8083` |
+| Gateway social WebSocket URI | `ws://127.0.0.1:8083` |
 
 注意：member/content/social 当前各自只配置一个 datasource URL，但 DDL 中按逻辑 schema 拆分为 `bluenote_auth`、`bluenote_user`、`bluenote_file`、`bluenote_note`、`bluenote_comment`、`bluenote_relation`、`bluenote_counter`、`bluenote_feed`、`bluenote_notification`、`bluenote_push`。应用内 SQL 使用显式 schema 名访问本应用拥有的逻辑 schema。
 
@@ -430,6 +434,6 @@ http://127.0.0.1:{port}/swagger-ui.html
 
 1. 补后端自动化测试和接口集成测试。
 2. 补 RocketMQ 死信告警和更完整的人工重放审计。
-3. 补真实 WebSocket / uni-push 投递通道、ACK 和移动端设备注册联调。
+3. 补真实 uni-push / 厂商 Push 离线投递通道、凭证配置和失败回执处理。
 4. 补 feed 大 V 推拉结合策略、清理任务后台化和更完整的补偿审计。
 5. 补生产部署、备份恢复、监控告警配置。

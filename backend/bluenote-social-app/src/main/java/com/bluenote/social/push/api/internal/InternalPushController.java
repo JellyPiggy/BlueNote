@@ -3,6 +3,9 @@ package com.bluenote.social.push.api.internal;
 import com.bluenote.common.core.ApiResponse;
 import com.bluenote.common.observability.TraceIdHolder;
 import com.bluenote.social.push.api.dto.PushConsumeEventResponse;
+import com.bluenote.social.push.api.dto.PushKickRequest;
+import com.bluenote.social.push.api.dto.PushKickResponse;
+import com.bluenote.social.push.api.dto.PushOnlineStateResponse;
 import com.bluenote.social.push.api.dto.PushReplayRequest;
 import com.bluenote.social.push.api.dto.PushRequestDetailResponse;
 import com.bluenote.social.push.api.dto.PushSendRequest;
@@ -43,5 +46,15 @@ public class InternalPushController {
     @PostMapping("/events/replay")
     public ApiResponse<PushConsumeEventResponse> replay(@RequestBody PushReplayRequest request) {
         return ApiResponse.success(pushApplicationService.replay(request), TraceIdHolder.currentOrNew());
+    }
+
+    @GetMapping("/users/{userId}/online-state")
+    public ApiResponse<PushOnlineStateResponse> onlineState(@PathVariable("userId") String userId) {
+        return ApiResponse.success(pushApplicationService.onlineState(userId), TraceIdHolder.currentOrNew());
+    }
+
+    @PostMapping("/users/{userId}/kick")
+    public ApiResponse<PushKickResponse> kick(@PathVariable("userId") String userId, @RequestBody PushKickRequest request) {
+        return ApiResponse.success(pushApplicationService.kickUserDevice(userId, request), TraceIdHolder.currentOrNew());
     }
 }

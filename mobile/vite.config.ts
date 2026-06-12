@@ -16,6 +16,11 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: gateway,
           changeOrigin: true
+        },
+        '/ws': {
+          target: gateway,
+          changeOrigin: true,
+          ws: true
         }
       }
     }

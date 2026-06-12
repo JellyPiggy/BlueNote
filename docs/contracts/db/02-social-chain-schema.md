@@ -445,7 +445,9 @@ Push 第一阶段物理部署在 `bluenote-social-app`，但使用独立 schema 
 
 通道尝试日志表。
 
-字段：`attempt_id`、`request_id`、`target_user_id`、`device_id`、`channel`、`attempt_status`、`skip_reason`、`provider_message_id`、`error_message`、`attempted_at`、`created_at`、`updated_at`。
+字段：`attempt_id`、`request_id`、`target_user_id`、`device_id`、`channel`、`attempt_status`、`skip_reason`、`provider_message_id`、`error_message`、`attempted_at`、`acked_at`、`created_at`、`updated_at`。
+
+状态：`SENT_TO_CONNECTION`、`ACKED`、`SENT_TO_PROVIDER`、`SKIPPED`、`FAILED`。
 
 索引：`idx_push_attempt_request(request_id, attempted_at)`、`idx_push_attempt_device(device_id, attempted_at)`、`idx_push_attempt_status(attempt_status, attempted_at)`。
 
