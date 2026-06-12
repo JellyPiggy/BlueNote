@@ -12,6 +12,7 @@ import type { NotificationCategory, NotificationItem } from '@/api/types'
 import AvatarCircle from '@/components/AvatarCircle.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useImStore } from '@/stores/im'
 import { useNotificationStore } from '@/stores/notification'
 import { formatCount } from '@/utils/format'
 
@@ -36,6 +37,7 @@ const tabs: NotificationTab[] = [
 ]
 
 const auth = useAuthStore()
+const im = useImStore()
 const notifications = useNotificationStore()
 const activeCategory = ref<NotificationCategory>('INTERACTION')
 const readingIds = ref<string[]>([])
@@ -50,6 +52,7 @@ const states = ref<Record<NotificationCategory, NotificationListState>>({
 
 const currentState = computed(() => states.value[activeCategory.value])
 const unreadTotalText = computed(() => (notifications.totalUnread > 99 ? '99+' : String(notifications.totalUnread)))
+const imUnreadText = computed(() => im.badgeText)
 const activeUnreadCount = computed(() => notifications.categoryUnread(activeCategory.value))
 const activeUnreadText = computed(() => (activeUnreadCount.value > 99 ? '99+' : String(activeUnreadCount.value)))
 const hasUnreadInCurrentTab = computed(() => activeUnreadCount.value > 0)
@@ -66,6 +69,7 @@ onShow(() => {
     return
   }
   void notifications.refreshUnread().catch(() => undefined)
+  void im.refreshUnread().catch(() => undefined)
   if (!currentState.value.loaded && !currentState.value.loading) {
     void loadCurrent(true)
   }
@@ -229,6 +233,14 @@ function goLogin() {
   uni.navigateTo({ url: '/pages/login/index' })
 }
 
+function openIm() {
+  if (!auth.isAuthenticated) {
+    goLogin()
+    return
+  }
+  uni.navigateTo({ url: '/pages/im/conversations' })
+}
+
 function jumpByNotification(item: NotificationItem) {
   const page = String(item.jump?.page ?? '')
   if (page === 'NOTE_DETAIL' && item.jump?.noteId) {
@@ -325,6 +337,13 @@ function formatNotificationTime(value: string) {
         </view>
         <view class="appbar-subtitle">最近通知</view>
       </view>
+      <button
+        class="im-button"
+        @tap="openIm"
+      >
+        <text>私信</text>
+        <text v-if="imUnreadText" class="mini-badge">{{ imUnreadText }}</text>
+      </button>
       <button
         class="read-all-button"
         :disabled="!auth.isAuthenticated || !hasUnreadInCurrentTab || markingAll"
@@ -486,6 +505,37 @@ function formatNotificationTime(value: string) {
   justify-content: center;
   font-size: 24rpx;
   font-weight: 780;
+}
+
+.im-button {
+  flex: 0 0 auto;
+  min-width: 112rpx;
+  height: 58rpx;
+  padding: 0 16rpx;
+  border-radius: 999rpx;
+  color: var(--bn-ink);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  font-size: 24rpx;
+  font-weight: 780;
+  box-shadow: var(--bn-shadow-soft);
+}
+
+.mini-badge {
+  min-width: 30rpx;
+  height: 30rpx;
+  padding: 0 8rpx;
+  border-radius: 999rpx;
+  background: var(--bn-coral);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18rpx;
+  font-weight: 820;
 }
 
 .read-all-button[disabled] {

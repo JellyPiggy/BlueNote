@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.im.infrastructure.mapper.ImMessageMapper">
+
+    <resultMap id="ImMessageResultMap" type="com.bluenote.social.im.infrastructure.entity.ImMessageEntity">
+        <id column="message_id" property="messageId"/>
+        <result column="conversation_id" property="conversationId"/>
+        <result column="conversation_seq" property="conversationSeq"/>
+        <result column="sender_id" property="senderId"/>
+        <result column="receiver_id" property="receiverId"/>
+        <result column="client_msg_id" property="clientMsgId"/>
+        <result column="message_type" property="messageType"/>
+        <result column="content_json" property="contentJson"/>
+        <result column="summary" property="summary"/>
+        <result column="message_status" property="messageStatus"/>
+        <result column="sent_at" property="sentAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="ImMessageColumns">
+        message_id, conversation_id, conversation_seq, sender_id, receiver_id,
+        client_msg_id, message_type, content_json, summary, message_status,
+        sent_at, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.bluenote.social.im.infrastructure.entity.ImMessageEntity">
+        INSERT INTO bluenote_im.im_message (
+            message_id, conversation_id, conversation_seq, sender_id, receiver_id,
+            client_msg_id, message_type, content_json, summary, message_status,
+            sent_at, created_at, updated_at
+        ) VALUES (
+            #{messageId}, #{conversationId}, #{conversationSeq}, #{senderId}, #{receiverId},
+            #{clientMsgId}, #{messageType}, #{contentJson}, #{summary}, #{messageStatus},
+            #{sentAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="ImMessageResultMap">
+        SELECT <include refid="ImMessageColumns"/>
+        FROM bluenote_im.im_message
+        WHERE message_id = #{messageId}
+    </select>
+
+    <select id="selectBySenderClientMsg" resultMap="ImMessageResultMap">
+        SELECT <include refid="ImMessageColumns"/>
+        FROM bluenote_im.im_message
+        WHERE sender_id = #{senderId}
+          AND client_msg_id = #{clientMsgId}
+    </select>
+
+    <select id="selectByIds" resultMap="ImMessageResultMap">
+        SELECT <include refid="ImMessageColumns"/>
+        FROM bluenote_im.im_message
+        WHERE message_id IN
+        <foreach collection="messageIds" item="messageId" open="(" separator="," close=")">
+            #{messageId}
+        </foreach>
+    </select>
+</mapper>

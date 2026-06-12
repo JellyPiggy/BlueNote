@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.im.infrastructure.mapper.ImUserMessageMapper">
+
+    <insert id="insert" parameterType="com.bluenote.social.im.infrastructure.entity.ImUserMessageEntity">
+        INSERT INTO bluenote_im.im_user_message (
+            id, user_id, user_seq, conversation_id, conversation_seq, message_id,
+            sender_id, read_status, received_status, sent_at, created_at, updated_at
+        ) VALUES (
+            #{id}, #{userId}, #{userSeq}, #{conversationId}, #{conversationSeq}, #{messageId},
+            #{senderId}, #{readStatus}, #{receivedStatus}, #{sentAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <update id="markReceived">
+        UPDATE bluenote_im.im_user_message
+        SET received_status = 1,
+            updated_at = #{updatedAt}
+        WHERE user_id = #{userId}
+          AND conversation_id = #{conversationId}
+          AND conversation_seq &lt;= #{conversationSeq}
+          AND received_status = 0
+    </update>
+
+    <update id="markRead">
+        UPDATE bluenote_im.im_user_message
+        SET read_status = 1,
+            received_status = 1,
+            updated_at = #{updatedAt}
+        WHERE user_id = #{userId}
+          AND conversation_id = #{conversationId}
+          AND conversation_seq &lt;= #{conversationSeq}
+          AND read_status = 0
+    </update>
+
+    <select id="countUnreadAfter" resultType="int">
+        SELECT COUNT(1)
+        FROM bluenote_im.im_user_message
+        WHERE user_id = #{userId}
+          AND conversation_id = #{conversationId}
+          AND conversation_seq &gt; #{conversationSeq}
+          AND read_status = 0
+    </select>
+</mapper>

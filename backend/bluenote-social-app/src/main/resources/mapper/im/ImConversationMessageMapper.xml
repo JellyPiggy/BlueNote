@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bluenote.social.im.infrastructure.mapper.ImConversationMessageMapper">
+
+    <resultMap id="ImMessageResultMap" type="com.bluenote.social.im.infrastructure.entity.ImMessageEntity">
+        <id column="message_id" property="messageId"/>
+        <result column="conversation_id" property="conversationId"/>
+        <result column="conversation_seq" property="conversationSeq"/>
+        <result column="sender_id" property="senderId"/>
+        <result column="receiver_id" property="receiverId"/>
+        <result column="client_msg_id" property="clientMsgId"/>
+        <result column="message_type" property="messageType"/>
+        <result column="content_json" property="contentJson"/>
+        <result column="summary" property="summary"/>
+        <result column="message_status" property="messageStatus"/>
+        <result column="sent_at" property="sentAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.bluenote.social.im.infrastructure.entity.ImConversationMessageEntity">
+        INSERT INTO bluenote_im.im_conversation_message (
+            id, conversation_id, conversation_seq, message_id, sender_id, sent_at, created_at
+        ) VALUES (
+            #{id}, #{conversationId}, #{conversationSeq}, #{messageId}, #{senderId}, #{sentAt}, #{createdAt}
+        )
+    </insert>
+
+    <select id="selectAfter" resultMap="ImMessageResultMap">
+        SELECT m.message_id,
+               m.conversation_id,
+               m.conversation_seq,
+               m.sender_id,
+               m.receiver_id,
+               m.client_msg_id,
+               m.message_type,
+               m.content_json,
+               m.summary,
+               m.message_status,
+               m.sent_at,
+               m.created_at,
+               m.updated_at
+        FROM bluenote_im.im_conversation_message cm
+        JOIN bluenote_im.im_message m ON m.message_id = cm.message_id
+        WHERE cm.conversation_id = #{conversationId}
+          AND cm.conversation_seq &gt; #{afterSeq}
+          AND cm.conversation_seq &gt; #{lastVisibleSeq}
+        ORDER BY cm.conversation_seq ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectBefore" resultMap="ImMessageResultMap">
+        SELECT *
+        FROM (
+            SELECT m.message_id,
+                   m.conversation_id,
+                   m.conversation_seq,
+                   m.sender_id,
+                   m.receiver_id,
+                   m.client_msg_id,
+                   m.message_type,
+                   m.content_json,
+                   m.summary,
+                   m.message_status,
+                   m.sent_at,
+                   m.created_at,
+                   m.updated_at
+            FROM bluenote_im.im_conversation_message cm
+            JOIN bluenote_im.im_message m ON m.message_id = cm.message_id
+            WHERE cm.conversation_id = #{conversationId}
+              AND cm.conversation_seq &lt; #{beforeSeq}
+              AND cm.conversation_seq &gt; #{lastVisibleSeq}
+            ORDER BY cm.conversation_seq DESC
+            LIMIT #{limit}
+        ) t
+        ORDER BY conversation_seq ASC
+    </select>
+
+    <select id="selectLatest" resultMap="ImMessageResultMap">
+        SELECT *
+        FROM (
+            SELECT m.message_id,
+                   m.conversation_id,
+                   m.conversation_seq,
+                   m.sender_id,
+                   m.receiver_id,
+                   m.client_msg_id,
+                   m.message_type,
+                   m.content_json,
+                   m.summary,
+                   m.message_status,
+                   m.sent_at,
+                   m.created_at,
+                   m.updated_at
+            FROM bluenote_im.im_conversation_message cm
+            JOIN bluenote_im.im_message m ON m.message_id = cm.message_id
+            WHERE cm.conversation_id = #{conversationId}
+              AND cm.conversation_seq &gt; #{lastVisibleSeq}
+            ORDER BY cm.conversation_seq DESC
+            LIMIT #{limit}
+        ) t
+        ORDER BY conversation_seq ASC
+    </select>
+</mapper>

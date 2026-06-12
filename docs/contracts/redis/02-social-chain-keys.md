@@ -140,7 +140,23 @@ Hash 字段：
 2. 偏好缓存从 `push_preference` 重建，缺失时使用默认开启策略。
 3. 在线连接 key 丢失视为用户离线，不影响业务事实。
 
-## 7. Key 变更规则
+## 7. im keys
+
+| Key | 类型 | TTL | 写入方 | 读取方 | 用途 |
+|---|---|---|---|---|---|
+| `bluenote:{env}:im:unread:{userId}` | String | 30 分钟 | im | im / gateway 后续 | 用户 IM 总未读缓存 |
+| `bluenote:{env}:im:conversation:list:{userId}` | ZSET | 10 分钟 | im | im | 用户会话列表短缓存，score 为最近消息时间毫秒，member 为 conversationId |
+| `bluenote:{env}:im:dedupe:client:{senderId}:{clientMsgId}` | String | 24 小时 | im | im | 发送消息短期幂等缓存，MySQL 唯一约束兜底 |
+| `bluenote:{env}:im:rate:send:{userId}` | String | 10 秒 | im / gateway | im | 发送私信限流 |
+| `bluenote:{env}:im:lock:conversation:{conversationId}` | String | 5 秒 | im | im | 热点会话序号分配短锁，MySQL 行锁兜底 |
+
+重建方式：
+
+1. `im:unread:{userId}` 从 `im_conversation_member.unread_count` 汇总重建。
+2. `im:conversation:list:{userId}` 从 `im_conversation_member` 和 `im_conversation` 按最近消息时间重建。
+3. 幂等和限流 Key 丢失不影响事实一致性。
+
+## 8. Key 变更规则
 
 新增或修改 Key 必须同步说明：
 

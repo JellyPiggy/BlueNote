@@ -37,6 +37,15 @@
 | GET | `/api/push/preferences` | 是 | 当前用户 | 否 | 用户 | 查询推送偏好 |
 | PUT | `/api/push/preferences` | 是 | 当前用户 | 是 | 用户 | 更新推送偏好 |
 | POST | `/api/push/clicks` | 是 | 当前用户设备 | 是 | 用户 / 设备 | Push 点击回传 |
+| POST | `/api/im/conversations/single` | 是 | 当前用户 | 业务唯一键 | 用户 / 目标用户 | 创建或获取单聊会话 |
+| GET | `/api/im/conversations` | 是 | 当前用户 | 否 | 用户 | 查询我的会话列表 |
+| POST | `/api/im/messages` | 是 | 当前用户参与会话 | `senderId + clientMsgId` | 用户 / 会话 | 发送 IM 消息 |
+| GET | `/api/im/conversations/{conversationId}/messages` | 是 | 会话成员 | 否 | 用户 / 会话 | 查询会话消息 |
+| POST | `/api/im/conversations/{conversationId}/received` | 是 | 会话成员 | 是 | 用户 / 会话 | 上报送达 |
+| POST | `/api/im/conversations/{conversationId}/read` | 是 | 会话成员 | 是 | 用户 / 会话 | 标记会话已读 |
+| GET | `/api/im/unread-count` | 是 | 当前用户 | 否 | 用户 | 查询 IM 总未读 |
+| PUT | `/api/im/conversations/{conversationId}/settings` | 是 | 会话成员 | 是 | 用户 / 会话 | 更新置顶/免打扰 |
+| DELETE | `/api/im/conversations/{conversationId}` | 是 | 会话成员 | 是 | 用户 / 会话 | 当前用户侧隐藏会话 |
 
 说明：
 
@@ -70,6 +79,9 @@
 | GET | `/internal/push/requests/{requestId}` | notification / im / order / ops | push | 服务身份认证 |
 | POST | `/internal/push/requests/{requestId}/retry` | ops / admin | push | 内部管理权限，审计 |
 | POST | `/internal/push/events/replay` | ops / admin | push | 内部管理权限，审计 |
+| POST | `/internal/im/conversations/batch-summary` | push / notification / admin | im | 服务身份认证，单次最多 100 |
+| GET | `/internal/im/conversations/{conversationId}/members/{userId}/push-policy` | push / ops | im | 服务身份认证 |
+| POST | `/internal/im/users/{userId}/rebuild-unread` | ops / admin | im | 内部管理权限，频率限制 |
 | POST | `/internal/notes/authors/recent` | feed | note | 服务身份认证，单次最多 50 作者 |
 | POST | `/internal/notes/counter-source` | counter | note | 服务身份认证，字段白名单 |
 
@@ -93,6 +105,10 @@
 | 更新推送偏好 | `userId` 最终偏好状态 |
 | Push 点击回传 | `requestId + userId + deviceId + clickedAt` 日志幂等后续增强 |
 | Push 投递请求 | `requestId`，并辅以 `sourceService + sourceBizType + sourceBizId + scene` |
+| 创建单聊会话 | `singleKey=minUserId:maxUserId` |
+| 发送 IM 消息 | `senderId + clientMsgId` |
+| IM 已读 / 送达 | `conversationId + userId` 最终序号状态 |
+| 删除 IM 会话 | `conversationId + userId` 最终隐藏状态 |
 
 重复请求已经成功时，应返回当前最终状态，不重复发布真实业务事件。
 
@@ -116,6 +132,10 @@
 | 推送标题 | 不超过 128 字符 |
 | 推送正文 | 不超过 512 字符 |
 | WebSocket 握手 | 必须同时提供有效 access token 和已绑定 ACTIVE 的 `deviceId` |
+| `targetUserId` | IM 单聊对象必须存在，不能是当前用户 |
+| `clientMsgId` | 非空，长度不超过 128 |
+| IM 文字消息 | 1 到 1000 字符 |
+| IM 分页 | 会话 `pageSize` 最大 50，消息 `limit` 最大 100 |
 
 ## 5. 可见性和归属规则
 
@@ -128,6 +148,8 @@
 7. 设备解绑、点击回传必须校验设备属于当前用户或已经是当前用户最近绑定设备。
 8. Push WebSocket 握手必须校验 token 中的 `userId`、`deviceId` 与设备事实表一致。
 9. Push 内部接口不得让移动端指定操作其他用户设备。
+10. IM 会话列表、消息查询、已读、送达、设置和删除必须校验当前用户是会话成员。
+11. IM 发送时服务端以当前登录用户作为 `senderId`，不信任移动端传发送人。
 
 ## 6. 限流建议
 
@@ -142,6 +164,8 @@
 | 设备注册 / 解绑 | 用户、设备 |
 | Push 点击回传 | 用户、设备 |
 | Push 投递请求 | 目标用户、来源服务 |
+| IM 发送消息 | 用户、会话、目标用户 |
+| IM 会话和消息查询 | 用户 |
 | 计数重建 | target、操作者 |
 | Feed 重建 | userId、操作者 |
 

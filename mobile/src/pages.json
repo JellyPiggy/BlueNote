@@ -32,6 +32,20 @@
       }
     },
     {
+      "path": "pages/im/conversations",
+      "style": {
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/im/chat",
+      "style": {
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/login/index",
       "style": {
         "navigationStyle": "custom"

@@ -336,3 +336,68 @@ export interface NotificationDeleteResponse {
 export interface NotificationDeleteBatchResponse {
   deletedCount: number
 }
+
+export interface ImUserSummary {
+  userId: string
+  nickname: string
+  avatarUrl: string | null
+}
+
+export interface ImMessageItem {
+  messageId: string
+  conversationId: string
+  conversationSeq: number
+  senderId: string
+  receiverId: string
+  messageType: 'TEXT' | string
+  content: Record<string, unknown>
+  summary: string
+  messageStatus: 'NORMAL' | string
+  mine: boolean
+  sentAt: string
+}
+
+export interface ImConversationItem {
+  conversationId: string
+  conversationType: 'SINGLE' | string
+  peerUser: ImUserSummary | null
+  lastMessage: ImMessageItem | null
+  lastConversationSeq: number
+  lastReadSeq: number
+  lastReceivedSeq: number
+  unreadCount: number
+  pinned: boolean
+  mute: boolean
+  hidden: boolean
+  updatedAt: string
+}
+
+export interface ImConversationListResponse extends CursorPage<ImConversationItem> {}
+
+export interface ImSendMessageResponse {
+  message: ImMessageItem
+  conversation: ImConversationItem
+}
+
+export interface ImMessageListResponse {
+  items: ImMessageItem[]
+  nextAfterSeq: number | null
+  nextBeforeSeq: number | null
+  hasMore: boolean
+}
+
+export interface ImReadResponse {
+  conversationId: string
+  lastReadSeq: number
+  unreadCount: number
+  totalUnread: number
+}
+
+export interface ImReceivedResponse {
+  conversationId: string
+  lastReceivedSeq: number
+}
+
+export interface ImUnreadCountResponse {
+  totalUnread: number
+}

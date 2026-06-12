@@ -34,6 +34,7 @@
 8. `bluenote-feed`
 9. `bluenote-notification`
 10. `bluenote-push`
+11. `bluenote-im`
 
 ## 2. 目录结构
 
@@ -54,6 +55,7 @@ docs/contracts/
     10-notification-api.md
     11-mq-admin-api.md
     12-push-api.md
+    13-im-api.md
   db/
     01-main-chain-schema.md
     02-social-chain-schema.md
@@ -85,6 +87,7 @@ docs/contracts/
 11. `方案/services/08-Timeline-Feed服务设计.md`
 12. `方案/services/11-通知服务设计.md`
 13. `方案/services/10-推送与实时投递服务设计.md`
+14. `方案/services/12-IM服务设计.md`
 
 如果本目录与旧方案示例冲突，以本目录为开发契约。典型例子：旧方案中部分响应示例使用字符串型 `"code": "OK"`，本目录统一改为数字型 `"code": 0`。
 
