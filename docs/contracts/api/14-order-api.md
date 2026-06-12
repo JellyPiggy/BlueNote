@@ -294,10 +294,14 @@ GET /api/order/my-coupons?status=UNUSED&cursor=xxx&pageSize=20
 
 ```http
 POST /internal/order/coupon-activities
+GET /internal/order/coupon-activities
+GET /internal/order/coupon-activities/{activityId}
 POST /internal/order/coupon-activities/{activityId}/preheat
 POST /internal/order/coupon-activities/{activityId}/pause
 POST /internal/order/coupon-activities/{activityId}/resume
 POST /internal/order/coupon-activities/{activityId}/end
+POST /internal/order/coupon-activities/{activityId}/precheck
+POST /internal/order/coupon-activities/{activityId}/stock-adjustments
 POST /internal/order/timeout-tasks/scan-once
 GET /internal/order/coupon-activities/{activityId}/ops-summary
 POST /internal/order/coupon-activities/{activityId}/redis-rebuild
@@ -334,6 +338,50 @@ POST /internal/order/seckill-requests/sweep-stuck
 }
 ```
 
+活动列表查询：
+
+```http
+GET /internal/order/coupon-activities?status=PREHEATED&cursor=1760270460000_10001&pageSize=20
+```
+
+`status` 可选，支持 `READY`、`PREHEATED`、`ONLINE`、`SOLD_OUT`、`PAUSED`、`ENDED`、`CANCELLED`。分页游标为 `createdAtMillis_activityId`。
+
+活动列表响应：
+
+```json
+{
+  "items": [
+    {
+      "activityId": "10001",
+      "activityName": "BlueNote 周末神券",
+      "templateId": "50001",
+      "templateName": "满30减10神券",
+      "status": "PREHEATED",
+      "displayStatus": "ONLINE",
+      "totalStock": 100,
+      "availableStock": 80,
+      "soldStock": 20,
+      "payAmount": 0,
+      "startAt": "2026-06-12T20:00:00+08:00",
+      "endAt": "2026-06-12T22:00:00+08:00",
+      "preheatedAt": "2026-06-12T19:55:00+08:00",
+      "createdAt": "2026-06-12T19:50:00+08:00",
+      "updatedAt": "2026-06-12T20:01:00+08:00"
+    }
+  ],
+  "nextCursor": "1760270460000_10001",
+  "hasMore": false
+}
+```
+
+活动详情：
+
+```http
+GET /internal/order/coupon-activities/{activityId}
+```
+
+响应体与 `GET /internal/order/coupon-activities/{activityId}/ops-summary` 一致。
+
 状态操作响应：
 
 ```json
@@ -342,6 +390,87 @@ POST /internal/order/seckill-requests/sweep-stuck
   "status": "PREHEATED"
 }
 ```
+
+状态操作约束：
+
+1. `preheat` 仅允许 `READY`、`PREHEATED`、`ONLINE`，并要求活动未过期、MySQL 库存与订单事实一致。
+2. `pause` 仅允许 `PREHEATED`、`ONLINE`、`SOLD_OUT`。
+3. `resume` 仅允许 `PAUSED`；如果可用库存为 0，恢复到 `SOLD_OUT`，否则恢复到 `PREHEATED`。
+4. `end` 仅允许 `READY`、`PREHEATED`、`ONLINE`、`SOLD_OUT`、`PAUSED`。
+
+上线前预检查：
+
+```http
+POST /internal/order/coupon-activities/{activityId}/precheck
+```
+
+响应：
+
+```json
+{
+  "activityId": "10001",
+  "passed": true,
+  "blockers": [],
+  "warnings": [],
+  "status": "PREHEATED",
+  "displayStatus": "ONLINE",
+  "totalStock": 100,
+  "availableStock": 80,
+  "soldStock": 20,
+  "expectedAvailableStock": 80,
+  "expectedSoldStock": 20,
+  "stockConsistent": true,
+  "redis": {
+    "stockKeyExists": true,
+    "stock": 80,
+    "participantCount": 20,
+    "soldOut": false,
+    "rebuilding": false
+  },
+  "serverTime": "2026-06-12T20:01:00+08:00"
+}
+```
+
+`blockers` 非空时不应继续上线或预热；`warnings` 表示可继续但建议运营处理。常见值包括 `MYSQL_STOCK_INCONSISTENT`、`REDIS_STOCK_MISMATCH`、`REDIS_STOCK_KEY_MISSING`、`REDIS_PARTICIPANT_MISMATCH`。
+
+库存调整请求：
+
+```http
+POST /internal/order/coupon-activities/{activityId}/stock-adjustments
+```
+
+```json
+{
+  "deltaStock": 20,
+  "reason": "运营追加库存",
+  "operatorId": "ops-001"
+}
+```
+
+库存调整响应：
+
+```json
+{
+  "activityId": "10001",
+  "beforeTotalStock": 100,
+  "beforeAvailableStock": 80,
+  "beforeSoldStock": 20,
+  "afterTotalStock": 120,
+  "afterAvailableStock": 100,
+  "afterSoldStock": 20,
+  "status": "PREHEATED",
+  "displayStatus": "ONLINE"
+}
+```
+
+库存调整规则：
+
+1. `deltaStock` 不能为 0，负数表示减少库存。
+2. 减库存不能低于已占用订单事实，不能让 `availableStock` 小于 0。
+3. `ENDED`、`CANCELLED` 活动不允许调整库存。
+4. 调整前必须通过 MySQL 库存一致性校验；不一致时先使用库存对账修复。
+5. 如果活动已有 Redis 库存 key，调整成功后必须按 MySQL 事实重建 Redis 库存和参与集合。
+6. 每次调整必须写入 `coupon_stock_log`，`change_type=OPS_ADJUST`，并记录 `operator_type`、`operator_id`、`reason`。
 
 超时任务扫一次响应：
 

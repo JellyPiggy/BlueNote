@@ -112,6 +112,28 @@ public final class OrderDtos {
     public record InternalActivityResponse(String activityId, String templateId, String status) {
     }
 
+    public record InternalActivityListResponse(List<InternalActivityListItem> items, String nextCursor, boolean hasMore) {
+    }
+
+    public record InternalActivityListItem(
+            String activityId,
+            String activityName,
+            String templateId,
+            String templateName,
+            String status,
+            String displayStatus,
+            Integer totalStock,
+            Integer availableStock,
+            Integer soldStock,
+            Integer payAmount,
+            String startAt,
+            String endAt,
+            String preheatedAt,
+            String createdAt,
+            String updatedAt
+    ) {
+    }
+
     public record ActivityStatusResponse(String activityId, String status) {
     }
 
@@ -148,6 +170,24 @@ public final class OrderDtos {
     ) {
     }
 
+    public record OrderActivityPrecheckResponse(
+            String activityId,
+            Boolean passed,
+            List<String> blockers,
+            List<String> warnings,
+            String status,
+            String displayStatus,
+            Integer totalStock,
+            Integer availableStock,
+            Integer soldStock,
+            Integer expectedAvailableStock,
+            Integer expectedSoldStock,
+            Boolean stockConsistent,
+            OrderRedisSnapshot redis,
+            String serverTime
+    ) {
+    }
+
     public record OrderRedisRebuildResponse(
             String activityId,
             Integer mysqlAvailableStock,
@@ -173,6 +213,22 @@ public final class OrderDtos {
             Boolean consistent,
             Boolean repaired,
             String message
+    ) {
+    }
+
+    public record OrderStockAdjustRequest(Integer deltaStock, String reason, String operatorId) {
+    }
+
+    public record OrderStockAdjustResponse(
+            String activityId,
+            Integer beforeTotalStock,
+            Integer beforeAvailableStock,
+            Integer beforeSoldStock,
+            Integer afterTotalStock,
+            Integer afterAvailableStock,
+            Integer afterSoldStock,
+            String status,
+            String displayStatus
     ) {
     }
 

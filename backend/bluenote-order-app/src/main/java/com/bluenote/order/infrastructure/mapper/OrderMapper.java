@@ -23,6 +23,13 @@ public interface OrderMapper {
 
     CouponActivity selectCurrentActivity(@Param("now") LocalDateTime now);
 
+    List<CouponActivity> selectActivities(
+            @Param("status") String status,
+            @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
+            @Param("cursorId") Long cursorId,
+            @Param("limit") int limit
+    );
+
     CouponActivity selectActivityById(@Param("activityId") Long activityId);
 
     CouponActivity selectActivityByIdForUpdate(@Param("activityId") Long activityId);
@@ -39,12 +46,23 @@ public interface OrderMapper {
 
     List<SeckillRequest> selectStuckProcessingRequests(@Param("deadline") LocalDateTime deadline, @Param("limit") int limit);
 
-    int updateActivityStatus(@Param("activityId") Long activityId, @Param("status") String status, @Param("updatedAt") LocalDateTime updatedAt);
+    int updateActivityStatus(
+            @Param("activityId") Long activityId,
+            @Param("status") String status,
+            @Param("updatedAt") LocalDateTime updatedAt,
+            @Param("allowedStatuses") List<String> allowedStatuses
+    );
 
     int repairActivityStock(
             @Param("activityId") Long activityId,
             @Param("availableStock") Integer availableStock,
             @Param("soldStock") Integer soldStock,
+            @Param("updatedAt") LocalDateTime updatedAt
+    );
+
+    int adjustActivityStock(
+            @Param("activityId") Long activityId,
+            @Param("deltaStock") Integer deltaStock,
             @Param("updatedAt") LocalDateTime updatedAt
     );
 
@@ -118,6 +136,11 @@ public interface OrderMapper {
             @Param("requestId") Long requestId,
             @Param("changeType") String changeType,
             @Param("changeAmount") Integer changeAmount,
+            @Param("beforeStock") Integer beforeStock,
+            @Param("afterStock") Integer afterStock,
+            @Param("operatorType") String operatorType,
+            @Param("operatorId") String operatorId,
+            @Param("reason") String reason,
             @Param("createdAt") LocalDateTime createdAt
     );
 

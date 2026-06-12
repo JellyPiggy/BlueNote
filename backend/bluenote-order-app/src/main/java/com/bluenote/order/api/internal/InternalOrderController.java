@@ -3,10 +3,14 @@ package com.bluenote.order.api.internal;
 import com.bluenote.common.core.ApiResponse;
 import com.bluenote.common.observability.TraceIdHolder;
 import com.bluenote.order.api.dto.OrderDtos.ActivityStatusResponse;
+import com.bluenote.order.api.dto.OrderDtos.InternalActivityListResponse;
 import com.bluenote.order.api.dto.OrderDtos.InternalActivityResponse;
 import com.bluenote.order.api.dto.OrderDtos.InternalCreateActivityRequest;
 import com.bluenote.order.api.dto.OrderDtos.InternalActivityOpsSummaryResponse;
+import com.bluenote.order.api.dto.OrderDtos.OrderActivityPrecheckResponse;
 import com.bluenote.order.api.dto.OrderDtos.OrderRedisRebuildResponse;
+import com.bluenote.order.api.dto.OrderDtos.OrderStockAdjustRequest;
+import com.bluenote.order.api.dto.OrderDtos.OrderStockAdjustResponse;
 import com.bluenote.order.api.dto.OrderDtos.OrderStockReconcileRequest;
 import com.bluenote.order.api.dto.OrderDtos.OrderStockReconcileResponse;
 import com.bluenote.order.api.dto.OrderDtos.OrderSweepStuckRequest;
@@ -18,6 +22,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -38,10 +43,49 @@ public class InternalOrderController {
         );
     }
 
+    @GetMapping("/coupon-activities")
+    public ApiResponse<InternalActivityListResponse> listActivities(
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "cursor", required = false) String cursor,
+            @RequestParam(value = "pageSize", required = false) Integer pageSize
+    ) {
+        return ApiResponse.success(
+                orderApplicationService.listActivities(status, cursor, pageSize),
+                TraceIdHolder.currentOrNew()
+        );
+    }
+
+    @GetMapping("/coupon-activities/{activityId}")
+    public ApiResponse<InternalActivityOpsSummaryResponse> activityDetail(@PathVariable("activityId") String activityId) {
+        return ApiResponse.success(
+                orderApplicationService.opsSummary(activityId),
+                TraceIdHolder.currentOrNew()
+        );
+    }
+
     @PostMapping("/coupon-activities/{activityId}/preheat")
     public ApiResponse<ActivityStatusResponse> preheat(@PathVariable("activityId") String activityId) {
         return ApiResponse.success(
                 orderApplicationService.preheat(activityId),
+                TraceIdHolder.currentOrNew()
+        );
+    }
+
+    @PostMapping("/coupon-activities/{activityId}/precheck")
+    public ApiResponse<OrderActivityPrecheckResponse> precheck(@PathVariable("activityId") String activityId) {
+        return ApiResponse.success(
+                orderApplicationService.precheck(activityId),
+                TraceIdHolder.currentOrNew()
+        );
+    }
+
+    @PostMapping("/coupon-activities/{activityId}/stock-adjustments")
+    public ApiResponse<OrderStockAdjustResponse> adjustStock(
+            @PathVariable("activityId") String activityId,
+            @RequestBody OrderStockAdjustRequest request
+    ) {
+        return ApiResponse.success(
+                orderApplicationService.adjustStock(activityId, request),
                 TraceIdHolder.currentOrNew()
         );
     }

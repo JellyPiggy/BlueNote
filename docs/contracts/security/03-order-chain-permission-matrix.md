@@ -21,10 +21,14 @@
 | 方法 | 路径 | 调用方 | 被调用方 | 要求 |
 |---|---|---|---|---|
 | POST | `/internal/order/coupon-activities` | ops / admin | order | 内部管理权限，活动参数校验 |
+| GET | `/internal/order/coupon-activities` | ops / admin | order | 内部管理权限，分页查询活动列表 |
+| GET | `/internal/order/coupon-activities/{activityId}` | ops / admin | order | 内部管理权限，查询活动详情和运维摘要 |
 | POST | `/internal/order/coupon-activities/{activityId}/preheat` | ops / admin | order | 内部管理权限，预热幂等 |
 | POST | `/internal/order/coupon-activities/{activityId}/pause` | ops / admin | order | 内部管理权限，状态 CAS |
 | POST | `/internal/order/coupon-activities/{activityId}/resume` | ops / admin | order | 内部管理权限，状态 CAS |
 | POST | `/internal/order/coupon-activities/{activityId}/end` | ops / admin | order | 内部管理权限，状态 CAS |
+| POST | `/internal/order/coupon-activities/{activityId}/precheck` | ops / admin | order | 内部运维权限，上线前库存、时间、Redis 和模板状态检查 |
+| POST | `/internal/order/coupon-activities/{activityId}/stock-adjustments` | ops / admin | order | 内部运维权限，库存增减必须记录操作人和原因 |
 | POST | `/internal/order/timeout-tasks/scan-once` | ops / scheduler | order | 内部运维权限，触发一次超时关单扫描 |
 | GET | `/internal/order/coupon-activities/{activityId}/ops-summary` | ops / admin | order | 内部运维权限，查询活动库存、请求、订单和 Redis 摘要 |
 | POST | `/internal/order/coupon-activities/{activityId}/redis-rebuild` | ops / admin | order | 内部运维权限，按 MySQL 事实重建 Redis 库存和参与集合 |

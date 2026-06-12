@@ -180,6 +180,21 @@
         LIMIT 1
     </select>
 
+    <select id="selectActivities" resultMap="ActivityMap">
+        SELECT <include refid="ActivityColumns"/>
+        FROM bluenote_order.coupon_activity
+        WHERE 1 = 1
+        <if test="status != null and status != ''">
+          AND activity_status = #{status}
+        </if>
+        <if test="cursorCreatedAt != null and cursorId != null">
+          AND (created_at &lt; #{cursorCreatedAt}
+               OR (created_at = #{cursorCreatedAt} AND activity_id &lt; #{cursorId}))
+        </if>
+        ORDER BY created_at DESC, activity_id DESC
+        LIMIT #{limit}
+    </select>
+
     <select id="selectActivityById" resultMap="ActivityMap">
         SELECT <include refid="ActivityColumns"/>
         FROM bluenote_order.coupon_activity
@@ -243,6 +258,12 @@
             updated_at = #{updatedAt},
             version = version + 1
         WHERE activity_id = #{activityId}
+        <if test="allowedStatuses != null and allowedStatuses.size() > 0">
+          AND activity_status IN
+          <foreach collection="allowedStatuses" item="allowedStatus" open="(" separator="," close=")">
+            #{allowedStatus}
+          </foreach>
+        </if>
     </update>
 
     <update id="repairActivityStock">
@@ -257,6 +278,23 @@
             updated_at = #{updatedAt},
             version = version + 1
         WHERE activity_id = #{activityId}
+    </update>
+
+    <update id="adjustActivityStock">
+        UPDATE bluenote_order.coupon_activity
+        SET total_stock = total_stock + #{deltaStock},
+            available_stock = available_stock + #{deltaStock},
+            activity_status = CASE
+                WHEN activity_status = 'SOLD_OUT' AND available_stock + #{deltaStock} &gt; 0 THEN 'PREHEATED'
+                WHEN activity_status IN ('PREHEATED', 'ONLINE') AND available_stock + #{deltaStock} = 0 THEN 'SOLD_OUT'
+                ELSE activity_status
+            END,
+            updated_at = #{updatedAt},
+            version = version + 1
+        WHERE activity_id = #{activityId}
+          AND activity_status NOT IN ('ENDED', 'CANCELLED')
+          AND total_stock + #{deltaStock} &gt;= sold_stock
+          AND available_stock + #{deltaStock} &gt;= 0
     </update>
 
     <update id="markActivityPreheated">
@@ -442,10 +480,10 @@
     <insert id="insertStockLog">
         INSERT INTO bluenote_order.coupon_stock_log (
             id, activity_id, order_id, request_id, change_type, change_amount,
-            before_stock, after_stock, created_at
+            operator_type, operator_id, reason, before_stock, after_stock, created_at
         ) VALUES (
             #{id}, #{activityId}, #{orderId}, #{requestId}, #{changeType}, #{changeAmount},
-            NULL, NULL, #{createdAt}
+            #{operatorType}, #{operatorId}, #{reason}, #{beforeStock}, #{afterStock}, #{createdAt}
         )
     </insert>
 
