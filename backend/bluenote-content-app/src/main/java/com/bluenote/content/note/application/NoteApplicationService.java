@@ -35,6 +35,8 @@ import com.bluenote.content.note.api.dto.PublishNoteResponse;
 import com.bluenote.content.note.api.dto.UpsertNoteRequest;
 import com.bluenote.content.note.api.dto.ViewerActionResponse;
 import com.bluenote.content.note.infrastructure.client.MemberInternalClient;
+import com.bluenote.content.note.infrastructure.client.NoteCounterClient;
+import com.bluenote.content.note.infrastructure.client.NoteCounterClient.NoteCounterValues;
 import com.bluenote.content.note.infrastructure.entity.NoteCollectionEntity;
 import com.bluenote.content.note.infrastructure.entity.NoteEntity;
 import com.bluenote.content.note.infrastructure.entity.NoteIdempotentRequestEntity;
@@ -100,6 +102,7 @@ public class NoteApplicationService {
     private final NoteInteractionMapper noteInteractionMapper;
     private final FileApplicationService fileApplicationService;
     private final MemberInternalClient memberInternalClient;
+    private final NoteCounterClient noteCounterClient;
     private final ContentIdGenerator idGenerator;
     private final JsonPayloads jsonPayloads;
     private final ObjectMapper objectMapper;
@@ -114,6 +117,7 @@ public class NoteApplicationService {
             NoteInteractionMapper noteInteractionMapper,
             FileApplicationService fileApplicationService,
             MemberInternalClient memberInternalClient,
+            NoteCounterClient noteCounterClient,
             ContentIdGenerator idGenerator,
             JsonPayloads jsonPayloads,
             ObjectMapper objectMapper
@@ -127,6 +131,7 @@ public class NoteApplicationService {
         this.noteInteractionMapper = noteInteractionMapper;
         this.fileApplicationService = fileApplicationService;
         this.memberInternalClient = memberInternalClient;
+        this.noteCounterClient = noteCounterClient;
         this.idGenerator = idGenerator;
         this.jsonPayloads = jsonPayloads;
         this.objectMapper = objectMapper;
@@ -262,14 +267,21 @@ public class NoteApplicationService {
         boolean degraded = false;
         NoteCountsResponse counts;
         try {
-            counts = new NoteCountsResponse(
-                    noteInteractionMapper.countLikes(note.getNoteId()),
-                    noteInteractionMapper.countCollections(note.getNoteId()),
-                    0L
-            );
+            NoteCounterValues counterValues = noteCounterClient.noteCounts(note.getNoteId());
+            if (counterValues == null) {
+                degraded = true;
+                counts = directNoteCounts(note.getNoteId());
+            } else {
+                degraded = counterValues.degraded();
+                counts = new NoteCountsResponse(
+                        counterValues.likeCount(),
+                        counterValues.collectCount(),
+                        counterValues.commentCount()
+                );
+            }
         } catch (RuntimeException exception) {
             degraded = true;
-            counts = new NoteCountsResponse(0L, 0L, 0L);
+            counts = directNoteCounts(note.getNoteId());
         }
 
         ViewerActionResponse viewerAction;
@@ -814,8 +826,9 @@ public class NoteApplicationService {
     private CursorPage<NoteCardResponse> toCardPage(List<NoteEntity> notes, int pageSize, boolean useInteractionSort) {
         boolean hasMore = notes.size() > pageSize;
         List<NoteEntity> pageItems = hasMore ? notes.subList(0, pageSize) : notes;
+        Map<Long, NoteCounterValues> counters = noteCounterValues(pageItems);
         List<NoteCardResponse> cards = pageItems.stream()
-                .map(this::toCard)
+                .map(note -> toCard(note, counters.get(note.getNoteId())))
                 .toList();
         String nextCursor = null;
         if (hasMore && !pageItems.isEmpty()) {
@@ -829,14 +842,18 @@ public class NoteApplicationService {
     }
 
     private NoteCardResponse toCard(NoteEntity note) {
+        return toCard(note, null);
+    }
+
+    private NoteCardResponse toCard(NoteEntity note, NoteCounterValues counterValues) {
         NoteVersionEntity version = requireVersion(note.getNoteId(), note.getCurrentVersion());
         return new NoteCardResponse(
                 String.valueOf(note.getNoteId()),
                 version.getTitle(),
                 fileAccessUrl(note.getCoverFileId()),
                 String.valueOf(note.getAuthorId()),
-                safeCountLikes(note.getNoteId()),
-                safeCountCollections(note.getNoteId()),
+                counterValues == null ? safeCountLikes(note.getNoteId()) : counterValues.likeCount(),
+                counterValues == null ? safeCountCollections(note.getNoteId()) : counterValues.collectCount(),
                 toOffsetString(note.getPublishedAt())
         );
     }
@@ -898,6 +915,27 @@ public class NoteApplicationService {
             return noteInteractionMapper.countCollections(noteId);
         } catch (RuntimeException exception) {
             return 0L;
+        }
+    }
+
+    private NoteCountsResponse directNoteCounts(Long noteId) {
+        return new NoteCountsResponse(
+                safeCountLikes(noteId),
+                safeCountCollections(noteId),
+                0L
+        );
+    }
+
+    private Map<Long, NoteCounterValues> noteCounterValues(List<NoteEntity> notes) {
+        if (notes.isEmpty()) {
+            return Map.of();
+        }
+        try {
+            return noteCounterClient.noteCounts(notes.stream()
+                    .map(NoteEntity::getNoteId)
+                    .toList());
+        } catch (RuntimeException exception) {
+            return Map.of();
         }
     }
 
