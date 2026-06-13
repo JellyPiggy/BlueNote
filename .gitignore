@@ -1,5 +1,7 @@
 .codex/
 方案/.codex/
+.m2/
+out/
 
 # Local/editor files
 .vscode/
@@ -9,6 +11,10 @@
 .DS_Store
 Thumbs.db
 target/
+dist/
+unpackage/
+node_modules/
+coverage/
 
 # Environment / secrets
 .env
