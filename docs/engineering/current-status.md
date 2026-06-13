@@ -3,7 +3,7 @@
 版本：v0.20
 状态：第一条主链路完成，移动端编辑主页和头像/封面上传闭环已接入，第二条社交链路 relation/counter/feed/rank/notification/push 完成 foundation，第三条实时链路 IM 单聊最小纵切面已接入，第四条订单链路 foundation、库存可靠性、活动运营最小闭环和订单通知最小纵切面已接入，移动端关注 Feed 和榜单页已接入
 更新时间：2026-06-13
-当前分支：`codex/profile-edit-foundation`
+当前分支：`codex/engineering-readiness`
 当前基线提交：以本分支最新提交为准
 
 ## 1. 文档用途
@@ -598,7 +598,8 @@ mobile/src/
 | `f53605b` | 排行榜 foundation |
 | `d7502e0` | 移动端榜单页 |
 | `a6737c5` | 订单通知最小纵切面 |
-| 本分支最新 | 资料编辑与头像/封面上传闭环 |
+| `aaa0012` | 资料编辑与头像/封面上传闭环 |
+| 本分支最新 | 工程收尾文档、第一链路冒烟脚本和契约核对记录 |
 
 ## 5. 当前运行与验证方式
 
@@ -707,19 +708,22 @@ npm run dev:h5
     - 头像文件 `324024850588901376`、主页封面文件 `324024850916057088` 均完成 `upload-token -> MinIO PUT -> confirm`。
     - `PUT /api/users/me/profile` 成功把昵称、简介、地区、头像和主页封面保存到用户资料，`profileVersion` 从 1 增加到 2。
     - `GET /api/users/me` 返回真实 `avatarFileId/avatarUrl/homeCoverFileId/homeCoverUrl`，`GET /api/users/{userId}/home` 返回更新后的昵称和头像摘要。
+32. 本轮工程收尾补齐 `backend/README.md`、`docs/engineering/02-local-main-chain-runbook.md`、`deploy/compose/README.md`、`docs/testing/01-main-chain-contract-audit.md` 和 `scripts/verify-main-chain.ps1` 后，第一条主链路冒烟脚本已通过：
+    - 通过 gateway 注册临时 H5 用户 `main_chain_20260613120620`，用户 `324036747971268608`。
+    - 笔记图片文件 `324036748726247424` 完成 `upload-token -> MinIO PUT -> confirm`，发布笔记 `324036749305061376`。
+    - 头像文件 `324036749871292416`、主页封面文件 `324036750122950656` 完成直传和确认。
+    - `PUT /api/users/me/profile` 后 `profileVersion` 从 1 增加到 2。
+    - `GET /api/notes/{noteId}` 返回 `degraded=false`，`GET /api/users/{userId}/home` 返回 `degraded=false`。
 
 ## 6. 待完成事项
 
 ### 6.1 第一条主链路收尾
 
-优先级最高：
+当前剩余：
 
-1. 补一次完整本地端到端验收：网关 -> member/content -> MySQL/MinIO。
-2. 更新 `backend/README.md`，它当前仍有早期“内存占位”的过时描述。
-3. 整理 local 启动顺序和常见问题到 `docs/engineering/` 或 `deploy/compose/README.md`。
-4. 为 auth/user/file/note 补最小接口测试或集成测试。
-5. 补 OpenAPI 与 `docs/contracts/api/` 的字段核对记录。
-6. 确认 H5 真机或手机浏览器适配，尤其是安全区、底部 tab、图片上传。
+1. 为 auth/user/file/note 补 Java 层最小接口测试或集成测试。
+2. 建立 OpenAPI JSON 与 `docs/contracts/api/` 的自动 diff。
+3. 确认 H5 真机或手机浏览器适配，尤其是安全区、底部 tab、图片上传。
 
 ### 6.2 移动端体验继续完善
 
