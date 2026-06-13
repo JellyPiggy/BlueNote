@@ -264,7 +264,7 @@ mvn -q -DskipTests spring-boot:run
 
 | 配置 | 默认值 |
 |---|---|
-| MySQL root 密码 | `bluenote_root_local` |
+| MySQL root 密码 | `change_me_local_mysql_root` |
 | member 数据源 | `jdbc:mysql://127.0.0.1:3306/bluenote_auth` |
 | content 数据源 | `jdbc:mysql://127.0.0.1:3306/bluenote_file` |
 | social 数据源 | `jdbc:mysql://127.0.0.1:3306/bluenote_relation` |
