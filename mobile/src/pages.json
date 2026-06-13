@@ -19,6 +19,12 @@
       }
     },
     {
+      "path": "pages/profile/edit",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/note/detail",
       "style": {
         "navigationStyle": "custom"

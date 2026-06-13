@@ -78,6 +78,23 @@ export interface UserProfile {
   profileVersion: number
 }
 
+export interface UpdateProfileRequest {
+  nickname?: string
+  avatarFileId?: string | null
+  bio?: string | null
+  gender?: UserProfile['gender']
+  birthday?: string | null
+  regionCode?: string | null
+  homeCoverFileId?: string | null
+  baseProfileVersion: number
+}
+
+export interface UpdateProfileResponse {
+  userId: string
+  profileVersion: number
+  updatedAt: string
+}
+
 export interface UserSummary {
   userId: string
   bluenoteNo: string

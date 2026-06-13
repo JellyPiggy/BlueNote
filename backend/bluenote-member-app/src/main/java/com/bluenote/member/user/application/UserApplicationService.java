@@ -25,6 +25,8 @@ import com.bluenote.member.user.infrastructure.entity.UserProfileAuditEntity;
 import com.bluenote.member.user.infrastructure.entity.UserProfileEntity;
 import com.bluenote.member.user.infrastructure.client.UserCounterClient;
 import com.bluenote.member.user.infrastructure.client.UserCounterClient.UserCounterResult;
+import com.bluenote.member.user.infrastructure.client.UserFileClient;
+import com.bluenote.member.user.infrastructure.client.UserFileClient.ValidatedUserFile;
 import com.bluenote.member.user.infrastructure.mapper.UserOutboxEventMapper;
 import com.bluenote.member.user.infrastructure.mapper.UserProfileAuditMapper;
 import com.bluenote.member.user.infrastructure.mapper.UserProfileMapper;
@@ -57,6 +59,7 @@ public class UserApplicationService {
     private final MemberIdGenerator idGenerator;
     private final JsonPayloads jsonPayloads;
     private final UserCounterClient userCounterClient;
+    private final UserFileClient userFileClient;
 
     public UserApplicationService(
             UserProfileMapper profileMapper,
@@ -64,7 +67,8 @@ public class UserApplicationService {
             UserOutboxEventMapper outboxEventMapper,
             MemberIdGenerator idGenerator,
             JsonPayloads jsonPayloads,
-            UserCounterClient userCounterClient
+            UserCounterClient userCounterClient,
+            UserFileClient userFileClient
     ) {
         this.profileMapper = profileMapper;
         this.profileAuditMapper = profileAuditMapper;
@@ -72,6 +76,7 @@ public class UserApplicationService {
         this.idGenerator = idGenerator;
         this.jsonPayloads = jsonPayloads;
         this.userCounterClient = userCounterClient;
+        this.userFileClient = userFileClient;
     }
 
     @Transactional(readOnly = true)
@@ -92,7 +97,7 @@ public class UserApplicationService {
 
         UserProfileEntity updated = copy(current);
         List<FieldChange> changes = new ArrayList<>();
-        applyProfileChanges(request, current, updated, changes);
+        ProfileFileBindings fileBindings = applyProfileChanges(userId, request, current, updated, changes);
         if (changes.isEmpty()) {
             return new UpdateProfileResponse(userId, current.getProfileVersion(), toOffsetString(current.getUpdatedAt()));
         }
@@ -109,6 +114,7 @@ public class UserApplicationService {
             insertAudit(parsedUserId, change, now);
         }
         insertUserOutbox(updated, now);
+        bindProfileFiles(userId, fileBindings);
         return new UpdateProfileResponse(userId, updated.getProfileVersion(), toOffsetString(now));
     }
 
@@ -196,12 +202,15 @@ public class UserApplicationService {
         return new StatusCheckResponse(results);
     }
 
-    private void applyProfileChanges(
+    private ProfileFileBindings applyProfileChanges(
+            String userId,
             UpdateProfileRequest request,
             UserProfileEntity current,
             UserProfileEntity updated,
             List<FieldChange> changes
     ) {
+        String avatarToBind = null;
+        String homeCoverToBind = null;
         if (request.nicknamePresent()) {
             String nickname = request.nickname();
             if (nickname == null || nickname.isBlank()) {
@@ -212,8 +221,14 @@ public class UserApplicationService {
         if (request.avatarFileIdPresent()) {
             Long avatarFileId = parseOptionalId(request.avatarFileId(), ApiErrorCode.AVATAR_FILE_INVALID);
             setLong("avatarFileId", current.getAvatarFileId(), avatarFileId, updated::setAvatarFileId, changes);
-            if (!Objects.equals(current.getAvatarFileId(), avatarFileId)) {
-                updated.setAvatarUrl(null);
+            if (avatarFileId != null && (!Objects.equals(current.getAvatarFileId(), avatarFileId) || isBlank(current.getAvatarUrl()))) {
+                ValidatedUserFile file = userFileClient.validateAvatar(userId, String.valueOf(avatarFileId));
+                setString("avatarUrl", current.getAvatarUrl(), file.accessUrl(), updated::setAvatarUrl, changes);
+                avatarToBind = file.fileId();
+            } else if (!Objects.equals(current.getAvatarFileId(), avatarFileId)) {
+                if (avatarFileId == null) {
+                    setString("avatarUrl", current.getAvatarUrl(), null, updated::setAvatarUrl, changes);
+                }
             }
         }
         if (request.bioPresent()) {
@@ -233,9 +248,26 @@ public class UserApplicationService {
         if (request.homeCoverFileIdPresent()) {
             Long homeCoverFileId = parseOptionalId(request.homeCoverFileId(), ApiErrorCode.HOME_COVER_FILE_INVALID);
             setLong("homeCoverFileId", current.getHomeCoverFileId(), homeCoverFileId, updated::setHomeCoverFileId, changes);
-            if (!Objects.equals(current.getHomeCoverFileId(), homeCoverFileId)) {
-                updated.setHomeCoverUrl(null);
+            if (homeCoverFileId != null
+                    && (!Objects.equals(current.getHomeCoverFileId(), homeCoverFileId) || isBlank(current.getHomeCoverUrl()))) {
+                ValidatedUserFile file = userFileClient.validateHomeCover(userId, String.valueOf(homeCoverFileId));
+                setString("homeCoverUrl", current.getHomeCoverUrl(), file.accessUrl(), updated::setHomeCoverUrl, changes);
+                homeCoverToBind = file.fileId();
+            } else if (!Objects.equals(current.getHomeCoverFileId(), homeCoverFileId)) {
+                if (homeCoverFileId == null) {
+                    setString("homeCoverUrl", current.getHomeCoverUrl(), null, updated::setHomeCoverUrl, changes);
+                }
             }
+        }
+        return new ProfileFileBindings(avatarToBind, homeCoverToBind);
+    }
+
+    private void bindProfileFiles(String userId, ProfileFileBindings fileBindings) {
+        if (fileBindings.avatarFileId() != null) {
+            userFileClient.bindAvatar(userId, fileBindings.avatarFileId());
+        }
+        if (fileBindings.homeCoverFileId() != null) {
+            userFileClient.bindHomeCover(userId, fileBindings.homeCoverFileId());
         }
     }
 
@@ -489,6 +521,13 @@ public class UserApplicationService {
         return value == null ? null : String.valueOf(value);
     }
 
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
     private record FieldChange(String fieldName, String oldValue, String newValue) {
+    }
+
+    private record ProfileFileBindings(String avatarFileId, String homeCoverFileId) {
     }
 }
