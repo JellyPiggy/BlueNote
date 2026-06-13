@@ -2,22 +2,16 @@
 
 BlueNote 后端采用 Java 21、Spring Boot 3.5.x、Spring Cloud 2025.0.x 和 Maven 多模块结构。
 
-当前后端已经支撑第一条主链路：
+当前后端已经支撑四条业务链路的本地联调基线：
 
 ```text
-注册/登录 -> 获取用户资料 -> 上传图片 -> 发布笔记 -> 查看笔记详情
+第一条主链路：注册/登录 -> 用户资料 -> 图片上传 -> 发布笔记 -> 笔记详情
+第二条社交链路：关注 -> Feed -> 互动 -> 计数 -> 通知 -> Push
+第三条实时链路：设备注册 -> WebSocket -> IM 单聊 -> 在线投递
+第四条订单链路：活动预热 -> 秒杀 -> 订单 -> MOCK 支付/发券 -> 通知
 ```
 
-第二条主链路已开始落地，当前完成 relation/comment/counter/feed/notification/push 起步纵切面，并已接入基础 MQ/outbox 闭环：
-
-```text
-关注用户 -> 关系事实落库 -> relation-event outbox
-评论/回复 -> 评论事实落库 -> comment-event outbox
-outbox dispatcher -> RocketMQ -> counter 自动消费 -> counter-event outbox
-NotePublished/UserFollowed -> feed 自动消费 -> 收件箱/重建/feed-event outbox
-点赞/收藏/评论/关注/笔记状态事件 -> notification 自动消费 -> 站内通知/未读数/notification-event/push-request-event outbox
-PushSendRequested -> push 自动消费 -> WebSocket 在线投递/离线通道降级 -> 投递请求/尝试日志/push-event outbox
-```
+接口字段、错误码、DDL、Redis Key、MQ 事件和权限边界以 `docs/contracts/` 为准；本文只记录当前后端运行状态。
 
 ## 1. 模块
 
@@ -36,6 +30,7 @@ backend/
   bluenote-member-app/
   bluenote-content-app/
   bluenote-social-app/
+  bluenote-order-app/
   sql/
 ```
 
@@ -44,9 +39,10 @@ backend/
 | 应用 | 端口 | 当前职责 |
 |---|---:|---|
 | `bluenote-gateway-app` | 8080 | 网关、JWT 校验、路由、用户上下文 Header 注入、WebSocket 转发 |
-| `bluenote-member-app` | 8081 | auth、user |
-| `bluenote-content-app` | 8082 | file、note、comment |
-| `bluenote-social-app` | 8083 | relation、counter、feed、notification、push，后续承载 rank |
+| `bluenote-member-app` | 8081 | auth、user、资料编辑和头像/封面文件校验绑定 |
+| `bluenote-content-app` | 8082 | file、note、comment、笔记互动列表 |
+| `bluenote-social-app` | 8083 | relation、counter、feed、rank、notification、push、im |
+| `bluenote-order-app` | 8084 | 神券活动、秒杀、订单、MOCK 支付、发券、订单运维 |
 
 ## 2. 当前实现状态
 
@@ -54,19 +50,15 @@ backend/
 
 `bluenote-gateway-app` 已实现：
 
-1. Access Token JWT 校验。
-2. 公开接口放行。
-3. 认证失败统一响应。
-4. 向下游注入：
-   - `X-User-Id`
-   - `X-Device-Id`
-   - `X-Session-Id`
-   - `X-Trace-Id`
-5. member/content/social 路由。
+1. Access Token JWT 校验和公开接口放行。
+2. 认证失败统一响应。
+3. 向下游注入 `X-User-Id`、`X-Device-Id`、`X-Session-Id`、`X-Trace-Id`。
+4. member/content/social/order 路由。
+5. `/ws/realtime` WebSocket 转发到 social-app。
 
 ### 2.2 Member App
 
-`bluenote-member-app` 已从内存占位改为 MySQL 落库。
+`bluenote-member-app` 已落 MySQL，包含 auth/user 第一条主链路能力。
 
 auth 外部接口：
 
@@ -87,28 +79,18 @@ user 外部接口：
 | `GET /api/users/{userId}/public` | 用户公开资料 |
 | `GET /api/users/{userId}/home` | 用户主页头部 |
 
-user 内部接口：
-
-| 接口 | 说明 |
-|---|---|
-| `POST /internal/users/register-profile` | 注册后创建默认用户资料 |
-| `POST /internal/users/batch-summary` | 批量查询用户摘要 |
-| `POST /internal/users/status-check` | 批量校验用户状态 |
-
 已接入能力：
 
-1. BCrypt 密码哈希。
-2. Access Token 签发。
-3. Refresh Token 哈希存储和轮换。
-4. 设备会话。
-5. 登录审计。
-6. 用户资料审计。
-7. auth/user outbox 写库。
-8. 用户主页头部计数通过 counter 聚合 relation/note 来源返回，异常时降级展示。
+1. BCrypt 密码哈希、Access Token 签发、Refresh Token 哈希存储和轮换。
+2. 设备会话、登录审计、用户资料审计。
+3. auth/user outbox 写库。
+4. 资料编辑使用 `profileVersion` 做并发控制。
+5. 头像和主页封面会调用 file 内部接口校验归属、场景、状态、类型和大小，保存访问 URL 快照，并绑定 `USER_AVATAR` / `USER_HOME_COVER` 文件。
+6. 用户主页头部计数通过 counter 聚合 relation/note 来源返回，异常时降级展示。
 
 ### 2.3 Content App
 
-`bluenote-content-app` 已从占位接口接入 MySQL 和 MinIO，并补齐 comment 最小可用链路。
+`bluenote-content-app` 已接入 MySQL 和 MinIO，包含 file/note/comment 能力。
 
 file 外部接口：
 
@@ -117,15 +99,6 @@ file 外部接口：
 | `POST /api/files/upload-token` | 申请预签名上传凭证 |
 | `POST /api/files/{fileId}/confirm` | 确认上传完成 |
 | `GET /api/files/{fileId}/access-url` | 获取文件访问地址 |
-
-file 内部接口：
-
-| 接口 | 说明 |
-|---|---|
-| `POST /internal/files/validate` | 校验文件 |
-| `POST /internal/files/batch-validate` | 批量校验文件 |
-| `POST /internal/files/bind` | 绑定文件 |
-| `POST /internal/files/batch-bind` | 批量绑定文件 |
 
 note 外部接口：
 
@@ -145,14 +118,6 @@ note 外部接口：
 | `POST /api/notes/{noteId}/collect` | 笔记收藏 |
 | `DELETE /api/notes/{noteId}/collect` | 取消笔记收藏 |
 
-note 内部接口：
-
-| 接口 | 说明 |
-|---|---|
-| `POST /internal/notes/batch-summary` | 批量笔记摘要 |
-| `POST /internal/notes/comment-check` | 评论前校验 |
-| `POST /internal/notes/counter-source` | 笔记和用户作品计数来源 |
-
 comment 外部接口：
 
 | 接口 | 说明 |
@@ -166,157 +131,65 @@ comment 外部接口：
 | `DELETE /api/comments/{commentId}/like` | 取消评论点赞 |
 | `GET /api/comments/me` | 我的评论 |
 
-comment 内部接口：
-
-| 接口 | 说明 |
-|---|---|
-| `POST /internal/comments/batch-summary` | 批量评论摘要 |
-| `POST /internal/comments/counter-source` | 评论计数来源 |
-
 已接入能力：
 
 1. MinIO 预签名 PUT 上传。
 2. 文件元数据、上传会话、绑定关系落库。
-3. 笔记、媒体、版本、话题、幂等请求落库。
-4. 发布、删除、点赞、取消点赞、收藏、取消收藏写 note outbox。
-5. 笔记详情聚合作者、媒体、counter 计数结构和 viewerAction，counter 异常时降级展示。
-6. 评论、回复、删除、评论点赞落 MySQL。
-7. 评论发布/删除/点赞写 comment outbox。
-8. 评论列表聚合作者、正文、计数快照和 viewerAction。
-
-限制：note/comment/file outbox 已可由通用 dispatcher 投递 RocketMQ；feed 已消费 note/relation 事件生成关注页读模型，notification 已消费 interaction/comment/relation/note 状态事件生成站内通知。
+3. 笔记、媒体、版本、话题、幂等请求和互动明细落库。
+4. 笔记发布、删除、点赞、收藏写 note outbox。
+5. 笔记详情和列表优先通过 counter 返回计数，异常时降级。
+6. 评论、回复、删除、评论点赞落库并写 comment outbox。
 
 ### 2.4 Social App
 
-`bluenote-social-app` 已新增 relation/counter/feed/notification/push 最小可用链路。
-
-relation 外部接口：
-
-| 接口 | 说明 |
-|---|---|
-| `POST /api/relations/following/{followeeId}` | 关注用户 |
-| `DELETE /api/relations/following/{followeeId}` | 取消关注 |
-| `GET /api/relations/users/{userId}/following` | 查询关注列表 |
-| `GET /api/relations/users/{userId}/followers` | 查询粉丝列表 |
-| `GET /api/relations/following/{targetUserId}/status` | 查询单个关注状态 |
-| `POST /api/relations/following/status/batch` | 批量查询关注状态 |
-
-relation 内部接口：
-
-| 接口 | 说明 |
-|---|---|
-| `POST /internal/relations/following/status/batch` | 内部批量查询关注状态 |
-| `GET /internal/relations/users/{userId}/followers/page` | Feed 扩散分页查询粉丝 |
-| `GET /internal/relations/users/{userId}/following/page` | Feed 查询和重建分页查询关注 |
-| `POST /internal/relations/counter-source` | 计数服务校准来源 |
-
-counter 内部接口：
-
-| 接口 | 说明 |
-|---|---|
-| `POST /internal/counters/batch` | 批量聚合 NOTE / USER / COMMENT 计数 |
-| `POST /internal/counters/events/consume` | 内部事件消费入口，可用于 MQ listener、补偿和本地联调 |
-| `POST /internal/counters/reconcile` | 计数校准和重建 |
-| `GET /internal/counters/rebuild-tasks/{taskId}` | 查询重建任务 |
-| `POST /internal/counters/warmup` | 批量预热计数 |
-
-feed 外部接口：
-
-| 接口 | 说明 |
-|---|---|
-| `GET /api/feed/following` | 关注页 Feed，优先读取 Redis/MySQL 收件箱，降级时回源关注作者近期公开笔记 |
-
-feed 内部接口：
-
-| 接口 | 说明 |
-|---|---|
-| `POST /internal/feed/users/{userId}/rebuild` | 触发用户 Feed 收件箱重建 |
-| `GET /internal/feed/rebuild-tasks/{taskId}` | 查询 Feed 重建任务 |
-| `GET /internal/feed/fanout-tasks/{taskId}` | 查询笔记 Feed 投递任务 |
-| `POST /internal/feed/fanout-tasks/{taskId}/retry` | 手动重试 Feed 投递任务 |
-
-notification 外部接口：
-
-| 接口 | 说明 |
-|---|---|
-| `GET /api/notifications/unread-count` | 查询总未读数和分类未读数 |
-| `GET /api/notifications` | 按分类和游标查询通知列表 |
-| `GET /api/notifications/{notificationId}` | 查询通知详情 |
-| `POST /api/notifications/{notificationId}/read` | 标记单条已读，幂等 |
-| `POST /api/notifications/read-all` | 按分类或全部标记已读 |
-| `DELETE /api/notifications/{notificationId}` | 删除单条通知 |
-| `DELETE /api/notifications` | 批量删除通知 |
-
-notification 内部接口：
-
-| 接口 | 说明 |
-|---|---|
-| `POST /internal/notifications/system` | 创建系统通知，按 requestId 幂等 |
-| `POST /internal/notifications/batch-summary` | 批量查询通知摘要 |
-| `POST /internal/notifications/users/{userId}/rebuild-unread` | 从通知事实表重建用户未读数 |
-| `POST /internal/notifications/events/replay` | 基于消费记录重放事件 |
-
-push 外部接口：
-
-| 接口 | 说明 |
-|---|---|
-| `POST /api/push/devices/register` | 登录后注册或更新当前设备 |
-| `GET /api/push/devices` | 查询当前用户设备列表 |
-| `DELETE /api/push/devices/{deviceId}` | 解绑当前用户设备 |
-| `GET /api/push/preferences` | 查询当前用户推送偏好 |
-| `PUT /api/push/preferences` | 更新当前用户推送偏好 |
-| `POST /api/push/clicks` | 记录 Push 点击回传 |
-
-push 内部接口：
-
-| 接口 | 说明 |
-|---|---|
-| `POST /internal/push/requests/send` | 创建或复用推送请求并执行投递 |
-| `GET /internal/push/requests/{requestId}` | 查询推送请求和尝试日志 |
-| `POST /internal/push/requests/{requestId}/retry` | 重试推送请求 |
-| `POST /internal/push/events/replay` | 基于消费记录重放 Push 事件 |
-| `GET /internal/push/users/{userId}/online-state` | 查询当前实例内用户在线设备 |
-| `POST /internal/push/users/{userId}/kick` | 踢下线用户设备连接 |
+`bluenote-social-app` 当前承载 relation/counter/feed/rank/notification/push/im。
 
 已接入能力：
 
-1. `relation_following` 关注事实落库。
-2. `relation_follower` 粉丝方向读表同步。
-3. `relation_change_log` 变更流水。
-4. `relation_outbox_event` 写出 `UserFollowed` / `UserUnfollowed`。
-5. 关注列表、粉丝列表和关注状态走 MySQL 查询。
-6. 通过 member 内部接口校验用户状态和补全用户摘要。
-7. counter 查询聚合 relation、note、comment 的 `counter-source`，供用户主页等接口使用。
-8. counter 已有快照表、delta 流水、消费幂等、Redis 在线计数、重建任务和 `CounterChanged` outbox。
-9. social-app 已启动 RocketMQ counter consumer，自动消费 `note-event`、`interaction-event`、`comment-event`、`relation-event`。
-10. feed 已落 `bluenote_feed.feed_note_index`、`feed_inbox_item`、`feed_fanout_task`、`feed_fanout_sub_task`、`feed_rebuild_task`、`feed_consume_record`、`feed_outbox_event`。
-11. feed 已启动 RocketMQ consumer，自动消费：
-   - `bluenote-feed-note-consumer`：`note-event`
-   - `bluenote-feed-relation-consumer`：`relation-event`
-   - `bluenote-feed-fanout-executor`：`feed-fanout-task-event`
-12. Feed 读取优先级为 Redis 收件箱 -> MySQL 收件箱 -> 关注作者近期公开笔记回源，并在读取时过滤已取关作者和不可见笔记。
-13. notification 已落 `bluenote_notification.notification_record`、`notification_aggregate_actor`、`notification_unread_counter`、`notification_consume_record`、`notification_outbox_event`。
-14. notification 支持点赞/收藏聚合通知、评论/回复明细通知、关注通知、系统通知、未读数 Redis 缓存和 MySQL 重建。
-15. notification 已启动 RocketMQ consumer，自动消费：
-   - `bluenote-notification-interaction-consumer`：`interaction-event`
-   - `bluenote-notification-comment-consumer`：`comment-event`
-   - `bluenote-notification-relation-consumer`：`relation-event`
-   - `bluenote-notification-note-consumer`：`note-event`
-16. push 已落 `bluenote_push.push_device`、`push_preference`、`push_delivery_request`、`push_delivery_attempt`、`push_click_log`、`push_consume_record`、`push_outbox_event`。
-17. push 已启动 `bluenote-push-request-consumer`，自动消费 `push-request-event` 中的 `PushSendRequested`。
-18. push 已支持 `/ws/realtime`，完成 token + deviceId 握手校验、在线设备 Redis 路由、`PING` / `PONG`、`PUSH_MESSAGE` 下行和客户端 `ACK` 落库。
-19. push 投递策略当前为 WebSocket 在线优先；离线 uni-push / 厂商 Push 通道仍为配置关闭的扩展点。
+1. relation：关注、取关、关注列表、粉丝列表、关注状态、relation outbox。
+2. counter：`counter_snapshot`、delta 流水、消费幂等、Redis 在线计数、重建任务、`CounterChanged` outbox。
+3. feed：关注页 Feed、收件箱、fanout 任务、重建任务、Redis/MySQL/回源降级读路径、feed outbox。
+4. rank：周热笔记榜、年度创作者成长榜、Redis 在线榜、MySQL 分数事实、快照、重建、`RankChanged` outbox。
+5. notification：点赞/收藏聚合通知、评论/回复/关注/系统/订单通知、未读数、重建、notification outbox。
+6. push：设备、偏好、投递请求、投递尝试、点击日志、WebSocket 在线投递、ACK 落库、push outbox。
+7. im：单聊文字消息、会话列表、消息列表、未读、已读、送达、IM outbox 和 `PushSendRequested`。
 
-### 2.5 MQ 与 Outbox
+当前已启动的 RocketMQ consumer 包括 counter/feed/rank/notification/push/order/IM 相关消费组。真实 uni-push / 厂商 Push 离线通道仍是后续扩展点。
+
+### 2.5 Order App
+
+`bluenote-order-app` 已接入神券订单 foundation、库存可靠性和活动运营最小闭环。
+
+主要外部接口：
+
+| 接口 | 说明 |
+|---|---|
+| `GET /api/order/coupon-activities/current` | 当前可参与活动 |
+| `POST /api/order/seckill/token` | 获取秒杀令牌 |
+| `POST /api/order/seckill/orders` | 提交抢券请求 |
+| `GET /api/order/seckill/results/{requestId}` | 查询抢券结果 |
+| `GET /api/order/orders/{orderId}` | 查询订单详情 |
+| `POST /api/order/orders/{orderId}/pay` | MOCK 支付 |
+| `POST /api/order/orders/{orderId}/cancel` | 取消待支付订单 |
+| `GET /api/order/my-coupons` | 我的神券 |
+
+已接入能力：
+
+1. 活动配置、预热、状态流转、上线前预检查。
+2. 秒杀 token、Redis Lua 预扣库存、异步下单。
+3. 免费券发券、MOCK 支付、超时关单和库存回补。
+4. 活动列表/详情、库存调整、库存对账修复、Redis 库存重建、卡住请求收敛。
+5. order outbox、MQ listener、订单通知事件。
+
+### 2.6 MQ 与 Outbox
 
 `bluenote-common-mq` 已提供基础 MQ/outbox 能力：
 
-1. 通用 RocketMQ producer。
-2. 通用 RocketMQ consumer 容器。
-3. 事件类型到 Topic 的契约映射。
-4. 通用 outbox dispatcher，扫描 `INIT` / `FAILED` 事件并发送 RocketMQ。
-5. 发送成功标记 `SENT`，发送失败标记 `FAILED`、增加 `retry_count` 并写入 `next_retry_at`。
-6. 内部运维接口可查询积压、手动触发发送和重置失败事件。
+1. 通用 RocketMQ producer 和 consumer 容器。
+2. 事件类型到 Topic 的契约映射。
+3. 通用 outbox dispatcher，扫描 `INIT` / `FAILED` 事件并发送 RocketMQ。
+4. 发送成功标记 `SENT`，失败标记 `FAILED`、增加 `retry_count` 并写入 `next_retry_at`。
+5. 内部运维接口可查询积压、手动触发发送和重置失败事件。
 
 当前接入的 outbox 表：
 
@@ -324,30 +197,17 @@ push 内部接口：
 |---|---|
 | member | `bluenote_auth.auth_outbox_event`、`bluenote_user.user_outbox_event` |
 | content | `bluenote_file.file_outbox_event`、`bluenote_note.note_outbox_event`、`bluenote_comment.comment_outbox_event` |
-| social | `bluenote_relation.relation_outbox_event`、`bluenote_counter.counter_outbox_event`、`bluenote_feed.feed_outbox_event`、`bluenote_notification.notification_outbox_event`、`bluenote_push.push_outbox_event` |
-
-本地默认启用 MQ/outbox，可通过环境变量关闭：
-
-| 环境变量 | 说明 | 默认 |
-|---|---|---|
-| `BLUENOTE_MQ_ENABLED` | 是否启动 RocketMQ producer/consumer | `true` |
-| `BLUENOTE_OUTBOX_DISPATCH_ENABLED` | 是否启动 outbox dispatcher | `true` |
-| `BLUENOTE_ROCKETMQ_NAME_SERVER` | RocketMQ NameServer 地址 | `127.0.0.1:9876` |
-
-MQ/outbox 内部运维接口：
-
-| 接口 | 说明 |
-|---|---|
-| `GET /internal/mq/outbox/stats` | 查询当前应用声明的 outbox 表积压、可重试失败、死信和已发送数量 |
-| `POST /internal/mq/outbox/dispatch-once` | 手动触发当前应用扫描发送一次 |
-| `POST /internal/mq/outbox/events/retry` | 将指定失败事件重置为可重试状态 |
+| social | `bluenote_relation.relation_outbox_event`、`bluenote_counter.counter_outbox_event`、`bluenote_feed.feed_outbox_event`、`bluenote_rank.rank_outbox_event`、`bluenote_notification.notification_outbox_event`、`bluenote_push.push_outbox_event`、`bluenote_im.im_outbox_event` |
+| order | `bluenote_order.order_outbox_event` |
 
 ## 3. 本地要求
 
 1. JDK 21。
-2. Maven，建议 3.6.3 或更高版本。
+2. Maven 可用；本地已知旧 Maven 环境下 `mvn -q -DskipTests compile` 可用。
 3. Docker Desktop 或可用 Docker Compose。
-4. 先启动 local 依赖：
+4. Node.js/npm 用于移动端 H5。
+
+启动 local 依赖：
 
 ```bash
 docker compose -f deploy/compose/compose.base.yml -f deploy/compose/compose.local.yml up -d
@@ -362,30 +222,41 @@ cd backend
 mvn -q -DskipTests compile
 ```
 
-如果单独运行某个应用时提示找不到本仓库内的 common 模块，可先安装本地模块：
+本地运行单个应用时，优先进入应用目录启动，避免旧 Maven / Spring Boot 插件在父工程上误判 main class：
 
-```bash
-mvn -q -DskipTests install
+```powershell
+cd backend/bluenote-member-app
+mvn -q -DskipTests spring-boot:run
 ```
 
-分别启动应用：
+建议分别开终端按顺序启动：
 
-```bash
-cd backend
-mvn -pl bluenote-member-app spring-boot:run
-mvn -pl bluenote-content-app spring-boot:run
-mvn -pl bluenote-social-app spring-boot:run
-mvn -pl bluenote-gateway-app spring-boot:run
+```powershell
+cd backend/bluenote-member-app
+mvn -q -DskipTests spring-boot:run
 ```
 
-建议启动顺序：
+```powershell
+cd backend/bluenote-content-app
+mvn -q -DskipTests spring-boot:run
+```
 
-1. 本地依赖。
-2. `bluenote-member-app`。
-3. `bluenote-content-app`。
-4. `bluenote-social-app`。
-5. `bluenote-gateway-app`。
-6. 移动端 H5。
+```powershell
+cd backend/bluenote-social-app
+mvn -q -DskipTests spring-boot:run
+```
+
+```powershell
+cd backend/bluenote-order-app
+mvn -q -DskipTests spring-boot:run
+```
+
+```powershell
+cd backend/bluenote-gateway-app
+mvn -q -DskipTests spring-boot:run
+```
+
+如果运行时出现 `NoSuchFieldError: COUNTER_*` 一类错误，通常是本地 Maven 仓库里 common 模块旧了。优先重新编译当前源码；确需安装本地模块时再执行 `mvn -q -DskipTests install`，注意旧 Maven/Surefire 组合可能在 install 阶段卡住。
 
 ## 5. 本地默认配置
 
@@ -397,15 +268,18 @@ mvn -pl bluenote-gateway-app spring-boot:run
 | member 数据源 | `jdbc:mysql://127.0.0.1:3306/bluenote_auth` |
 | content 数据源 | `jdbc:mysql://127.0.0.1:3306/bluenote_file` |
 | social 数据源 | `jdbc:mysql://127.0.0.1:3306/bluenote_relation` |
+| order 数据源 | `jdbc:mysql://127.0.0.1:3306/bluenote_order` |
+| Redis | `127.0.0.1:6379` |
 | MinIO endpoint | `http://127.0.0.1:9000` |
 | MinIO bucket | `bluenote-files` |
 | RocketMQ NameServer | `127.0.0.1:9876` |
 | Gateway member URI | `http://127.0.0.1:8081` |
 | Gateway content URI | `http://127.0.0.1:8082` |
 | Gateway social URI | `http://127.0.0.1:8083` |
+| Gateway order URI | `http://127.0.0.1:8084` |
 | Gateway social WebSocket URI | `ws://127.0.0.1:8083` |
 
-注意：member/content/social 当前各自只配置一个 datasource URL，但 DDL 中按逻辑 schema 拆分为 `bluenote_auth`、`bluenote_user`、`bluenote_file`、`bluenote_note`、`bluenote_comment`、`bluenote_relation`、`bluenote_counter`、`bluenote_feed`、`bluenote_notification`、`bluenote_push`。应用内 SQL 使用显式 schema 名访问本应用拥有的逻辑 schema。
+注意：应用数据源按拥有者 schema 连接，SQL 中使用显式 schema 访问同应用内的逻辑库。例如 social-app 使用 `bluenote_relation` 连接，同时访问 relation/counter/feed/rank/notification/push/im 相关 schema。
 
 ## 6. 检查入口
 
@@ -417,6 +291,7 @@ Probe：
 | member | `http://127.0.0.1:8081/internal/member/probe` |
 | content | `http://127.0.0.1:8082/internal/content/probe` |
 | social | `http://127.0.0.1:8083/api/social/probe` |
+| order | `http://127.0.0.1:8084/internal/order/probe` |
 
 Actuator health：
 
@@ -430,10 +305,19 @@ OpenAPI UI：
 http://127.0.0.1:{port}/swagger-ui.html
 ```
 
+第一条主链路冒烟：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/verify-main-chain.ps1 -GatewayBaseUrl http://127.0.0.1:8080
+```
+
 ## 7. 已知待办
 
-1. 补后端自动化测试和接口集成测试。
-2. 补 RocketMQ 死信告警和更完整的人工重放审计。
-3. 补真实 uni-push / 厂商 Push 离线投递通道、凭证配置和失败回执处理。
-4. 补 feed 大 V 推拉结合策略、清理任务后台化和更完整的补偿审计。
-5. 补生产部署、备份恢复、监控告警配置。
+1. 为 auth/user/file/note 补 Java 层最小接口或集成测试。
+2. 建立 OpenAPI JSON 与 `docs/contracts/api/` 的自动 diff。
+3. 补 RocketMQ 死信告警和更完整的人工重放审计。
+4. 补真实 uni-push / 厂商 Push 离线投递通道、凭证配置和失败回执处理。
+5. 补 feed 大 V 推拉结合策略、清理任务后台化和更完整的补偿审计。
+6. 补 rank 定时快照/冻结、历史榜单和运营后台。
+7. 补真实支付渠道、退款、订单运营后台和高并发压测。
+8. 补生产部署、备份恢复、监控告警配置。
