@@ -4,6 +4,8 @@ BlueNote is a full-stack mobile community app inspired by modern note-sharing pr
 
 The project is currently a runnable local demo rather than a production deployment. It is suitable for showcasing backend service design, event-driven workflows, mobile API integration, and end-to-end product thinking.
 
+[中文说明 / Chinese README](README.zh-CN.md)
+
 ## Highlights
 
 - Mobile H5 app built with uni-app, Vue 3, TypeScript and Pinia.
@@ -15,6 +17,26 @@ The project is currently a runnable local demo rather than a production deployme
 - Redis-backed online counters, feed inbox, ranking list, notification unread count, push online state and order seckill stock.
 - Mobile pages for login, home feed, publish, note detail, profile, profile editing, notifications, IM, coupon activity and rankings.
 - Repeatable local smoke script for the main user journey.
+
+## Why This Project Is Useful
+
+BlueNote is intentionally documented as a backend internship project reference. It tries to answer questions that are often missing from small demo projects:
+
+- Where does each business fact live?
+- Which APIs are external and which are internal?
+- Why is Redis used, and how can Redis data be rebuilt?
+- Which changes are sent through RocketMQ events?
+- How are outbox sending, duplicate consumption, idempotency and state transitions handled?
+- What is implemented now, and what is honestly left as production work?
+
+Recommended reading for backend learners:
+
+- [Chinese README](README.zh-CN.md)
+- [Engineering docs index](docs/engineering/README.md)
+- [Backend internship study roadmap](docs/engineering/04-backend-internship-study-roadmap.md)
+- [Architecture and core flows](docs/engineering/05-architecture-and-core-flows.md)
+- [Interview and resume guide](docs/engineering/06-interview-and-resume-guide.md)
+- [Module design overview](docs/engineering/07-module-design-overview.md)
 
 ## What Works
 
@@ -93,6 +115,19 @@ BlueNote/
   scripts/               local verification scripts
   方案/                  original Chinese architecture and service design docs
 ```
+
+## Learning Map
+
+For a quick review, start with this README and [README.zh-CN.md](README.zh-CN.md).
+
+For a serious walkthrough:
+
+1. Read [Contract index](docs/contracts/README.md) to understand the contract-first baseline.
+2. Read [Architecture and core flows](docs/engineering/05-architecture-and-core-flows.md) to understand service boundaries and data flow.
+3. Follow [Backend internship study roadmap](docs/engineering/04-backend-internship-study-roadmap.md) from auth/user/file/note to counter/feed/order/rank.
+4. Read [Module design overview](docs/engineering/07-module-design-overview.md) when you want a module-by-module explanation of architecture, flow and design choices.
+5. Use [Interview and resume guide](docs/engineering/06-interview-and-resume-guide.md) to turn the implementation into a clear project story.
+6. Open `方案/services/` when you want the original detailed Chinese service design documents.
 
 ## Quick Start
 
@@ -184,6 +219,7 @@ npm run build:h5
 
 More details:
 
+- [Engineering docs index](docs/engineering/README.md)
 - [Local main-chain runbook](docs/engineering/02-local-main-chain-runbook.md)
 - [Main-chain contract audit](docs/testing/01-main-chain-contract-audit.md)
 - [Current engineering status](docs/engineering/current-status.md)
@@ -219,6 +255,7 @@ The project has completed the foundation of the planned personal-project scope:
 - realtime push and IM single-chat foundation
 - coupon order chain with MOCK payment
 - mobile H5 pages for the core flows
+- GitHub-facing Chinese and English documentation for backend learners
 
 Known non-goals for the current demo:
 
