@@ -1,10 +1,10 @@
 # BlueNote 当前工程状态
 
-版本：v0.22
+版本：v0.23
 状态：第一条主链路完成，移动端编辑主页和头像/封面上传闭环已接入，第二条社交链路 relation/counter/feed/rank/notification/push 完成 foundation，第三条实时链路 IM 单聊最小纵切面已接入，第四条订单链路 foundation、库存可靠性、活动运营最小闭环和订单通知最小纵切面已接入，移动端关注 Feed 和榜单页已接入，项目已进入 GitHub 展示收口阶段
 更新时间：2026-06-13
-当前分支：`main`
-当前基线提交：以 main 最新提交为准
+当前分支：`codex/github-showcase-polish`
+当前基线提交：以本分支最新提交为准
 
 ## 1. 文档用途
 
@@ -91,6 +91,9 @@ docs/contracts/
 已补工程规范：
 
 ```text
+LICENSE
+README.zh-CN.md
+docs/assets/showcase/
 docs/engineering/README.md
 docs/engineering/01-engineering-structure-and-coding-guidelines.md
 docs/engineering/03-github-demo-guide.md
@@ -608,7 +611,8 @@ mobile/src/
 | `e14ecb5` | 工程收尾文档、第一链路冒烟脚本和契约核对记录 |
 | `ef62a76` | GitHub 展示入口 README 和项目收口指南 |
 | `a011098` | 合并后端实习项目展示文档 |
-| main 最新 | 主分支状态文档同步为 GitHub 展示收口基线 |
+| `6cdecce` | 主分支状态文档同步为 GitHub 展示收口基线 |
+| 本分支最新 | README 顶部视觉、H5 截图/GIF、功能矩阵和 MIT License |
 
 ## 5. 当前运行与验证方式
 
@@ -725,6 +729,7 @@ npm run dev:h5
     - `GET /api/notes/{noteId}` 返回 `degraded=false`，`GET /api/users/{userId}/home` 返回 `degraded=false`。
 33. 本轮项目收口阶段新增根目录 `README.md` 和 `docs/engineering/03-github-demo-guide.md`，并补充 `.gitignore` 忽略 `.m2/`、`out/`、`node_modules/`、`unpackage/`、`dist/`、`coverage/` 等本地产物，目标是让仓库可以作为 GitHub 个人作品直接展示。
 34. 本轮 GitHub star / 后端实习项目展示强化新增 `README.zh-CN.md`、`docs/engineering/README.md`、`docs/engineering/04-backend-internship-study-roadmap.md`、`docs/engineering/05-architecture-and-core-flows.md`、`docs/engineering/06-interview-and-resume-guide.md`、`docs/engineering/07-module-design-overview.md`，并在根 README 和 GitHub Demo Guide 中补充学习入口、架构流程、模块设计和简历面试导向说明。
+35. 本轮第二轮 GitHub 展示 polish 新增 MIT `LICENSE`，并在 `docs/assets/showcase/` 保存从本地 H5 页面截取的展示素材：`hero.png`、`mobile-flow.gif`、`mobile-rank.png` 以及登录、首页、榜单、神券、通知、私信页面截图；根 README 和中文 README 已补充 badge、顶部展示图、项目截图、功能矩阵和 License 入口。
 
 ## 6. 待完成事项
 

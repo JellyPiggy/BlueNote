@@ -1,5 +1,14 @@
 # BlueNote
 
+[![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](#tech-stack)
+[![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot&logoColor=white)](#tech-stack)
+[![Redis 7](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](#tech-stack)
+[![RocketMQ 5](https://img.shields.io/badge/RocketMQ-5-34495E)](#tech-stack)
+[![Mobile H5](https://img.shields.io/badge/Mobile-uni--app%20H5-42B883)](#tech-stack)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+![BlueNote showcase](docs/assets/showcase/hero.png)
+
 BlueNote is a full-stack mobile community app inspired by modern note-sharing products. It is built as a personal project, but the codebase is organized like a small production system: contract-first APIs, separate backend applications, MySQL fact tables, Redis read models, RocketMQ outbox events, MinIO direct upload, and a uni-app mobile H5 client.
 
 The project is currently a runnable local demo rather than a production deployment. It is suitable for showcasing backend service design, event-driven workflows, mobile API integration, and end-to-end product thinking.
@@ -53,6 +62,34 @@ Register / login
 ```
 
 This is not a clone of any specific product brand. The UI and domain model are intentionally generic.
+
+## Showcase
+
+The screenshots below are captured from the local uni-app H5 routes. The ranking screenshot uses data returned by the local backend; unauthenticated pages intentionally show login-required states.
+
+![BlueNote H5 flow](docs/assets/showcase/mobile-flow.gif)
+
+![BlueNote ranking page](docs/assets/showcase/mobile-rank.png)
+
+## Feature Matrix
+
+| Area | User-facing flow | Backend design focus | Status |
+|---|---|---|---|
+| Gateway | Single mobile API entry | JWT validation, public path allowlist, downstream user context headers, WebSocket forwarding | Implemented |
+| Auth | Register, login, refresh token, logout | BCrypt password hash, Access/Refresh Token split, device session, login audit | Implemented |
+| User | Profile, public profile, user home | Profile versioning, avatar/cover file binding, counter-backed home stats | Implemented |
+| File | Image upload for notes, avatars and covers | MinIO presigned PUT, upload session, metadata, ownership validation, business binding | Implemented |
+| Note | Drafts, publishing, detail, lists, likes, collections | Note/media/version tables, idempotent write path, interaction facts, note outbox | Implemented |
+| Comment | Comments, replies, delete, comment likes | Comment hierarchy, status delete, content storage, comment outbox, counter source | Implemented |
+| Relation | Follow, unfollow, following/follower lists | Following/follower read models, idempotent relation writes, relation events | Implemented |
+| Counter | Note/user/comment counts | Event consumption, Redis online count, MySQL snapshot, source fallback, rebuild tasks, CounterChanged outbox | Implemented |
+| Feed | Following feed | Inbox model, fanout tasks, Redis/MySQL read path, follow backfill, rebuild and retry APIs | Implemented |
+| Notification | Unread count and notification center | Aggregated like/collect notifications, detail notifications, unread rebuild, PushSendRequested | Implemented |
+| Push | Realtime in-app delivery | Device registry, preferences, Redis online route, WebSocket delivery, ACK and delivery logs | Implemented foundation |
+| IM | Single chat | Conversation/message persistence, unread count, delivery/read acknowledgements, PushSendRequested | Implemented foundation |
+| Order | Coupon seckill, MOCK payment, user coupons | Seckill token, Redis Lua pre-deduct, async order creation, state machine, timeout close, stock reconcile | Implemented foundation |
+| Rank | Weekly hot notes, yearly creator growth | CounterChanged scoring, Redis ZSet online rank, MySQL score facts, snapshot and rebuild | Implemented foundation |
+| Operations | Local verification | Docker Compose dependencies, backend compile, mobile typecheck/build, main-chain smoke script | Implemented baseline |
 
 ## Architecture
 
@@ -271,8 +308,10 @@ Known non-goals for the current demo:
 
 Some directories and documents use Chinese names because the original architecture notes were written in Chinese. They are intentionally kept in the repository: they show the planning process behind the implementation and are part of the project artifact.
 
+Showcase images are stored under `docs/assets/showcase/`. They are documentation assets captured from the local H5 app, not product marketing mockups.
+
 Local generated files such as `.m2/`, `out/`, `target/`, `node_modules/` and `unpackage/` are ignored.
 
 ## License
 
-No license has been selected yet. Treat the repository as source-available for review unless a license is added.
+BlueNote is licensed under the [MIT License](LICENSE).
