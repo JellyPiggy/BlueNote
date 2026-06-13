@@ -190,10 +190,7 @@ function closeAccountMenu() {
 
 function editProfileFromMenu() {
   accountMenuOpen.value = false
-  uni.showToast({
-    title: '编辑主页功能接入中',
-    icon: 'none'
-  })
+  uni.navigateTo({ url: '/pages/profile/edit' })
 }
 
 async function refreshFromMenu() {

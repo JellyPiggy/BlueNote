@@ -15,6 +15,8 @@ export interface UploadedImage extends PickedImage {
   accessUrl: string
 }
 
+type ImageUploadScene = 'USER_AVATAR' | 'USER_HOME_COVER' | 'NOTE_IMAGE'
+
 export async function pickNoteImages(limit = 9): Promise<PickedImage[]> {
   const result = await uni.chooseImage({
     count: limit,
@@ -42,9 +44,26 @@ export async function pickNoteImages(limit = 9): Promise<PickedImage[]> {
   })
 }
 
+export async function pickSingleImage(): Promise<PickedImage | null> {
+  try {
+    const images = await pickNoteImages(1)
+    return images[0] ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function uploadNoteImage(image: PickedImage): Promise<UploadedImage> {
+  return uploadImageForScene(image, 'NOTE_IMAGE')
+}
+
+export async function uploadProfileImage(image: PickedImage, scene: 'USER_AVATAR' | 'USER_HOME_COVER'): Promise<UploadedImage> {
+  return uploadImageForScene(image, scene)
+}
+
+async function uploadImageForScene(image: PickedImage, scene: ImageUploadScene): Promise<UploadedImage> {
   const token = await createUploadToken({
-    scene: 'NOTE_IMAGE',
+    scene,
     filename: image.name,
     mimeType: image.mimeType,
     fileSize: image.size
@@ -135,4 +154,3 @@ export function confirmedMediaFiles(files: ConfirmUploadResult[]) {
     cover: index === 0
   }))
 }
-

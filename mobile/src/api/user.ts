@@ -1,5 +1,5 @@
 import { apiRequest } from './request'
-import type { UserHome, UserProfile, UserSummary } from './types'
+import type { UpdateProfileRequest, UpdateProfileResponse, UserHome, UserProfile, UserSummary } from './types'
 
 export function getCurrentUser() {
   return apiRequest<UserProfile>({
@@ -21,3 +21,10 @@ export function getUserHome(userId: string) {
   })
 }
 
+export function updateCurrentUserProfile(payload: UpdateProfileRequest) {
+  return apiRequest<UpdateProfileResponse>({
+    method: 'PUT',
+    path: '/api/users/me/profile',
+    data: payload
+  })
+}
