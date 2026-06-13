@@ -1,9 +1,9 @@
 # BlueNote 当前工程状态
 
-版本：v0.21
+版本：v0.22
 状态：第一条主链路完成，移动端编辑主页和头像/封面上传闭环已接入，第二条社交链路 relation/counter/feed/rank/notification/push 完成 foundation，第三条实时链路 IM 单聊最小纵切面已接入，第四条订单链路 foundation、库存可靠性、活动运营最小闭环和订单通知最小纵切面已接入，移动端关注 Feed 和榜单页已接入，项目已进入 GitHub 展示收口阶段
 更新时间：2026-06-13
-当前分支：`codex/github-polish`
+当前分支：`codex/github-internship-polish`
 当前基线提交：以本分支最新提交为准
 
 ## 1. 文档用途
@@ -91,8 +91,13 @@ docs/contracts/
 已补工程规范：
 
 ```text
+docs/engineering/README.md
 docs/engineering/01-engineering-structure-and-coding-guidelines.md
 docs/engineering/03-github-demo-guide.md
+docs/engineering/04-backend-internship-study-roadmap.md
+docs/engineering/05-architecture-and-core-flows.md
+docs/engineering/06-interview-and-resume-guide.md
+docs/engineering/07-module-design-overview.md
 ```
 
 本文用于补充“当前做到哪里”的交接视图。
@@ -601,7 +606,8 @@ mobile/src/
 | `a6737c5` | 订单通知最小纵切面 |
 | `aaa0012` | 资料编辑与头像/封面上传闭环 |
 | `e14ecb5` | 工程收尾文档、第一链路冒烟脚本和契约核对记录 |
-| 本分支最新 | GitHub 展示入口 README 和项目收口指南 |
+| `ef62a76` | GitHub 展示入口 README 和项目收口指南 |
+| 本分支最新 | 面向后端实习项目的中文入口、学习路线、架构流程和面试讲解文档 |
 
 ## 5. 当前运行与验证方式
 
@@ -717,6 +723,7 @@ npm run dev:h5
     - `PUT /api/users/me/profile` 后 `profileVersion` 从 1 增加到 2。
     - `GET /api/notes/{noteId}` 返回 `degraded=false`，`GET /api/users/{userId}/home` 返回 `degraded=false`。
 33. 本轮项目收口阶段新增根目录 `README.md` 和 `docs/engineering/03-github-demo-guide.md`，并补充 `.gitignore` 忽略 `.m2/`、`out/`、`node_modules/`、`unpackage/`、`dist/`、`coverage/` 等本地产物，目标是让仓库可以作为 GitHub 个人作品直接展示。
+34. 本轮 GitHub star / 后端实习项目展示强化新增 `README.zh-CN.md`、`docs/engineering/README.md`、`docs/engineering/04-backend-internship-study-roadmap.md`、`docs/engineering/05-architecture-and-core-flows.md`、`docs/engineering/06-interview-and-resume-guide.md`、`docs/engineering/07-module-design-overview.md`，并在根 README 和 GitHub Demo Guide 中补充学习入口、架构流程、模块设计和简历面试导向说明。
 
 ## 6. 待完成事项
 
