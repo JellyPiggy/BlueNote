@@ -1,7 +1,7 @@
 # 第二条主链路 MQ 事件契约
 
-版本：v0.3
-状态：第二条主链路开发基线，排行榜 foundation 契约开发基线
+版本：v0.4
+状态：第二条主链路开发基线，排行榜 foundation 契约开发基线，订单通知消费组已接入
 
 本文扩展第二条主链路需要的 Topic、事件类型、payload 和消费组。Event Envelope 继承 `01-main-chain-events.md`。
 
@@ -656,6 +656,7 @@ Topic：`push-event`
 | `bluenote-notification-comment-consumer` | `comment-event` | notification |
 | `bluenote-notification-relation-consumer` | `relation-event` | notification |
 | `bluenote-notification-note-consumer` | `note-event` | notification |
+| `bluenote-notification-order-consumer` | `order-event` | notification |
 | `bluenote-im-push-result-consumer` | `push-event` | im，后续 |
 | `bluenote-push-request-consumer` | `push-request-event` | push |
 

@@ -1,7 +1,7 @@
 # 通知 API 契约
 
-版本：v0.2
-状态：第二条主链路开发基线
+版本：v0.3
+状态：第二条主链路开发基线，订单通知最小纵切面开发基线
 
 移动端通过网关访问 `/api/notifications/**`。通知服务负责站内通知和未读数，不负责 WebSocket、系统 Push 或 IM 消息。
 
@@ -14,7 +14,7 @@
 | `INTERACTION` | 互动通知 |
 | `FOLLOW` | 关注通知 |
 | `SYSTEM` | 系统通知 |
-| `ORDER` | 订单通知，预留 |
+| `ORDER` | 订单通知 |
 
 ### 1.2 notificationType
 
@@ -28,6 +28,7 @@
 | `NOTE_AUDIT_REJECTED` | `SYSTEM` | 笔记审核失败 |
 | `NOTE_OFFLINE` | `SYSTEM` | 笔记下架 |
 | `SYSTEM_ANNOUNCEMENT` | `SYSTEM` | 系统公告 |
+| `ORDER_STATUS_CHANGED` | `ORDER` | 神券订单状态变化 |
 
 ## 2. 通用对象
 
@@ -48,6 +49,14 @@
 | `jump` | object | 是 | 移动端跳转参数 |
 | `createdAt` | string | 是 | 创建时间 |
 | `lastEventAt` | string | 是 | 最近触发时间 |
+
+订单通知约定：
+
+1. `category` 为 `ORDER`。
+2. `notificationType` 为 `ORDER_STATUS_CHANGED`。
+3. `target.targetType` 为 `ORDER`，`target.targetId` 为 `orderId`。
+4. `target` 可携带 `orderNo`、`activityId`、`status`、`userCouponId`、`validEndAt`。
+5. `jump.page` 为 `ORDER_ACTIVITY`，移动端跳转到神券活动页；后续如补订单详情页，再扩展为 `ORDER_DETAIL`。
 
 ## 3. 查询未读数
 
@@ -344,7 +353,7 @@ POST /internal/notifications/events/replay
 ## 11. 移动端实现要求
 
 1. 通知入口展示 `totalUnread`。
-2. 通知页按 `互动`、`关注`、`系统` 分 Tab。
+2. 通知页按 `互动`、`关注`、`系统`、`订单` 分 Tab。
 3. 点击通知时先调用已读接口，再跳转目标页面。
 4. 跳转后的目标内容不可见时，由目标页面展示“内容已删除或不可见”。
 5. App 回到前台时重新拉取未读数。

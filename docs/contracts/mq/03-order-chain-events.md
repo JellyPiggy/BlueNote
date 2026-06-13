@@ -1,7 +1,7 @@
 # 第四条订单链路 MQ 事件契约
 
-版本：v0.1
-状态：订单 foundation 开发基线
+版本：v0.2
+状态：订单 foundation 开发基线，订单通知最小纵切面开发基线
 
 订单事件继承 `01-main-chain-events.md` 的通用 Envelope。
 
@@ -20,6 +20,7 @@
 |---|---|---|
 | `bluenote-order-seckill-consumer` | `order-seckill-task-event` | 异步创建神券订单 |
 | `bluenote-order-timeout-consumer` | `order-timeout-event` | 检查并关闭过期待支付订单 |
+| `bluenote-notification-order-consumer` | `order-event` | 生成订单站内通知 |
 
 ## 3. CouponSeckillAccepted
 
@@ -109,3 +110,86 @@
   }
 }
 ```
+
+## 7. OrderPaid
+
+```json
+{
+  "eventId": "uuid",
+  "eventType": "OrderPaid",
+  "eventVersion": 1,
+  "occurredAt": "2026-06-12T20:03:02+08:00",
+  "traceId": "trace-id",
+  "producer": "bluenote-order",
+  "bizKey": "40001",
+  "payload": {
+    "orderId": "40001",
+    "orderNo": "BN2026061220000001",
+    "userId": "10001",
+    "activityId": "30001",
+    "payAmount": 990,
+    "status": "SUCCESS",
+    "userCouponId": "50001",
+    "paidAt": "2026-06-12T20:03:02+08:00"
+  }
+}
+```
+
+通知服务不直接用 `OrderPaid` 生成站内通知，避免和同一笔订单随后发出的 `CouponIssued` 重复展示“已到账”。
+
+## 8. OrderClosed
+
+```json
+{
+  "eventId": "uuid",
+  "eventType": "OrderClosed",
+  "eventVersion": 1,
+  "occurredAt": "2026-06-12T20:15:05+08:00",
+  "traceId": "trace-id",
+  "producer": "bluenote-order",
+  "bizKey": "40001",
+  "payload": {
+    "orderId": "40001",
+    "orderNo": "BN2026061220000001",
+    "userId": "10001",
+    "activityId": "30001",
+    "closedAt": "2026-06-12T20:15:05+08:00"
+  }
+}
+```
+
+## 9. OrderCancelled
+
+```json
+{
+  "eventId": "uuid",
+  "eventType": "OrderCancelled",
+  "eventVersion": 1,
+  "occurredAt": "2026-06-12T20:05:00+08:00",
+  "traceId": "trace-id",
+  "producer": "bluenote-order",
+  "bizKey": "40001",
+  "payload": {
+    "orderId": "40001",
+    "orderNo": "BN2026061220000001",
+    "userId": "10001",
+    "activityId": "30001",
+    "cancelledAt": "2026-06-12T20:05:00+08:00"
+  }
+}
+```
+
+## 10. 订单通知消费规则
+
+`bluenote-notification-order-consumer` 消费 `order-event` 后生成 `ORDER_STATUS_CHANGED` 站内通知：
+
+| 来源事件 | 通知行为 |
+|---|---|
+| `OrderCreated` 且 `status=WAIT_PAY` | 生成待支付通知 |
+| `OrderCreated` 且 `status=SUCCESS` | 跳过，由 `CouponIssued` 生成已到账通知 |
+| `OrderPaid` | 跳过，由 `CouponIssued` 生成已到账通知 |
+| `CouponIssued` | 生成神券已到账通知 |
+| `OrderClosed` | 生成订单关闭通知 |
+| `OrderCancelled` | 生成订单取消通知 |
+
+业务幂等键使用 `orderId + status`，消费幂等仍使用 `consumerGroup + eventId`。订单状态 Push 请求当前仍由订单服务直接写出 `PushSendRequested`，站内通知链路不重复写订单 Push。
