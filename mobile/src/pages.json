@@ -83,14 +83,27 @@
     "selectedColor": "#ff5f57",
     "backgroundColor": "#ffffff",
     "borderStyle": "black",
+    "fontSize": "15px",
+    "height": "50px",
+    "spacing": "6px",
     "list": [
       {
         "pagePath": "pages/home/index",
         "text": "首页"
       },
       {
+        "pagePath": "pages/order/activity",
+        "text": "神券"
+      },
+      {
         "pagePath": "pages/publish/index",
-        "text": "发布"
+        "text": "",
+        "iconPath": "static/tabbar/publish.png",
+        "selectedIconPath": "static/tabbar/publish.png"
+      },
+      {
+        "pagePath": "pages/notifications/index",
+        "text": "消息"
       },
       {
         "pagePath": "pages/profile/index",

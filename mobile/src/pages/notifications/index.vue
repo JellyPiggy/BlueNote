@@ -52,10 +52,7 @@ const states = ref<Record<NotificationCategory, NotificationListState>>({
 })
 
 const currentState = computed(() => states.value[activeCategory.value])
-const unreadTotalText = computed(() => (notifications.totalUnread > 99 ? '99+' : String(notifications.totalUnread)))
-const imUnreadText = computed(() => im.badgeText)
 const activeUnreadCount = computed(() => notifications.categoryUnread(activeCategory.value))
-const activeUnreadText = computed(() => (activeUnreadCount.value > 99 ? '99+' : String(activeUnreadCount.value)))
 const hasUnreadInCurrentTab = computed(() => activeUnreadCount.value > 0)
 
 onLoad((options) => {
@@ -234,14 +231,6 @@ function goLogin() {
   uni.navigateTo({ url: '/pages/login/index' })
 }
 
-function openIm() {
-  if (!auth.isAuthenticated) {
-    goLogin()
-    return
-  }
-  uni.navigateTo({ url: '/pages/im/conversations' })
-}
-
 function jumpByNotification(item: NotificationItem) {
   const page = String(item.jump?.page ?? '')
   if (page === 'NOTE_DETAIL' && item.jump?.noteId) {
@@ -260,7 +249,7 @@ function jumpByNotification(item: NotificationItem) {
     return
   }
   if (page === 'ORDER_ACTIVITY') {
-    uni.navigateTo({ url: '/pages/order/activity' })
+    uni.switchTab({ url: '/pages/order/activity' })
     return
   }
   uni.showToast({ title: '暂时无法打开目标内容', icon: 'none' })
@@ -337,28 +326,11 @@ function formatNotificationTime(value: string) {
 <template>
   <view class="screen notification-screen top-safe">
     <view class="notification-appbar">
-      <button class="back-button" @tap="back">‹</button>
-      <view class="appbar-title">
-        <view class="title-row">
-          <text>消息</text>
-          <text v-if="notifications.totalUnread" class="total-badge">{{ unreadTotalText }}</text>
-        </view>
-        <view class="appbar-subtitle">最近通知</view>
+      <view class="title-row">消息</view>
+      <view class="message-search">
+        <text class="search-mark">⌕</text>
+        <text class="search-copy">搜索消息</text>
       </view>
-      <button
-        class="im-button"
-        @tap="openIm"
-      >
-        <text>私信</text>
-        <text v-if="imUnreadText" class="mini-badge">{{ imUnreadText }}</text>
-      </button>
-      <button
-        class="read-all-button"
-        :disabled="!auth.isAuthenticated || !hasUnreadInCurrentTab || markingAll"
-        @tap="markCurrentRead"
-      >
-        已读
-      </button>
     </view>
 
     <view class="notification-tabs">
@@ -370,9 +342,6 @@ function formatNotificationTime(value: string) {
         @tap="switchTab(tab.category)"
       >
         <text>{{ tab.label }}</text>
-        <text v-if="notifications.categoryUnread(tab.category)" class="tab-badge">
-          {{ formatCount(notifications.categoryUnread(tab.category)) }}
-        </text>
       </button>
     </view>
 
@@ -446,30 +415,12 @@ function formatNotificationTime(value: string) {
 .notification-appbar {
   display: flex;
   align-items: center;
-  gap: 18rpx;
-  min-height: 86rpx;
-}
-
-.back-button {
-  flex: 0 0 auto;
-  width: 62rpx;
-  height: 62rpx;
-  border-radius: 50%;
-  color: var(--bn-ink);
-  background: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 48rpx;
-  box-shadow: var(--bn-shadow-soft);
-}
-
-.appbar-title {
-  flex: 1;
-  min-width: 0;
+  gap: 20rpx;
+  min-height: 68rpx;
 }
 
 .title-row {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 12rpx;
@@ -479,90 +430,46 @@ function formatNotificationTime(value: string) {
   line-height: 1.2;
 }
 
-.total-badge,
-.tab-badge {
-  min-width: 34rpx;
-  height: 34rpx;
-  padding: 0 10rpx;
+.message-search {
+  flex: 1;
+  min-width: 0;
+  height: 66rpx;
+  margin: 0;
+  padding: 0 22rpx;
   border-radius: 999rpx;
-  background: var(--bn-coral);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20rpx;
-  font-weight: 820;
-  line-height: 1;
-}
-
-.appbar-subtitle {
-  margin-top: 4rpx;
-  color: var(--bn-muted);
-  font-size: 23rpx;
-}
-
-.read-all-button {
-  flex: 0 0 auto;
-  width: 96rpx;
-  height: 58rpx;
-  border-radius: 999rpx;
-  color: var(--bn-coral);
-  background: rgba(255, 95, 87, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24rpx;
-  font-weight: 780;
-}
-
-.im-button {
-  flex: 0 0 auto;
-  min-width: 112rpx;
-  height: 58rpx;
-  padding: 0 16rpx;
-  border-radius: 999rpx;
-  color: var(--bn-ink);
   background: #fff;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8rpx;
+  gap: 12rpx;
+  color: var(--bn-muted);
   font-size: 24rpx;
-  font-weight: 780;
   box-shadow: var(--bn-shadow-soft);
 }
 
-.mini-badge {
-  min-width: 30rpx;
-  height: 30rpx;
-  padding: 0 8rpx;
-  border-radius: 999rpx;
-  background: var(--bn-coral);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18rpx;
+.search-mark {
+  color: var(--bn-coral);
+  font-size: 28rpx;
   font-weight: 820;
 }
 
-.read-all-button[disabled] {
-  color: var(--bn-faint);
-  background: #edf0f2;
+.search-copy {
+  color: var(--bn-muted);
+  font-size: 24rpx;
 }
 
 .notification-tabs {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14rpx;
-  margin: 22rpx 0;
+  gap: 0;
+  margin: 8rpx 0 20rpx;
+  border-bottom: 1rpx solid var(--bn-line);
 }
 
 .notification-tab {
   position: relative;
   min-height: 70rpx;
-  border-radius: 8rpx;
-  background: #fff;
+  border-radius: 0;
+  background: transparent;
   color: #676d76;
   display: flex;
   align-items: center;
@@ -570,30 +477,25 @@ function formatNotificationTime(value: string) {
   gap: 10rpx;
   font-size: 27rpx;
   font-weight: 760;
-  box-shadow: var(--bn-shadow-soft);
+  box-shadow: none;
 }
 
 .notification-tab.active {
   color: var(--bn-ink);
-  background: #fff7f6;
+  background: transparent;
+  font-weight: 900;
 }
 
 .notification-tab.active::after {
   content: '';
   position: absolute;
   left: 50%;
-  bottom: 8rpx;
+  bottom: 0;
   width: 34rpx;
-  height: 5rpx;
+  height: 6rpx;
   border-radius: 999rpx;
   background: var(--bn-coral);
   transform: translateX(-50%);
-}
-
-.tab-badge {
-  height: 30rpx;
-  min-width: 30rpx;
-  font-size: 18rpx;
 }
 
 .empty-action {

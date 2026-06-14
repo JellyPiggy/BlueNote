@@ -9,10 +9,8 @@ import AvatarCircle from '@/components/AvatarCircle.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import NoteCardView from '@/components/NoteCard.vue'
 import { useAuthStore } from '@/stores/auth'
-import { useNotificationStore } from '@/stores/notification'
 
 const auth = useAuthStore()
-const notifications = useNotificationStore()
 const profileHome = ref<UserHome | null>(null)
 const loading = ref(false)
 const accountMenuOpen = ref(false)
@@ -173,10 +171,6 @@ function openAccountMenu() {
   accountMenuOpen.value = true
 }
 
-function openNotifications() {
-  uni.navigateTo({ url: '/pages/notifications/index' })
-}
-
 async function switchProfileTab(tab: ProfileTabKey) {
   activeTab.value = tab
   if (!activeState.value.loaded && !activeState.value.loading) {
@@ -271,10 +265,6 @@ function formatCount(value: number) {
       <view class="profile-card">
         <view class="profile-hero" :style="coverStyle">
           <view class="hero-overlay"></view>
-          <button class="profile-message-button" @tap="openNotifications">
-            <text class="profile-message-icon">◌</text>
-            <text v-if="notifications.badgeText" class="profile-message-badge">{{ notifications.badgeText }}</text>
-          </button>
           <button class="account-menu-button" @tap="openAccountMenu">
             <view class="menu-line"></view>
             <view class="menu-line"></view>
@@ -446,49 +436,6 @@ function formatCount(value: number) {
   gap: 7rpx;
 }
 
-.profile-message-button {
-  position: absolute;
-  top: 28rpx;
-  left: 28rpx;
-  z-index: 2;
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1rpx solid rgba(255, 255, 255, 0.28);
-  color: #fff;
-  backdrop-filter: blur(12rpx);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.profile-message-icon {
-  color: #fff;
-  font-size: 38rpx;
-  line-height: 1;
-  text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.2);
-}
-
-.profile-message-badge {
-  position: absolute;
-  right: -8rpx;
-  top: -8rpx;
-  min-width: 30rpx;
-  height: 30rpx;
-  padding: 0 8rpx;
-  border-radius: 999rpx;
-  background: var(--bn-coral);
-  color: #fff;
-  border: 3rpx solid rgba(255, 255, 255, 0.96);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18rpx;
-  font-weight: 820;
-  line-height: 1;
-}
-
 .menu-line {
   width: 28rpx;
   height: 4rpx;
@@ -563,14 +510,17 @@ function formatCount(value: number) {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   margin: 0;
-  padding: 0 40rpx;
-  border-bottom: 1rpx solid rgba(236, 238, 240, 0.96);
+  padding: 0;
+  border-bottom: 1rpx solid var(--bn-line);
   background: #fff;
 }
 
 .profile-tab {
   position: relative;
   min-height: 92rpx;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   color: var(--bn-muted);
   display: flex;
   align-items: center;
@@ -589,7 +539,7 @@ function formatCount(value: number) {
   position: absolute;
   left: 50%;
   bottom: 0;
-  width: 52rpx;
+  width: 58rpx;
   height: 6rpx;
   border-radius: 999rpx;
   background: var(--bn-coral);

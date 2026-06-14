@@ -106,11 +106,6 @@ async function chooseProfileImage(scene: 'USER_AVATAR' | 'USER_HOME_COVER') {
   }
 }
 
-function clearCover() {
-  form.value.homeCoverFileId = null
-  form.value.homeCoverUrl = null
-}
-
 function setGender(gender: UserProfile['gender']) {
   form.value.gender = gender
 }
@@ -214,7 +209,6 @@ function isVersionConflict(error: unknown) {
         <button class="cover-action" :disabled="uploadingCover || saving" @tap="chooseCover">
           {{ uploadingCover ? '上传中' : '更换封面' }}
         </button>
-        <button v-if="form.homeCoverFileId" class="cover-clear" :disabled="saving" @tap="clearCover">清除</button>
       </view>
 
       <view class="avatar-section panel">
@@ -339,10 +333,10 @@ function isVersionConflict(error: unknown) {
   box-shadow: var(--bn-shadow);
 }
 
-.cover-action,
-.cover-clear {
+.cover-action {
   position: absolute;
   right: 24rpx;
+  top: 24rpx;
   min-height: 58rpx;
   padding: 0 22rpx;
   border-radius: 999rpx;
@@ -353,15 +347,6 @@ function isVersionConflict(error: unknown) {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.cover-action {
-  bottom: 24rpx;
-}
-
-.cover-clear {
-  top: 24rpx;
-  color: var(--bn-coral);
 }
 
 .avatar-section {

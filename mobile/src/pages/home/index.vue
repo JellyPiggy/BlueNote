@@ -8,10 +8,8 @@ import type { NoteCard } from '@/api/types'
 import EmptyState from '@/components/EmptyState.vue'
 import NoteCardView from '@/components/NoteCard.vue'
 import { useAuthStore } from '@/stores/auth'
-import { useNotificationStore } from '@/stores/notification'
 
 const auth = useAuthStore()
-const notifications = useNotificationStore()
 type HomeChannel = 'recommend' | 'following'
 
 const activeChannel = ref<HomeChannel>('recommend')
@@ -158,28 +156,8 @@ function goPublish() {
   uni.switchTab({ url: '/pages/publish/index' })
 }
 
-function openNotifications() {
-  if (!auth.isAuthenticated) {
-    goLogin()
-    return
-  }
-  uni.navigateTo({ url: '/pages/notifications/index' })
-}
-
-function openOrderActivity() {
-  if (!auth.isAuthenticated) {
-    goLogin()
-    return
-  }
-  uni.navigateTo({ url: '/pages/order/activity' })
-}
-
 function openRank() {
   uni.navigateTo({ url: '/pages/rank/index' })
-}
-
-function goProfile() {
-  uni.switchTab({ url: '/pages/profile/index' })
 }
 
 function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
@@ -204,20 +182,12 @@ function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
         <text class="search-mark">⌕</text>
         <text class="search-copy">搜索笔记、话题</text>
       </button>
-      <button class="message-button" @tap="openNotifications">
-        <text class="message-icon">◌</text>
-        <text v-if="notifications.badgeText" class="message-badge">{{ notifications.badgeText }}</text>
-      </button>
-      <button class="rank-button" @tap="openRank">榜</button>
-      <button class="coupon-button" @tap="openOrderActivity">券</button>
-      <button class="new-button" @tap="goPublish">+</button>
     </view>
 
     <view class="channel-tabs">
       <button :class="['channel', { active: activeChannel === 'recommend' }]" @tap="switchChannel('recommend')">推荐</button>
       <button :class="['channel', { active: activeChannel === 'following' }]" @tap="switchChannel('following')">关注</button>
       <button class="channel" @tap="openRank">榜单</button>
-      <button class="channel" @tap="goProfile">我的</button>
     </view>
 
     <view v-if="loading && !currentLoaded" class="loading-copy">正在整理笔记</view>
@@ -306,89 +276,6 @@ function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.new-button {
-  flex: 0 0 auto;
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  color: #fff;
-  background: linear-gradient(135deg, var(--bn-coral), #ff9b62);
-  box-shadow: 0 12rpx 24rpx rgba(255, 95, 87, 0.22);
-  font-size: 38rpx;
-  font-weight: 520;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.message-button {
-  position: relative;
-  flex: 0 0 auto;
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  color: var(--bn-ink);
-  background: #fff;
-  box-shadow: 0 6rpx 18rpx rgba(18, 22, 28, 0.05);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.coupon-button {
-  flex: 0 0 auto;
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  color: #7a4d00;
-  background: #fff4cf;
-  box-shadow: 0 6rpx 18rpx rgba(243, 190, 62, 0.18);
-  font-size: 27rpx;
-  font-weight: 860;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.rank-button {
-  flex: 0 0 auto;
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  color: #164c7a;
-  background: #e5f3ff;
-  box-shadow: 0 6rpx 18rpx rgba(44, 116, 214, 0.14);
-  font-size: 27rpx;
-  font-weight: 860;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.message-icon {
-  font-size: 38rpx;
-  line-height: 1;
-}
-
-.message-badge {
-  position: absolute;
-  right: -8rpx;
-  top: -8rpx;
-  min-width: 30rpx;
-  height: 30rpx;
-  padding: 0 8rpx;
-  border-radius: 999rpx;
-  background: var(--bn-coral);
-  color: #fff;
-  border: 3rpx solid #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18rpx;
-  font-weight: 820;
-  line-height: 1;
 }
 
 .channel-tabs {
