@@ -139,23 +139,36 @@ async function submit() {
 .tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10rpx;
-  padding: 8rpx;
-  border-radius: 16rpx;
-  background: #f3f4f5;
+  border-bottom: 1rpx solid var(--bn-line);
+  background: transparent;
 }
 
 .tab {
-  height: 70rpx;
-  border-radius: 14rpx;
+  position: relative;
+  height: 78rpx;
+  border-radius: 0;
+  background: transparent;
   color: var(--bn-muted);
+  font-size: 31rpx;
   font-weight: 720;
+  box-shadow: none;
 }
 
 .tab.active {
-  background: #fff;
   color: var(--bn-coral);
-  box-shadow: 0 8rpx 18rpx rgba(24, 33, 42, 0.07);
+  font-weight: 900;
+}
+
+.tab.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 58rpx;
+  height: 6rpx;
+  border-radius: 999rpx;
+  background: var(--bn-coral);
+  transform: translateX(-50%);
 }
 
 .form-title {
