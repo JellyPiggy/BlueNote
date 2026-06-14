@@ -311,10 +311,15 @@ function back() {
 }
 
 function openAuthor() {
-  if (!note.value) {
+  const authorId = note.value?.author.userId
+  if (!authorId) {
     return
   }
-  uni.switchTab({ url: '/pages/profile/index' })
+  if (auth.userId === authorId) {
+    uni.switchTab({ url: '/pages/profile/index' })
+    return
+  }
+  uni.navigateTo({ url: `/pages/profile/user?userId=${encodeURIComponent(authorId)}` })
 }
 
 function handleSwiperChange(event: Event) {

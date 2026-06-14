@@ -25,6 +25,13 @@
       }
     },
     {
+      "path": "pages/profile/user",
+      "style": {
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/note/detail",
       "style": {
         "navigationStyle": "custom"

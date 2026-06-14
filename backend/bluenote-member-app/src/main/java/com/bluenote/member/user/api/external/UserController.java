@@ -53,7 +53,7 @@ public class UserController {
 
     @GetMapping("/{userId}/home")
     public ApiResponse<UserHomeResponse> home(@PathVariable("userId") String userId) {
-        return ApiResponse.success(userApplicationService.home(userId), TraceIdHolder.currentOrNew());
+        return ApiResponse.success(userApplicationService.home(optionalUserId(), userId), TraceIdHolder.currentOrNew());
     }
 
     private String requireUserId() {
@@ -62,5 +62,10 @@ public class UserController {
             throw new BusinessException(ApiErrorCode.ACCESS_TOKEN_INVALID);
         }
         return userContext.userId();
+    }
+
+    private String optionalUserId() {
+        UserContext userContext = UserContextHolder.current();
+        return userContext == null || !userContext.authenticated() ? null : userContext.userId();
     }
 }

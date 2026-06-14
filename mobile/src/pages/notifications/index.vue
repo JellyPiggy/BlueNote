@@ -241,7 +241,16 @@ function jumpByNotification(item: NotificationItem) {
     return
   }
   if (page === 'USER_PROFILE') {
-    uni.showToast({ title: '用户主页后续接入', icon: 'none' })
+    const userId = String(item.jump?.userId ?? item.actors?.[0]?.userId ?? '')
+    if (userId && userId === auth.userId) {
+      uni.switchTab({ url: '/pages/profile/index' })
+      return
+    }
+    if (userId) {
+      uni.navigateTo({ url: `/pages/profile/user?userId=${encodeURIComponent(userId)}` })
+      return
+    }
+    uni.showToast({ title: '暂时无法打开用户主页', icon: 'none' })
     return
   }
   if (page === 'SYSTEM_NOTICE') {
