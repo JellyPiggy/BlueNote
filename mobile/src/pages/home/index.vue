@@ -296,20 +296,6 @@ function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
 
 .channel.active {
   color: var(--bn-ink);
-  font-size: 31rpx;
-  font-weight: 900;
-}
-
-.channel.active::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 34rpx;
-  height: 6rpx;
-  border-radius: 999rpx;
-  background: var(--bn-coral);
-  transform: translateX(-50%);
 }
 
 .empty-action {
