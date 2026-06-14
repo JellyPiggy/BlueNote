@@ -79,6 +79,18 @@ export function getAuthorNotes(userId: string, cursor?: string | null, size = 20
   })
 }
 
+export function getPublicTimeline(cursor?: string | null, size = 20) {
+  const query = new URLSearchParams()
+  query.set('size', String(size))
+  if (cursor) {
+    query.set('cursor', cursor)
+  }
+  return apiRequest<CursorPage<NoteCard>>({
+    path: `/api/notes?${query.toString()}`,
+    auth: false
+  })
+}
+
 export function getMyNotes(status?: string, cursor?: string | null, size = 20) {
   const query = new URLSearchParams()
   query.set('size', String(size))

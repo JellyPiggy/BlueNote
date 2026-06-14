@@ -30,6 +30,7 @@ public class GatewayAuthFilter implements GlobalFilter, Ordered {
     private static final String BEARER_PREFIX = "Bearer ";
     private static final Pattern PUBLIC_USER_PATH = Pattern.compile("^/api/users/[^/]+/(public|home)$");
     private static final Pattern FILE_ACCESS_URL_PATH = Pattern.compile("^/api/files/[^/]+/access-url$");
+    private static final Pattern NOTE_PUBLIC_TIMELINE_PATH = Pattern.compile("^/api/notes$");
     private static final Pattern NOTE_DETAIL_PATH = Pattern.compile("^/api/notes/(?!(me|drafts)$|users/)[^/]+$");
     private static final Pattern NOTE_USER_LIST_PATH = Pattern.compile("^/api/notes/users/[^/]+$");
     private static final Pattern COMMENT_NOTE_LIST_PATH = Pattern.compile("^/api/comments/notes/[^/]+$");
@@ -111,6 +112,7 @@ public class GatewayAuthFilter implements GlobalFilter, Ordered {
         String path = request.getURI().getPath();
         return PUBLIC_USER_PATH.matcher(path).matches()
                 || FILE_ACCESS_URL_PATH.matcher(path).matches()
+                || NOTE_PUBLIC_TIMELINE_PATH.matcher(path).matches()
                 || NOTE_DETAIL_PATH.matcher(path).matches()
                 || NOTE_USER_LIST_PATH.matcher(path).matches()
                 || COMMENT_NOTE_LIST_PATH.matcher(path).matches()

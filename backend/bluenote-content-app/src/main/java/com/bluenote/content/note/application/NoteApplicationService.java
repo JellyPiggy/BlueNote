@@ -442,6 +442,18 @@ public class NoteApplicationService {
     }
 
     @Transactional(readOnly = true)
+    public CursorPage<NoteCardResponse> publicTimeline(String cursor, Integer size) {
+        PageCursor pageCursor = parseCursor(cursor);
+        int pageSize = normalizePageSize(size);
+        List<NoteEntity> notes = noteMapper.selectPublicTimelinePage(
+                pageCursor.sortAt(),
+                pageCursor.noteId(),
+                pageSize + 1
+        );
+        return toCardPage(notes, pageSize);
+    }
+
+    @Transactional(readOnly = true)
     public CursorPage<NoteCardResponse> myNotes(String userId, String status, String cursor, Integer size) {
         Long authorId = parseId(userId, ApiErrorCode.ACCESS_TOKEN_INVALID);
         String normalizedStatus = normalizeOptionalNoteStatus(status);

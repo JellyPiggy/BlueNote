@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { onPullDownRefresh, onReachBottom, onShow } from '@dcloudio/uni-app'
 import { feedCardToNoteCard, getFollowingFeed } from '@/api/feed'
-import { getMyNotes } from '@/api/note'
+import { getPublicTimeline } from '@/api/note'
 import { showApiError } from '@/api/request'
 import type { NoteCard } from '@/api/types'
 import EmptyState from '@/components/EmptyState.vue'
@@ -14,6 +14,8 @@ type HomeChannel = 'recommend' | 'following'
 
 const activeChannel = ref<HomeChannel>('recommend')
 const notes = ref<NoteCard[]>([])
+const notesCursor = ref<string | null>(null)
+const notesHasMore = ref(false)
 const followingNotes = ref<NoteCard[]>([])
 const followingCursor = ref<string | null>(null)
 const followingHasMore = ref(false)
@@ -32,19 +34,13 @@ const emptyTitle = computed(() => activeChannel.value === 'following' ? '关注�
 const emptySubtitle = computed(() =>
   activeChannel.value === 'following'
     ? '去发现喜欢的创作者，关注后这里会出现他们的公开笔记。'
-    : '选一张图片，写下标题和正文，BlueNote 会把它发布到你的主页。'
+    : '公开发布的笔记会按时间出现在这里。'
 )
-const unauthTitle = computed(() => activeChannel.value === 'following' ? '登录后查看关注页' : '登录后查看你的笔记流')
-const unauthSubtitle = computed(() =>
-  activeChannel.value === 'following'
-    ? '关注创作者后，可以在这里按时间看到他们的新笔记。'
-    : '注册或登录后，可以上传图片、发布笔记，并在这里看到已发布内容。'
-)
+const unauthTitle = '登录后查看关注页'
+const unauthSubtitle = '关注创作者后，可以在这里按时间看到他们的新笔记。'
 
 onShow(() => {
-  if (auth.isAuthenticated) {
-    void refreshActive()
-  }
+  void refreshActive()
 })
 
 onPullDownRefresh(async () => {
@@ -58,6 +54,8 @@ onPullDownRefresh(async () => {
 onReachBottom(() => {
   if (activeChannel.value === 'following') {
     void loadMoreFollowing()
+  } else {
+    void loadMoreRecommend()
   }
 })
 
@@ -72,7 +70,7 @@ async function refreshActive() {
 async function switchChannel(channel: HomeChannel) {
   activeChannel.value = channel
   errorText.value = ''
-  if (!auth.isAuthenticated) {
+  if (channel === 'following' && !auth.isAuthenticated) {
     return
   }
   if (channel === 'following' && !followingLoaded.value) {
@@ -84,16 +82,13 @@ async function switchChannel(channel: HomeChannel) {
 }
 
 async function refreshRecommend() {
-  if (!auth.isAuthenticated) {
-    notesLoaded.value = true
-    notes.value = []
-    return
-  }
   loading.value = true
   errorText.value = ''
   try {
-    const page = await getMyNotes('PUBLISHED', null, 30)
+    const page = await getPublicTimeline(null, 30)
     notes.value = page.items
+    notesCursor.value = page.nextCursor
+    notesHasMore.value = page.hasMore
     notesLoaded.value = true
   } catch (error) {
     errorText.value = '信息流加载失败'
@@ -160,6 +155,21 @@ function openRank() {
   uni.navigateTo({ url: '/pages/rank/index' })
 }
 
+async function loadMoreRecommend() {
+  if (loadingMore.value || loading.value || !notesHasMore.value) return
+  loadingMore.value = true
+  try {
+    const page = await getPublicTimeline(notesCursor.value, 30)
+    notes.value = mergeNotes(notes.value, page.items)
+    notesCursor.value = page.nextCursor
+    notesHasMore.value = page.hasMore
+  } catch (error) {
+    showApiError(error, '加载更多失败')
+  } finally {
+    loadingMore.value = false
+  }
+}
+
 function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
   const seen = new Set(current.map((note) => note.noteId))
   const merged = [...current]
@@ -193,7 +203,7 @@ function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
     <view v-if="loading && !currentLoaded" class="loading-copy">正在整理笔记</view>
 
     <EmptyState
-      v-else-if="!auth.isAuthenticated"
+      v-else-if="activeChannel === 'following' && !auth.isAuthenticated"
       :title="unauthTitle"
       :subtitle="unauthSubtitle"
     >
@@ -226,7 +236,11 @@ function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
       <button v-if="activeChannel === 'following' && followingHasMore" class="load-more-button" :disabled="loadingMore" @tap="loadMoreFollowing">
         {{ loadingMore ? '加载中' : '加载更多' }}
       </button>
+      <button v-else-if="activeChannel === 'recommend' && notesHasMore" class="load-more-button" :disabled="loadingMore" @tap="loadMoreRecommend">
+        {{ loadingMore ? '加载中' : '加载更多' }}
+      </button>
       <view v-else-if="activeChannel === 'following' && followingLoaded" class="list-end">没有更多了</view>
+      <view v-else-if="activeChannel === 'recommend' && notesLoaded" class="list-end">没有更多了</view>
     </view>
   </view>
 </template>

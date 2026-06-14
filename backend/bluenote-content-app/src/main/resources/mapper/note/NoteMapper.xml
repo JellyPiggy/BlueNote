@@ -100,6 +100,22 @@
         LIMIT #{size}
     </select>
 
+    <select id="selectPublicTimelinePage" resultMap="NoteResultMap">
+        SELECT <include refid="NoteColumns"/>
+        FROM bluenote_note.note
+        WHERE note_status = 'PUBLISHED'
+          AND visibility = 'PUBLIC'
+          AND deleted = 0
+        <if test="cursorPublishedAt != null and cursorNoteId != null">
+          AND (
+            published_at &lt; #{cursorPublishedAt}
+            OR (published_at = #{cursorPublishedAt} AND note_id &lt; #{cursorNoteId})
+          )
+        </if>
+        ORDER BY published_at DESC, note_id DESC
+        LIMIT #{size}
+    </select>
+
     <select id="selectMyNotesPage" resultMap="NoteResultMap">
         SELECT <include refid="NoteColumns"/>
         FROM bluenote_note.note
