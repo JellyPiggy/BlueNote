@@ -190,7 +190,6 @@ function statText(value: number | null | undefined) {
     <view class="rank-appbar">
       <button class="back-button" @tap="goHome">‹</button>
       <view class="page-title">排行榜</view>
-      <button class="refresh-button" @tap="refreshAll">↻</button>
     </view>
 
     <view class="rank-summary">
@@ -205,8 +204,8 @@ function statText(value: number | null | undefined) {
     </view>
 
     <view class="rank-tabs">
-      <button :class="['rank-tab', { active: activeTab === 'notes' }]" @tap="switchTab('notes')">周热笔记</button>
-      <button :class="['rank-tab', { active: activeTab === 'creators' }]" @tap="switchTab('creators')">创作者</button>
+      <button :class="['rank-tab', { active: activeTab === 'notes' }]" @tap="switchTab('notes')">本周热门笔记</button>
+      <button :class="['rank-tab', { active: activeTab === 'creators' }]" @tap="switchTab('creators')">年度创作者</button>
     </view>
 
     <view class="my-rank-card panel">
@@ -277,33 +276,20 @@ function statText(value: number | null | undefined) {
 
 .rank-appbar {
   display: grid;
-  grid-template-columns: 68rpx 1fr 96rpx;
+  grid-template-columns: 56rpx 1fr 56rpx;
   align-items: center;
-  min-height: 76rpx;
+  min-height: 60rpx;
 }
 
-.back-button,
-.refresh-button {
-  min-height: 60rpx;
+.back-button {
+  width: 48rpx;
+  height: 48rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--bn-ink);
-  background: #fff;
-  border-radius: 16rpx;
-  box-shadow: var(--bn-shadow-soft);
-}
-
-.back-button {
-  font-size: 46rpx;
-}
-
-.refresh-button {
-  font-size: 24rpx;
-  color: var(--bn-muted);
-  padding: 0;
+  font-size: 38rpx;
   line-height: 1;
-  white-space: nowrap;
 }
 
 .page-title {
@@ -361,18 +347,16 @@ function statText(value: number | null | undefined) {
 
 .rank-tabs {
   margin-top: 20rpx;
-  padding: 8rpx;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8rpx;
-  border-radius: 16rpx;
-  background: #fff;
-  box-shadow: var(--bn-shadow-soft);
+  border-bottom: 1rpx solid var(--bn-line);
 }
 
 .rank-tab {
+  position: relative;
   min-height: 68rpx;
-  border-radius: 12rpx;
+  border-radius: 0;
+  background: transparent;
   color: var(--bn-muted);
   font-size: 26rpx;
   font-weight: 760;
@@ -380,7 +364,20 @@ function statText(value: number | null | undefined) {
 
 .rank-tab.active {
   color: var(--bn-ink);
-  background: #f3f5f6;
+  background: transparent;
+  font-weight: 900;
+}
+
+.rank-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 72rpx;
+  height: 6rpx;
+  border-radius: 999rpx;
+  background: var(--bn-coral);
+  transform: translateX(-50%);
 }
 
 .my-rank-card {
