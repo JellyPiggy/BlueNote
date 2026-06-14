@@ -16,8 +16,9 @@ import {
   uncollectNote,
   unlikeNote
 } from '@/api/note'
+import { followUser, getFollowStatus, unfollowUser } from '@/api/relation'
 import { BlueNoteApiError, showApiError } from '@/api/request'
-import type { CommentItem, NoteDetail } from '@/api/types'
+import type { CommentItem, FollowStatus, NoteDetail } from '@/api/types'
 import AvatarCircle from '@/components/AvatarCircle.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { createClientRequestId, formatCount, formatTime } from '@/utils/format'
@@ -63,9 +64,23 @@ const noteActionSubmitting = ref({
   like: false,
   collect: false
 })
+const authorFollowStatus = ref<FollowStatus>('UNKNOWN')
+const authorFollowLoading = ref(false)
 
 const coverMedia = computed(() => note.value?.mediaFiles ?? [])
 const mediaTotal = computed(() => coverMedia.value.length)
+const isOwnNote = computed(() => {
+  const currentNote = note.value
+  return Boolean(currentNote?.author.userId && auth.userId === currentNote.author.userId)
+})
+const isFollowingAuthor = computed(() => authorFollowStatus.value === 'FOLLOWING')
+const canShowFollowButton = computed(() => Boolean(note.value) && !isOwnNote.value)
+const followButtonText = computed(() => {
+  if (authorFollowLoading.value) {
+    return '...'
+  }
+  return isFollowingAuthor.value ? '已关注' : '关注'
+})
 const canWriteComment = computed(() => Boolean(note.value?.commentEnabled) && !commentBlocked.value)
 const commentPlaceholder = computed(() => {
   if (!canWriteComment.value) {
@@ -103,6 +118,7 @@ async function loadDetail() {
     commentCount.value = note.value.counts.commentCount
     commentBlocked.value = !note.value.commentEnabled
     currentMediaIndex.value = 0
+    await loadAuthorFollowStatus()
     await loadComments(true)
   } catch (error) {
     errorText.value = '笔记暂时不可见'
@@ -306,8 +322,53 @@ function handleSwiperChange(event: Event) {
   currentMediaIndex.value = Number(detail?.current ?? 0)
 }
 
-function followAuthor() {
-  uni.showToast({ title: '关注功能后续接入', icon: 'none' })
+async function loadAuthorFollowStatus() {
+  authorFollowStatus.value = 'UNKNOWN'
+  if (!note.value || !auth.isAuthenticated || isOwnNote.value) {
+    return
+  }
+  authorFollowLoading.value = true
+  try {
+    const response = await getFollowStatus(note.value.author.userId)
+    authorFollowStatus.value = normalizeFollowStatus(response.followStatus)
+  } catch {
+    authorFollowStatus.value = 'UNKNOWN'
+  } finally {
+    authorFollowLoading.value = false
+  }
+}
+
+async function followAuthor() {
+  if (!note.value || authorFollowLoading.value) {
+    return
+  }
+  if (!ensureAuthenticated()) {
+    return
+  }
+  if (isOwnNote.value) {
+    uni.showToast({ title: '不能关注自己', icon: 'none' })
+    return
+  }
+
+  const previousStatus = authorFollowStatus.value
+  const shouldUnfollow = previousStatus === 'FOLLOWING'
+  authorFollowStatus.value = shouldUnfollow ? 'NOT_FOLLOWING' : 'FOLLOWING'
+  authorFollowLoading.value = true
+  try {
+    const response = shouldUnfollow
+      ? await unfollowUser(note.value.author.userId)
+      : await followUser(note.value.author.userId)
+    authorFollowStatus.value = normalizeFollowStatus(response.followStatus)
+    uni.showToast({
+      title: authorFollowStatus.value === 'FOLLOWING' ? '已关注' : '已取消关注',
+      icon: 'none'
+    })
+  } catch (error) {
+    authorFollowStatus.value = previousStatus
+    showApiError(error, '操作失败')
+  } finally {
+    authorFollowLoading.value = false
+  }
 }
 
 function shareNote() {
@@ -444,6 +505,13 @@ function formatCommentDate(value: string) {
   return `${year}-${month}-${day}`
 }
 
+function normalizeFollowStatus(status: string): FollowStatus {
+  if (status === 'FOLLOWING' || status === 'NOT_FOLLOWING') {
+    return status
+  }
+  return 'UNKNOWN'
+}
+
 function ensureAuthenticated() {
   if (auth.isAuthenticated) {
     return true
@@ -472,7 +540,15 @@ function isCommentBlocked(error: unknown) {
           <AvatarCircle :src="note.author.avatarUrl" :name="note.author.nickname" size="small" />
           <view class="top-name">{{ note.author.nickname }}</view>
         </view>
-        <button class="follow-button" @tap="followAuthor">关注</button>
+        <button
+          v-if="canShowFollowButton"
+          class="follow-button"
+          :class="{ followed: isFollowingAuthor }"
+          :disabled="authorFollowLoading"
+          @tap="followAuthor"
+        >
+          {{ followButtonText }}
+        </button>
         <button class="share-button" @tap="shareNote">↗</button>
       </view>
 
@@ -730,6 +806,16 @@ function isCommentBlocked(error: unknown) {
   font-weight: 760;
   line-height: 1;
   white-space: nowrap;
+}
+
+.follow-button.followed {
+  border-color: #d8dbe0;
+  color: #727983;
+  background: #f5f6f7;
+}
+
+.follow-button[disabled] {
+  opacity: 0.7;
 }
 
 .gallery-section {

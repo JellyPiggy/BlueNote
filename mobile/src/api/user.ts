@@ -16,8 +16,7 @@ export function getPublicProfile(userId: string) {
 
 export function getUserHome(userId: string) {
   return apiRequest<UserHome>({
-    path: `/api/users/${userId}/home`,
-    auth: false
+    path: `/api/users/${userId}/home`
   })
 }
 

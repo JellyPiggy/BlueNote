@@ -105,6 +105,23 @@ export interface UserSummary {
   profileVersion: number
 }
 
+export type FollowStatus = 'FOLLOWING' | 'NOT_FOLLOWING' | 'UNKNOWN'
+
+export interface FollowActionResponse {
+  followerId: string
+  followeeId: string
+  followStatus: FollowStatus
+  followedAt: string | null
+  canceledAt: string | null
+}
+
+export interface FollowStatusResponse {
+  currentUserId: string
+  targetUserId: string
+  followStatus: FollowStatus
+  followedAt: string | null
+}
+
 export interface UserHome {
   user: UserSummary
   counts: {
@@ -114,7 +131,7 @@ export interface UserHome {
     likedCount: number
   }
   relation: {
-    followStatus: string
+    followStatus: FollowStatus
   }
   degraded: boolean
 }
