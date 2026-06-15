@@ -41,25 +41,7 @@ The current project is more suitable for learning and showcasing backend design 
 
 The following images are captured from the local uni-app H5 pages.
 
-Profile page:
-
-![BlueNote profile page](docs/assets/showcase/hero.png)
-
-Home page:
-
-![BlueNote home page](docs/assets/showcase/home.png)
-
-Comments / likes / collections:
-
-![BlueNote comments page](docs/assets/showcase/comment.png)
-
-IM:
-
-![BlueNote IM](docs/assets/showcase/notifications.png)
-
-Ranking:
-
-![BlueNote ranking page](docs/assets/showcase/rank.png)
+![BlueNote](docs/assets/showcase/showcase.gif)
 
 ## Tech Stack
 
