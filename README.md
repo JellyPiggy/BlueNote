@@ -7,100 +7,139 @@
 [![Mobile H5](https://img.shields.io/badge/Mobile-uni--app%20H5-42B883)](#tech-stack)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-![BlueNote showcase](docs/assets/showcase/hero.png)
+BlueNote is a content community system for full-stack and backend learning. It is not a practice repository that stops at Controller CRUD. Instead, it follows a realistic internet product style and separates modules such as user, content, comment, relation, feed, counter, notification, push, IM, order and ranking, with auditable contracts for APIs, databases, Redis, MQ and security boundaries.
 
-BlueNote is a full-stack mobile community app inspired by modern note-sharing products. It is built as a personal project, but the codebase is organized like a small production system: contract-first APIs, separate backend applications, MySQL fact tables, Redis read models, RocketMQ outbox events, MinIO direct upload, and a uni-app mobile H5 client.
+The current project positioning is: **personally runnable, contract-first, module-complete, and suitable for learning backend-related knowledge**.
 
-The project is currently a runnable local demo rather than a production deployment. It is suitable for showcasing backend service design, event-driven workflows, mobile API integration, and end-to-end product thinking.
+If you are looking for a project that can be learned module by module and used to understand architecture trade-offs, BlueNote's main value is here:
+
+1. It **covers the major backend business flows of common community products**.
+2. It explains logical service boundaries, merged physical deployment, database schemas, Redis read models and MQ events separately.
+3. It includes a runnable Java backend, a multi-module project structure, local Docker Compose dependencies and a uni-app H5 mobile client.
+4. It does not treat Redis or MQ as the only source of truth. Many modules keep MySQL facts, idempotency records, rebuild paths or fallback paths.
+5. It keeps a large set of Chinese design documents so readers can review why the system is designed this way, not only what the final code looks like.
 
 [中文说明 / Chinese README](README.zh-CN.md)
 
-## Highlights
-
-- Mobile H5 app built with uni-app, Vue 3, TypeScript and Pinia.
-- Java 21 + Spring Boot 3.5 multi-module backend.
-- Gateway JWT authentication and downstream user context propagation.
-- MySQL-backed auth, user profile, file, note, comment, relation, counter, feed, rank, notification, push, IM and order domains.
-- MinIO presigned image upload flow for note images, avatars and profile covers.
-- RocketMQ + outbox baseline for note, interaction, relation, counter, feed, rank, notification, push, IM and order events.
-- Redis-backed online counters, feed inbox, ranking list, notification unread count, push online state and order seckill stock.
-- Mobile pages for login, home feed, publish, note detail, profile, profile editing, notifications, IM, coupon activity and rankings.
-- Repeatable local smoke script for the main user journey.
-
-## Why This Project Is Useful
-
-BlueNote is intentionally documented as a backend internship project reference. It tries to answer questions that are often missing from small demo projects:
-
-- Where does each business fact live?
-- Which APIs are external and which are internal?
-- Why is Redis used, and how can Redis data be rebuilt?
-- Which changes are sent through RocketMQ events?
-- How are outbox sending, duplicate consumption, idempotency and state transitions handled?
-- What is implemented now, and what is honestly left as production work?
-
-Recommended reading for backend learners:
-
-- [Chinese README](README.zh-CN.md)
-- [Engineering docs index](docs/engineering/README.md)
-- [Backend internship study roadmap](docs/engineering/04-backend-internship-study-roadmap.md)
-- [Architecture and core flows](docs/engineering/05-architecture-and-core-flows.md)
-- [Interview and resume guide](docs/engineering/06-interview-and-resume-guide.md)
-- [Module design overview](docs/engineering/07-module-design-overview.md)
-
-## What Works
+## At A Glance
 
 ```text
 Register / login
-  -> edit user profile and upload avatar / cover
-  -> upload note image and publish note
+  -> edit user profile and upload avatar / profile cover
+  -> upload images and publish a note
   -> view note detail
-  -> follow users and read following feed
+  -> follow authors and read the following feed
   -> like, collect, comment and receive notifications
-  -> realtime WebSocket push and IM single chat
-  -> ranking list
-  -> coupon seckill order with MOCK payment
+  -> realtime WebSocket delivery and IM single chat
+  -> weekly hot note ranking and yearly creator growth ranking
+  -> coupon seckill order and MOCK payment
 ```
 
-This is not a clone of any specific product brand. The UI and domain model are intentionally generic.
+The current project is more suitable for learning and showcasing backend design than for direct production deployment. A real production system would still need monitoring and alerting, real payment, real offline push channels, recommendation and search, moderation/admin systems and deployment security.
 
-## Showcase
+## Screenshots
 
-The screenshots below are captured from the local uni-app H5 routes. The ranking screenshot uses data returned by the local backend; unauthenticated pages intentionally show login-required states.
+The following images are captured from the local uni-app H5 pages.
 
-![BlueNote H5 flow](docs/assets/showcase/mobile-flow.gif)
+Profile page:
 
-![BlueNote ranking page](docs/assets/showcase/mobile-rank.png)
+![BlueNote profile page](docs/assets/showcase/hero.png)
+
+Home page:
+
+![BlueNote home page](docs/assets/showcase/home.png)
+
+Comments / likes / collections:
+
+![BlueNote comments page](docs/assets/showcase/comment.png)
+
+IM:
+
+![BlueNote IM](docs/assets/showcase/notifications.png)
+
+Ranking:
+
+![BlueNote ranking page](docs/assets/showcase/rank.png)
+
+## Tech Stack
+
+| Area | Stack |
+|---|---|
+| Backend language | Java 21 |
+| Backend framework | Spring Boot 3.5, Spring Cloud Gateway, Spring MVC |
+| Persistence | MySQL 8, MyBatis / MyBatis-Plus XML |
+| Cache and read models | Redis 7 |
+| Messaging | RocketMQ 5, local transaction + outbox, idempotent consumption |
+| Object storage | MinIO presigned direct upload |
+| Mobile | uni-app, Vue 3, TypeScript, Pinia, Vite |
+| Local environment | Docker Compose |
+
+## Backend Applications
+
+The project is logically designed around service boundaries, but the physical deployment is merged so it can run on a personal computer or small server.
+
+| Physical app | Default port | Logical services | Description |
+|---|---:|---|---|
+| `bluenote-gateway-app` | 8080 | gateway | Unified entry, JWT validation, routing, user context headers, WebSocket forwarding |
+| `bluenote-member-app` | 8081 | auth, user | Registration/login, tokens, device sessions, user profiles, user home header |
+| `bluenote-content-app` | 8082 | file, note, comment | File upload, notes, comments, like/collect facts |
+| `bluenote-social-app` | 8083 | relation, counter, feed, rank, notification, push, im | Follow relations, counters, feed, rankings, notifications, realtime delivery, single chat |
+| `bluenote-order-app` | 8084 | order | Coupon activities, seckill, orders, MOCK payment, coupon issuing, stock operations |
+
+Merged deployment does not mean blurred boundaries. The project still requires:
+
+1. Each logical service owns its data.
+2. No cross-schema joins.
+3. Cross-service reads go through internal APIs or event-driven read models.
+
+## Implemented Modules
+
+| Module | Current capabilities | Backend learning points |
+|---|---|---|
+| Gateway | JWT authentication, public path allowlist, downstream user context headers, WebSocket forwarding | Unified gateway entry, authentication before routing, isolation between mobile client and internal services |
+| Auth | Registration, login, token refresh, logout, password change, device session | Access/Refresh Token split, BCrypt, session rotation, login audit |
+| User | Current profile, public profile, user home header, avatar/cover binding | Separation between user profile and login credentials, profile versioning, file ownership validation |
+| File | Upload credential, upload confirmation, access URL, internal validation and binding | MinIO presigned direct upload, file metadata, business binding |
+| Note | Drafts, publishing, deletion, detail, lists, likes, collections, my collections/likes | Content fact tables, media binding, idempotency, interaction facts, outbox |
+| Comment | Top-level comments, replies, deletion, comment likes, my comments | Comment hierarchy, status control, comment count source, event publishing |
+| Relation | Follow, unfollow, following/follower lists, follow status | Bidirectional relation read models, idempotent follow, feed and notification event source |
+| Counter | Batch counts, event consumption, Redis online counters, MySQL snapshots, rebuild tasks, `CounterChanged` outbox | Eventually consistent counters, Redis/MySQL/source fallback, event idempotency |
+| Feed | Following feed, inbox, fanout tasks, follow backfill, rebuild and retry | Write fanout, read models, Redis/MySQL fallback, push-pull evolution |
+| Notification | Unread count, notification list, aggregated interaction notifications, comment/follow/order notifications, rebuild | Notification read model, aggregation strategy, unread count, Push request handoff |
+| Push | Device registration, preferences, delivery request, WebSocket online delivery, ACK, delivery logs | Redis online routing, unified delivery entry, offline Push extension boundary |
+| IM | Single-chat conversation, text message, unread, delivered, read | Message persistence, conversation sequence, send idempotency, online/offline reminder split |
+| Order | Activity, seckill token, Redis Lua pre-deduction, async order creation, MOCK payment, coupon issuing, timeout close, stock reconciliation | Traffic peak shaving, inventory consistency, state machine, idempotency and compensation |
+| Rank | Weekly hot notes, yearly creator growth ranking, Redis ZSet, MySQL score facts, snapshots, rebuild | Ranking score model, online ranking and snapshots, event-driven updates |
 
 ## Feature Matrix
 
-| Area | User-facing flow | Backend design focus | Status |
+| Domain | User-facing flow | Backend design focus | Status |
 |---|---|---|---|
-| Gateway | Single mobile API entry | JWT validation, public path allowlist, downstream user context headers, WebSocket forwarding | Implemented |
-| Auth | Register, login, refresh token, logout | BCrypt password hash, Access/Refresh Token split, device session, login audit | Implemented |
-| User | Profile, public profile, user home | Profile versioning, avatar/cover file binding, counter-backed home stats | Implemented |
-| File | Image upload for notes, avatars and covers | MinIO presigned PUT, upload session, metadata, ownership validation, business binding | Implemented |
-| Note | Drafts, publishing, detail, lists, likes, collections | Note/media/version tables, idempotent write path, interaction facts, note outbox | Implemented |
-| Comment | Comments, replies, delete, comment likes | Comment hierarchy, status delete, content storage, comment outbox, counter source | Implemented |
-| Relation | Follow, unfollow, following/follower lists | Following/follower read models, idempotent relation writes, relation events | Implemented |
-| Counter | Note/user/comment counts | Event consumption, Redis online count, MySQL snapshot, source fallback, rebuild tasks, CounterChanged outbox | Implemented |
-| Feed | Following feed | Inbox model, fanout tasks, Redis/MySQL read path, follow backfill, rebuild and retry APIs | Implemented |
-| Notification | Unread count and notification center | Aggregated like/collect notifications, detail notifications, unread rebuild, PushSendRequested | Implemented |
-| Push | Realtime in-app delivery | Device registry, preferences, Redis online route, WebSocket delivery, ACK and delivery logs | Implemented foundation |
-| IM | Single chat | Conversation/message persistence, unread count, delivery/read acknowledgements, PushSendRequested | Implemented foundation |
-| Order | Coupon seckill, MOCK payment, user coupons | Seckill token, Redis Lua pre-deduct, async order creation, state machine, timeout close, stock reconcile | Implemented foundation |
-| Rank | Weekly hot notes, yearly creator growth | CounterChanged scoring, Redis ZSet online rank, MySQL score facts, snapshot and rebuild | Implemented foundation |
-| Operations | Local verification | Docker Compose dependencies, backend compile, mobile typecheck/build, main-chain smoke script | Implemented baseline |
+| Gateway | Unified mobile entry | JWT validation, public paths, user context headers, WebSocket forwarding | Implemented |
+| Account | Register, login, refresh, logout | BCrypt, Access/Refresh Token, device session, login audit | Implemented |
+| User | Profile, public profile, user home | Profile versioning, avatar/cover file binding, user home counter aggregation | Implemented |
+| File | Note image, avatar, cover upload | MinIO presigned direct upload, upload confirmation, ownership validation, business binding | Implemented |
+| Content | Draft, publish, detail, list, like, collect | Note facts, media binding, idempotent writes, interaction facts, outbox | Implemented |
+| Comment | Comment, reply, delete, like | Comment hierarchy, status deletion, comment count source, event publishing | Implemented |
+| Relation | Follow, unfollow, following/follower list | Bidirectional read models, idempotent follow, relation events | Implemented |
+| Counter | Note/user/comment counts | Redis online counters, MySQL snapshots, source fallback, rebuild, CounterChanged | Implemented |
+| Feed | Following feed | Inbox, fanout, Redis/MySQL fallback, follow backfill, rebuild | Implemented |
+| Notification | Unread count, notification center | Aggregated notifications, detail notifications, unread rebuild, PushSendRequested | Implemented |
+| Push | Online delivery | Devices, preferences, online routing, WebSocket, ACK, delivery logs | Foundation implemented |
+| IM | Single chat, messages, unread, read | Message persistence, conversation sequence, send idempotency, Push request | Foundation implemented |
+| Order | Coupon seckill, MOCK payment, user coupons | Seckill token, Redis Lua, async order creation, state machine, stock reconciliation | Foundation implemented |
+| Ranking | Weekly hot notes, yearly creator growth | CounterChanged scoring, Redis ZSet, MySQL score facts, snapshot rebuild | Foundation implemented |
 
-## Architecture
+## Core Architecture
 
 ```mermaid
 flowchart LR
-  Mobile["Mobile H5<br/>uni-app + Vue 3"] --> Gateway["Gateway<br/>JWT + routing"]
+  Mobile["Mobile H5<br/>uni-app + Vue 3"] --> Gateway["gateway-app<br/>JWT + routing"]
   Gateway --> Member["member-app<br/>auth / user"]
   Gateway --> Content["content-app<br/>file / note / comment"]
   Gateway --> Social["social-app<br/>relation / counter / feed / rank / notification / push / im"]
   Gateway --> Order["order-app<br/>coupon / seckill / order"]
-  Gateway -. websocket .-> Social
+  Gateway -. "WebSocket /ws/realtime" .-> Social
 
   Member --> MySQL[(MySQL)]
   Content --> MySQL
@@ -117,65 +156,24 @@ flowchart LR
   Order --> RocketMQ
 ```
 
-Backend applications:
+The core engineering principles are:
 
-| App | Port | Responsibility |
-|---|---:|---|
-| gateway-app | 8080 | Authentication, routing, user context headers, WebSocket forwarding |
-| member-app | 8081 | Auth, session, user profile, profile image binding |
-| content-app | 8082 | File upload, notes, comments, note interactions |
-| social-app | 8083 | Relation, counter, feed, rank, notification, push, IM |
-| order-app | 8084 | Coupon activities, seckill, orders, MOCK payment |
+1. **Contract first**: define APIs, error codes, DDL, Redis keys, MQ events and permissions before implementation.
+2. **Clear fact ownership**: user profiles, notes, comments, relations, orders and other business facts each have a clear write owner.
+3. **Asynchronous decoupling**: counters, feed, rankings, notifications, Push and order status reminders are connected through events.
+4. **Rebuildable read models**: Redis counters, feeds, rankings and unread counts are not the only source of truth.
+5. **Controlled complexity for a personal project**: the design follows microservice-style logical boundaries, while physical deployment is merged into 5 apps so small machines can run it.
 
-## Tech Stack
-
-| Area | Stack |
-|---|---|
-| Mobile | uni-app, Vue 3, TypeScript, Pinia, Vite |
-| Backend | Java 21, Spring Boot 3.5, Spring Cloud Gateway, Maven |
-| Persistence | MySQL 8, MyBatis / MyBatis-Plus XML mappers |
-| Cache / read model | Redis 7 |
-| Messaging | RocketMQ 5, transactional outbox pattern |
-| Object storage | MinIO presigned PUT upload |
-| Local environment | Docker Compose |
-
-## Repository Layout
-
-```text
-BlueNote/
-  backend/               Java backend multi-module project
-  mobile/                uni-app mobile H5 client
-  deploy/compose/        local Docker Compose dependencies
-  docs/contracts/        API, DB, Redis, MQ and security contracts
-  docs/engineering/      engineering notes and local runbooks
-  docs/testing/          smoke-test and contract-audit records
-  scripts/               local verification scripts
-  方案/                  original Chinese architecture and service design docs
-```
-
-## Learning Map
-
-For a quick review, start with this README and [README.zh-CN.md](README.zh-CN.md).
-
-For a serious walkthrough:
-
-1. Read [Contract index](docs/contracts/README.md) to understand the contract-first baseline.
-2. Read [Architecture and core flows](docs/engineering/05-architecture-and-core-flows.md) to understand service boundaries and data flow.
-3. Follow [Backend internship study roadmap](docs/engineering/04-backend-internship-study-roadmap.md) from auth/user/file/note to counter/feed/order/rank.
-4. Read [Module design overview](docs/engineering/07-module-design-overview.md) when you want a module-by-module explanation of architecture, flow and design choices.
-5. Use [Interview and resume guide](docs/engineering/06-interview-and-resume-guide.md) to turn the implementation into a clear project story.
-6. Open `方案/services/` when you want the original detailed Chinese service design documents.
-
-## Quick Start
+## Local Start
 
 Prerequisites:
 
-- JDK 21
-- Maven
-- Node.js and npm
-- Docker Desktop or Docker Compose
+1. JDK 21
+2. Maven
+3. Node.js / npm
+4. Docker Desktop or Docker Compose
 
-Start local dependencies from the repository root:
+Start local dependencies:
 
 ```bash
 docker compose -f deploy/compose/compose.base.yml -f deploy/compose/compose.local.yml up -d
@@ -188,7 +186,7 @@ cd backend
 mvn -q -DskipTests compile
 ```
 
-Start backend applications in separate terminals:
+Start backend applications separately:
 
 ```bash
 cd backend/bluenote-member-app
@@ -215,7 +213,7 @@ cd backend/bluenote-gateway-app
 mvn -q -DskipTests spring-boot:run
 ```
 
-Run the mobile H5 app:
+Start the mobile H5 app:
 
 ```bash
 cd mobile
@@ -229,17 +227,24 @@ Default H5 URL:
 http://127.0.0.1:5173
 ```
 
-Vite proxies `/api` and `/ws` to the gateway by default. You can override it with `VITE_BLUENOTE_GATEWAY=http://127.0.0.1:8080`.
-
 ## Verification
 
-Main journey smoke test:
+Main-chain smoke script:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/verify-main-chain.ps1 -GatewayBaseUrl http://127.0.0.1:8080
 ```
 
-This creates a temporary user, uploads images to MinIO, publishes a note, updates the user profile and verifies the user home response.
+This script automatically verifies:
+
+1. Registering a temporary user.
+2. Fetching the current user profile.
+3. Requesting an image upload credential and uploading directly to MinIO.
+4. Publishing a note.
+5. Querying note detail.
+6. Uploading avatar and profile cover.
+7. Updating the user profile.
+8. Querying the user home and verifying the returned counter aggregation.
 
 Common checks:
 
@@ -254,63 +259,17 @@ npm run typecheck
 npm run build:h5
 ```
 
-More details:
+## Current Boundaries
 
-- [Engineering docs index](docs/engineering/README.md)
-- [Local main-chain runbook](docs/engineering/02-local-main-chain-runbook.md)
-- [Main-chain contract audit](docs/testing/01-main-chain-contract-audit.md)
-- [Current engineering status](docs/engineering/current-status.md)
+Most foundation loops required for a personal project showcase are complete, but several areas are explicitly out of scope for now:
 
-## API And Contracts
+1. Real payment providers are not integrated. The current payment flow is MOCK payment.
+2. Real uni-push / vendor offline Push channels are not integrated. The current focus is device registration, preferences, delivery requests, WebSocket online delivery and logs.
+3. A complete recommendation system and full-text search are not implemented.
+4. A complete moderation console, operations admin console and production-grade monitoring/alerting are not implemented.
+5. Automated tests are still not sufficient. Current verification relies more on compilation, mobile build and the main-chain smoke script.
 
-BlueNote is contract-first. The most useful entry points are:
-
-- [Contract index](docs/contracts/README.md)
-- [Common API format](docs/contracts/api/00-common.md)
-- [Auth API](docs/contracts/api/02-auth-api.md)
-- [User API](docs/contracts/api/03-user-api.md)
-- [File API](docs/contracts/api/04-file-api.md)
-- [Note API](docs/contracts/api/05-note-api.md)
-- [Feed API](docs/contracts/api/09-feed-api.md)
-- [IM API](docs/contracts/api/13-im-api.md)
-- [Order API](docs/contracts/api/14-order-api.md)
-- [Rank API](docs/contracts/api/15-rank-api.md)
-
-OpenAPI UI is available locally after backend apps start:
-
-```text
-http://127.0.0.1:{port}/swagger-ui.html
-```
-
-## Project Status
-
-The project has completed the foundation of the planned personal-project scope:
-
-- main content publishing chain
-- social relation and feed chain
-- counter, ranking and notification foundation
-- realtime push and IM single-chat foundation
-- coupon order chain with MOCK payment
-- mobile H5 pages for the core flows
-- GitHub-facing Chinese and English documentation for backend learners
-
-Known non-goals for the current demo:
-
-- production deployment and observability stack
-- real payment provider integration
-- real offline vendor push channels
-- recommendation engine and full-text search
-- moderation console and admin dashboard
-- IM group chat and rich media messages
-- comprehensive automated test suite
-
-## Notes For Reviewers
-
-Some directories and documents use Chinese names because the original architecture notes were written in Chinese. They are intentionally kept in the repository: they show the planning process behind the implementation and are part of the project artifact.
-
-Showcase images are stored under `docs/assets/showcase/`. They are documentation assets captured from the local H5 app, not product marketing mockups.
-
-Local generated files such as `.m2/`, `out/`, `target/`, `node_modules/` and `unpackage/` are ignored.
+These boundaries are not defects. They are an honest scope statement for a personal project. This makes the project more credible and more suitable for discussing how it could evolve toward production.
 
 ## License
 
