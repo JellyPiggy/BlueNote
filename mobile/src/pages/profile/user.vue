@@ -266,10 +266,6 @@ function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
         </view>
       </view>
 
-      <view class="profile-tabs">
-        <button class="profile-tab active">笔记</button>
-      </view>
-
       <view v-if="notesLoading && !notes.length" class="loading-copy">正在读取笔记</view>
 
       <EmptyState v-else-if="loaded && !notes.length" title="还没有公开笔记" subtitle="这个作者暂时没有可看的公开内容。" />
@@ -434,36 +430,6 @@ function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
   color: var(--bn-muted);
   font-size: 23rpx;
   line-height: 1.1;
-}
-
-.profile-tabs {
-  display: grid;
-  grid-template-columns: 1fr;
-  border-bottom: 1rpx solid var(--bn-line);
-  background: #fff;
-}
-
-.profile-tab {
-  position: relative;
-  min-height: 86rpx;
-  color: var(--bn-ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28rpx;
-  font-weight: 900;
-}
-
-.profile-tab.active::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 58rpx;
-  height: 6rpx;
-  border-radius: 999rpx;
-  background: var(--bn-coral);
-  transform: translateX(-50%);
 }
 
 .masonry {

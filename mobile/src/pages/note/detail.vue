@@ -708,7 +708,7 @@ function isCommentBlocked(error: unknown) {
             :disabled="!canSubmitComment"
             @tap="submitComment"
           >
-            {{ commentSubmitting ? '发送中' : '发送' }}
+            <text class="send-comment-text">{{ commentSubmitting ? '发送中' : '发送' }}</text>
           </button>
           <view v-else class="action-group">
             <button
@@ -1245,7 +1245,8 @@ function isCommentBlocked(error: unknown) {
 
 .send-comment {
   flex: 0 0 auto;
-  width: 100rpx;
+  width: 128rpx;
+  min-width: 128rpx;
   height: 66rpx;
   border-radius: 999rpx;
   background: var(--bn-coral);
@@ -1255,6 +1256,15 @@ function isCommentBlocked(error: unknown) {
   justify-content: center;
   font-size: 24rpx;
   font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.send-comment-text {
+  color: #fff;
+  white-space: nowrap;
+  word-break: keep-all;
+  line-height: 1;
 }
 
 .send-comment[disabled] {
