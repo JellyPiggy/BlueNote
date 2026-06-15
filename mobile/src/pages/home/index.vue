@@ -188,10 +188,10 @@ function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
   <view class="screen feed-screen top-safe">
     <view class="feed-appbar">
       <view class="brand-word">BlueNote</view>
-      <button class="search-pill" @tap="goPublish">
+      <view class="search-pill">
         <text class="search-mark">⌕</text>
         <text class="search-copy">搜索笔记、话题</text>
-      </button>
+      </view>
     </view>
 
     <view class="channel-tabs">

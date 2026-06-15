@@ -151,6 +151,18 @@ function openNote(noteId: string) {
   uni.navigateTo({ url: `/pages/note/detail?noteId=${noteId}` })
 }
 
+function openChat() {
+  if (!userId.value || isSelf.value) {
+    return
+  }
+  if (!auth.isAuthenticated) {
+    uni.navigateTo({ url: '/pages/login/index' })
+    return
+  }
+  const title = encodeURIComponent(user.value?.nickname || '私信')
+  uni.navigateTo({ url: `/pages/im/chat?targetUserId=${encodeURIComponent(userId.value)}&title=${title}` })
+}
+
 async function toggleFollow() {
   if (!profileHome.value || followSubmitting.value) {
     return
@@ -240,6 +252,7 @@ function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
       >
         {{ followText }}
       </button>
+      <button v-if="profileHome && !isSelf" class="message-button" @tap="openChat">私信</button>
       <view v-else class="top-spacer"></view>
     </view>
 
@@ -333,7 +346,8 @@ function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
   white-space: nowrap;
 }
 
-.follow-button {
+.follow-button,
+.message-button {
   flex: 0 0 auto;
   min-width: 112rpx;
   height: 64rpx;
@@ -347,6 +361,7 @@ function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
   justify-content: center;
   font-size: 26rpx;
   font-weight: 860;
+  white-space: nowrap;
 }
 
 .follow-button.followed {
@@ -356,6 +371,12 @@ function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
 
 .follow-button[disabled] {
   opacity: 0.62;
+}
+
+.message-button {
+  border-color: var(--bn-line);
+  color: var(--bn-ink);
+  background: #fff;
 }
 
 .profile-body {
