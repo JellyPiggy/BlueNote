@@ -14,10 +14,10 @@ export function getPublicProfile(userId: string) {
   })
 }
 
-export function getUserHome(userId: string) {
+export function getUserHome(userId: string, withAuth = true) {
   return apiRequest<UserHome>({
     path: `/api/users/${userId}/home`,
-    auth: false
+    auth: withAuth
   })
 }
 

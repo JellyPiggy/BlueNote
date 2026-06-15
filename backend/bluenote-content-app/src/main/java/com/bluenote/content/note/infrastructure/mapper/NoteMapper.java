@@ -36,6 +36,12 @@ public interface NoteMapper {
             @Param("size") int size
     );
 
+    List<NoteEntity> selectPublicTimelinePage(
+            @Param("cursorPublishedAt") LocalDateTime cursorPublishedAt,
+            @Param("cursorNoteId") Long cursorNoteId,
+            @Param("size") int size
+    );
+
     List<NoteEntity> selectMyNotesPage(
             @Param("authorId") Long authorId,
             @Param("status") String status,

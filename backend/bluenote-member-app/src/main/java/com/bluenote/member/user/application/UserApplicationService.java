@@ -27,6 +27,7 @@ import com.bluenote.member.user.infrastructure.client.UserCounterClient;
 import com.bluenote.member.user.infrastructure.client.UserCounterClient.UserCounterResult;
 import com.bluenote.member.user.infrastructure.client.UserFileClient;
 import com.bluenote.member.user.infrastructure.client.UserFileClient.ValidatedUserFile;
+import com.bluenote.member.user.infrastructure.client.UserRelationClient;
 import com.bluenote.member.user.infrastructure.mapper.UserOutboxEventMapper;
 import com.bluenote.member.user.infrastructure.mapper.UserProfileAuditMapper;
 import com.bluenote.member.user.infrastructure.mapper.UserProfileMapper;
@@ -60,6 +61,7 @@ public class UserApplicationService {
     private final JsonPayloads jsonPayloads;
     private final UserCounterClient userCounterClient;
     private final UserFileClient userFileClient;
+    private final UserRelationClient userRelationClient;
 
     public UserApplicationService(
             UserProfileMapper profileMapper,
@@ -68,7 +70,8 @@ public class UserApplicationService {
             MemberIdGenerator idGenerator,
             JsonPayloads jsonPayloads,
             UserCounterClient userCounterClient,
-            UserFileClient userFileClient
+            UserFileClient userFileClient,
+            UserRelationClient userRelationClient
     ) {
         this.profileMapper = profileMapper;
         this.profileAuditMapper = profileAuditMapper;
@@ -77,6 +80,7 @@ public class UserApplicationService {
         this.jsonPayloads = jsonPayloads;
         this.userCounterClient = userCounterClient;
         this.userFileClient = userFileClient;
+        this.userRelationClient = userRelationClient;
     }
 
     @Transactional(readOnly = true)
@@ -124,24 +128,29 @@ public class UserApplicationService {
     }
 
     @Transactional(readOnly = true)
-    public UserHomeResponse home(String userId) {
+    public UserHomeResponse home(String viewerId, String userId) {
         UserSummaryResponse user = publicProfile(userId);
+        UserCountsResponse counts = new UserCountsResponse(0, 0, 0, 0);
+        UserRelationResponse relation = new UserRelationResponse("UNKNOWN");
+        boolean degraded = false;
+
         try {
             UserCounterResult result = userCounterClient.userCounts(userId);
-            return new UserHomeResponse(
-                    user,
-                    result.counts(),
-                    new UserRelationResponse("UNKNOWN"),
-                    result.degraded()
-            );
+            counts = result.counts();
+            degraded = result.degraded();
         } catch (RuntimeException exception) {
-            return new UserHomeResponse(
-                    user,
-                    new UserCountsResponse(0, 0, 0, 0),
-                    new UserRelationResponse("UNKNOWN"),
-                    true
-            );
+            degraded = true;
         }
+
+        if (!isBlank(viewerId)) {
+            try {
+                relation = new UserRelationResponse(userRelationClient.followStatus(viewerId, userId));
+            } catch (RuntimeException exception) {
+                degraded = true;
+            }
+        }
+
+        return new UserHomeResponse(user, counts, relation, degraded);
     }
 
     @Transactional

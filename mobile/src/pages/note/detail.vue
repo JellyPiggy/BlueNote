@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 import { onLoad, onReachBottom } from '@dcloudio/uni-app'
 import {
   createNoteComment,
-  deleteComment as deleteCommentApi,
   getCommentReplies,
   getNoteComments,
   likeComment,
@@ -17,8 +16,9 @@ import {
   uncollectNote,
   unlikeNote
 } from '@/api/note'
+import { followUser, getFollowStatus, unfollowUser } from '@/api/relation'
 import { BlueNoteApiError, showApiError } from '@/api/request'
-import type { CommentItem, NoteDetail } from '@/api/types'
+import type { CommentItem, FollowStatus, NoteDetail } from '@/api/types'
 import AvatarCircle from '@/components/AvatarCircle.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { createClientRequestId, formatCount, formatTime } from '@/utils/format'
@@ -64,12 +64,22 @@ const noteActionSubmitting = ref({
   like: false,
   collect: false
 })
+const authorFollowStatus = ref<FollowStatus>('UNKNOWN')
+const authorFollowLoading = ref(false)
 
 const coverMedia = computed(() => note.value?.mediaFiles ?? [])
 const mediaTotal = computed(() => coverMedia.value.length)
-const searchKeyword = computed(() => {
-  const firstTopic = note.value?.topics?.[0]
-  return firstTopic ? `${firstTopic}相关笔记` : note.value?.title || '相似笔记'
+const isOwnNote = computed(() => {
+  const currentNote = note.value
+  return Boolean(currentNote?.author.userId && auth.userId === currentNote.author.userId)
+})
+const isFollowingAuthor = computed(() => authorFollowStatus.value === 'FOLLOWING')
+const canShowFollowButton = computed(() => Boolean(note.value) && !isOwnNote.value)
+const followButtonText = computed(() => {
+  if (authorFollowLoading.value) {
+    return '...'
+  }
+  return isFollowingAuthor.value ? '已关注' : '关注'
 })
 const canWriteComment = computed(() => Boolean(note.value?.commentEnabled) && !commentBlocked.value)
 const commentPlaceholder = computed(() => {
@@ -108,6 +118,7 @@ async function loadDetail() {
     commentCount.value = note.value.counts.commentCount
     commentBlocked.value = !note.value.commentEnabled
     currentMediaIndex.value = 0
+    await loadAuthorFollowStatus()
     await loadComments(true)
   } catch (error) {
     errorText.value = '笔记暂时不可见'
@@ -290,46 +301,6 @@ async function toggleCommentLike(comment: CommentItem) {
   }
 }
 
-function deleteCommentItem(comment: CommentItem) {
-  if (!ensureAuthenticated()) {
-    return
-  }
-  uni.showModal({
-    title: '删除评论',
-    content: '确定删除这条评论吗？',
-    confirmText: '删除',
-    success: (result) => {
-      if (result.confirm) {
-        void performDeleteComment(comment)
-      }
-    }
-  })
-}
-
-async function performDeleteComment(comment: CommentItem) {
-  try {
-    await deleteCommentApi(comment.commentId)
-    if (comment.level === 1) {
-      comments.value = comments.value.filter((item) => item.commentId !== comment.commentId)
-      delete replyStates.value[comment.rootId]
-      expandedRootIds.value = expandedRootIds.value.filter((item) => item !== comment.rootId)
-      commentCount.value = Math.max(0, commentCount.value - Math.max(1, comment.replyCount + 1))
-    } else {
-      const state = replyStates.value[comment.rootId]
-      if (state) {
-        state.items = state.items.filter((item) => item.commentId !== comment.commentId)
-      }
-      patchComment(comment.rootId, (item) => {
-        item.replyCount = Math.max(0, item.replyCount - 1)
-      })
-      commentCount.value = Math.max(0, commentCount.value - 1)
-    }
-    uni.showToast({ title: '已删除', icon: 'none' })
-  } catch (error) {
-    showApiError(error, '删除失败')
-  }
-}
-
 function back() {
   const pages = getCurrentPages()
   if (pages.length > 1) {
@@ -340,10 +311,15 @@ function back() {
 }
 
 function openAuthor() {
-  if (!note.value) {
+  const authorId = note.value?.author.userId
+  if (!authorId) {
     return
   }
-  uni.switchTab({ url: '/pages/profile/index' })
+  if (auth.userId === authorId) {
+    uni.switchTab({ url: '/pages/profile/index' })
+    return
+  }
+  uni.navigateTo({ url: `/pages/profile/user?userId=${encodeURIComponent(authorId)}` })
 }
 
 function handleSwiperChange(event: Event) {
@@ -351,8 +327,53 @@ function handleSwiperChange(event: Event) {
   currentMediaIndex.value = Number(detail?.current ?? 0)
 }
 
-function followAuthor() {
-  uni.showToast({ title: '关注功能后续接入', icon: 'none' })
+async function loadAuthorFollowStatus() {
+  authorFollowStatus.value = 'UNKNOWN'
+  if (!note.value || !auth.isAuthenticated || isOwnNote.value) {
+    return
+  }
+  authorFollowLoading.value = true
+  try {
+    const response = await getFollowStatus(note.value.author.userId)
+    authorFollowStatus.value = normalizeFollowStatus(response.followStatus)
+  } catch {
+    authorFollowStatus.value = 'UNKNOWN'
+  } finally {
+    authorFollowLoading.value = false
+  }
+}
+
+async function followAuthor() {
+  if (!note.value || authorFollowLoading.value) {
+    return
+  }
+  if (!ensureAuthenticated()) {
+    return
+  }
+  if (isOwnNote.value) {
+    uni.showToast({ title: '不能关注自己', icon: 'none' })
+    return
+  }
+
+  const previousStatus = authorFollowStatus.value
+  const shouldUnfollow = previousStatus === 'FOLLOWING'
+  authorFollowStatus.value = shouldUnfollow ? 'NOT_FOLLOWING' : 'FOLLOWING'
+  authorFollowLoading.value = true
+  try {
+    const response = shouldUnfollow
+      ? await unfollowUser(note.value.author.userId)
+      : await followUser(note.value.author.userId)
+    authorFollowStatus.value = normalizeFollowStatus(response.followStatus)
+    uni.showToast({
+      title: authorFollowStatus.value === 'FOLLOWING' ? '已关注' : '已取消关注',
+      icon: 'none'
+    })
+  } catch (error) {
+    authorFollowStatus.value = previousStatus
+    showApiError(error, '操作失败')
+  } finally {
+    authorFollowLoading.value = false
+  }
 }
 
 function shareNote() {
@@ -393,14 +414,6 @@ async function toggleNoteCollect() {
   } finally {
     noteActionSubmitting.value.collect = false
   }
-}
-
-function scrollToComments() {
-  uni.pageScrollTo({ selector: '.comments-section', duration: 220 })
-}
-
-function isMyComment(comment: CommentItem) {
-  return Boolean(auth.userId && comment.author.userId === auth.userId)
 }
 
 function isRepliesExpanded(rootId: string) {
@@ -480,6 +493,30 @@ function syncVisibleCommentCount() {
   commentCount.value = Math.max(commentCount.value, visibleCount)
 }
 
+function formatCommentDate(value: string) {
+  if (!value) {
+    return ''
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value.slice(0, 10)
+  }
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  if (year === new Date().getFullYear()) {
+    return `${month}-${day}`
+  }
+  return `${year}-${month}-${day}`
+}
+
+function normalizeFollowStatus(status: string): FollowStatus {
+  if (status === 'FOLLOWING' || status === 'NOT_FOLLOWING') {
+    return status
+  }
+  return 'UNKNOWN'
+}
+
 function ensureAuthenticated() {
   if (auth.isAuthenticated) {
     return true
@@ -508,7 +545,15 @@ function isCommentBlocked(error: unknown) {
           <AvatarCircle :src="note.author.avatarUrl" :name="note.author.nickname" size="small" />
           <view class="top-name">{{ note.author.nickname }}</view>
         </view>
-        <button class="follow-button" @tap="followAuthor">关注</button>
+        <button
+          v-if="canShowFollowButton"
+          class="follow-button"
+          :class="{ followed: isFollowingAuthor }"
+          :disabled="authorFollowLoading"
+          @tap="followAuthor"
+        >
+          {{ followButtonText }}
+        </button>
         <button class="share-button" @tap="shareNote">↗</button>
       </view>
 
@@ -542,14 +587,8 @@ function isCommentBlocked(error: unknown) {
           <view v-for="topic in note.topics" :key="topic" class="topic-chip">#{{ topic }}</view>
         </view>
 
-        <view class="search-suggestion">
-          <text class="search-icon">⌕</text>
-          <text>猜你想搜｜{{ searchKeyword }}</text>
-        </view>
-
         <view class="note-meta-row">
           <text>{{ formatTime(note.publishedAt) }} · {{ note.visibility === 'PUBLIC' ? '公开' : '私密' }}</text>
-          <button class="dislike-button">不喜欢</button>
         </view>
 
         <view v-if="note.degraded" class="degraded-chip">部分信息降级展示</view>
@@ -558,7 +597,6 @@ function isCommentBlocked(error: unknown) {
       <view class="comments-section">
         <view class="comments-title-row">
           <view class="comments-title">评论 {{ formatCount(commentCount) }}</view>
-          <button class="comments-refresh" :disabled="commentsLoading" @tap="refreshComments">刷新</button>
         </view>
 
         <view v-if="commentsLoading && !commentsLoaded" class="comments-loading">正在加载评论</view>
@@ -579,21 +617,20 @@ function isCommentBlocked(error: unknown) {
             <view class="comment-main">
               <view class="comment-head">
                 <text class="comment-name">{{ comment.author.nickname }}</text>
-                <text class="comment-time">{{ formatTime(comment.createdAt) }}</text>
               </view>
               <view class="comment-copy">{{ comment.content }}</view>
               <view v-if="comment.degraded" class="comment-degraded">部分评论信息暂时不完整</view>
 
               <view class="comment-tools">
+                <text class="comment-time">{{ formatCommentDate(comment.createdAt) }}</text>
                 <button class="comment-tool" @tap="prepareReply(comment)">回复</button>
-                <button v-if="isMyComment(comment)" class="comment-tool" @tap="deleteCommentItem(comment)">删除</button>
                 <button
                   class="comment-like"
                   :class="{ liked: comment.viewerAction.liked }"
                   @tap="toggleCommentLike(comment)"
                 >
-                  <text>{{ comment.viewerAction.liked ? '♥' : '♡' }}</text>
-                  <text>{{ formatCount(comment.likeCount) }}</text>
+                  <text class="comment-like-icon">{{ comment.viewerAction.liked ? '♥' : '♡' }}</text>
+                  <text class="comment-like-count" :class="{ hidden: !comment.likeCount }">{{ comment.likeCount ? formatCount(comment.likeCount) : '0' }}</text>
                 </button>
               </view>
 
@@ -615,19 +652,18 @@ function isCommentBlocked(error: unknown) {
                     <view class="comment-head">
                       <text class="comment-name">{{ reply.author.nickname }}</text>
                       <text v-if="reply.replyToUser" class="reply-to">回复 {{ reply.replyToUser.nickname }}</text>
-                      <text class="comment-time">{{ formatTime(reply.createdAt) }}</text>
                     </view>
                     <view class="comment-copy">{{ reply.content }}</view>
                     <view class="comment-tools">
+                      <text class="comment-time">{{ formatCommentDate(reply.createdAt) }}</text>
                       <button class="comment-tool" @tap="prepareReply(reply)">回复</button>
-                      <button v-if="isMyComment(reply)" class="comment-tool" @tap="deleteCommentItem(reply)">删除</button>
                       <button
                         class="comment-like"
                         :class="{ liked: reply.viewerAction.liked }"
                         @tap="toggleCommentLike(reply)"
                       >
-                        <text>{{ reply.viewerAction.liked ? '♥' : '♡' }}</text>
-                        <text>{{ formatCount(reply.likeCount) }}</text>
+                        <text class="comment-like-icon">{{ reply.viewerAction.liked ? '♥' : '♡' }}</text>
+                        <text class="comment-like-count" :class="{ hidden: !reply.likeCount }">{{ reply.likeCount ? formatCount(reply.likeCount) : '0' }}</text>
                       </button>
                     </view>
                   </view>
@@ -672,7 +708,7 @@ function isCommentBlocked(error: unknown) {
             :disabled="!canSubmitComment"
             @tap="submitComment"
           >
-            {{ commentSubmitting ? '发送中' : '发送' }}
+            <text class="send-comment-text">{{ commentSubmitting ? '发送中' : '发送' }}</text>
           </button>
           <view v-else class="action-group">
             <button
@@ -693,10 +729,6 @@ function isCommentBlocked(error: unknown) {
               <text class="action-icon">{{ note.viewerAction.collected ? '★' : '☆' }}</text>
               <text>{{ formatCount(note.counts.collectCount) }}</text>
             </button>
-            <button class="action-item" @tap="scrollToComments">
-            <text class="action-icon">◌</text>
-              <text>{{ formatCount(commentCount) }}</text>
-          </button>
           </view>
         </view>
       </view>
@@ -779,6 +811,16 @@ function isCommentBlocked(error: unknown) {
   font-weight: 760;
   line-height: 1;
   white-space: nowrap;
+}
+
+.follow-button.followed {
+  border-color: #d8dbe0;
+  color: #727983;
+  background: #f5f6f7;
+}
+
+.follow-button[disabled] {
+  opacity: 0.7;
 }
 
 .gallery-section {
@@ -902,28 +944,6 @@ function isCommentBlocked(error: unknown) {
   font-size: 23rpx;
 }
 
-.search-suggestion {
-  max-width: 100%;
-  min-height: 66rpx;
-  margin-top: 28rpx;
-  padding: 0 22rpx;
-  border: 1rpx solid #ececec;
-  border-radius: 10rpx;
-  background: #fff;
-  color: #3a3f46;
-  display: inline-flex;
-  align-items: center;
-  gap: 12rpx;
-  font-size: 27rpx;
-  box-shadow: 0 4rpx 14rpx rgba(18, 22, 28, 0.04);
-}
-
-.search-icon {
-  color: #1d2026;
-  font-size: 36rpx;
-  font-weight: 800;
-}
-
 .note-meta-row {
   margin-top: 28rpx;
   color: var(--bn-muted);
@@ -932,17 +952,6 @@ function isCommentBlocked(error: unknown) {
   justify-content: space-between;
   gap: 20rpx;
   font-size: 25rpx;
-}
-
-.dislike-button {
-  flex: 0 0 auto;
-  height: 52rpx;
-  padding: 0 18rpx;
-  border-radius: 999rpx;
-  border: 1rpx solid #e8e8e8;
-  color: #4c5158;
-  background: #fff;
-  font-size: 24rpx;
 }
 
 .comments-section {
@@ -963,19 +972,6 @@ function isCommentBlocked(error: unknown) {
   color: var(--bn-ink);
   font-size: 31rpx;
   font-weight: 860;
-}
-
-.comments-refresh {
-  flex: 0 0 auto;
-  height: 52rpx;
-  padding: 0 18rpx;
-  border-radius: 999rpx;
-  background: #f5f6f7;
-  color: #636872;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 23rpx;
 }
 
 .comments-loading,
@@ -1072,15 +1068,20 @@ function isCommentBlocked(error: unknown) {
 
 .comment-tools {
   margin-top: 14rpx;
-  display: flex;
+  display: grid;
+  grid-template-columns: 116rpx 108rpx 120rpx;
   align-items: center;
-  gap: 24rpx;
+  column-gap: 22rpx;
+  justify-content: start;
 }
 
 .comment-tool,
 .comment-like {
-  flex: 0 0 auto;
-  height: 42rpx;
+  min-width: 0;
+  min-height: 38rpx;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
   color: #8a9099;
   display: flex;
   align-items: center;
@@ -1089,13 +1090,32 @@ function isCommentBlocked(error: unknown) {
 }
 
 .comment-like {
-  margin-left: auto;
-  min-width: 72rpx;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: 36rpx 50rpx;
+  column-gap: 8rpx;
+  justify-content: flex-start;
+  align-items: center;
 }
 
 .comment-like.liked {
   color: var(--bn-coral);
+}
+
+.comment-like-icon {
+  width: 36rpx;
+  text-align: center;
+  font-size: 34rpx;
+  line-height: 1;
+}
+
+.comment-like-count {
+  width: 50rpx;
+  color: inherit;
+  text-align: left;
+}
+
+.comment-like-count.hidden {
+  visibility: hidden;
 }
 
 .reply-toggle {
@@ -1196,8 +1216,9 @@ function isCommentBlocked(error: unknown) {
 }
 
 .comment-entry {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  max-width: none;
   height: 70rpx;
   padding: 0 22rpx;
   border-radius: 999rpx;
@@ -1224,7 +1245,8 @@ function isCommentBlocked(error: unknown) {
 
 .send-comment {
   flex: 0 0 auto;
-  width: 100rpx;
+  width: 128rpx;
+  min-width: 128rpx;
   height: 66rpx;
   border-radius: 999rpx;
   background: var(--bn-coral);
@@ -1234,6 +1256,15 @@ function isCommentBlocked(error: unknown) {
   justify-content: center;
   font-size: 24rpx;
   font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.send-comment-text {
+  color: #fff;
+  white-space: nowrap;
+  word-break: keep-all;
+  line-height: 1;
 }
 
 .send-comment[disabled] {

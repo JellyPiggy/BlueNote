@@ -7,8 +7,9 @@ import {
   markAllNotificationsRead,
   markNotificationRead
 } from '@/api/notification'
+import { deleteImConversation, getImConversations } from '@/api/im'
 import { showApiError } from '@/api/request'
-import type { NotificationCategory, NotificationItem } from '@/api/types'
+import type { ImConversationItem, NotificationCategory, NotificationItem } from '@/api/types'
 import AvatarCircle from '@/components/AvatarCircle.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -16,9 +17,11 @@ import { useImStore } from '@/stores/im'
 import { useNotificationStore } from '@/stores/notification'
 import { formatCount } from '@/utils/format'
 
-interface NotificationTab {
+type MessageTabKey = 'IM' | NotificationCategory
+
+interface MessageTab {
   label: string
-  category: NotificationCategory
+  key: MessageTabKey
 }
 
 interface NotificationListState {
@@ -30,19 +33,32 @@ interface NotificationListState {
   errorText: string
 }
 
-const tabs: NotificationTab[] = [
-  { label: '互动', category: 'INTERACTION' },
-  { label: '关注', category: 'FOLLOW' },
-  { label: '系统', category: 'SYSTEM' },
-  { label: '订单', category: 'ORDER' }
+interface ImListState {
+  items: ImConversationItem[]
+  nextCursor: string | null
+  hasMore: boolean
+  loading: boolean
+  loaded: boolean
+  errorText: string
+}
+
+const notificationCategories: NotificationCategory[] = ['INTERACTION', 'FOLLOW', 'SYSTEM', 'ORDER']
+const tabs: MessageTab[] = [
+  { label: '私信', key: 'IM' },
+  { label: '互动', key: 'INTERACTION' },
+  { label: '关注', key: 'FOLLOW' },
+  { label: '系统', key: 'SYSTEM' },
+  { label: '订单', key: 'ORDER' }
 ]
 
 const auth = useAuthStore()
 const im = useImStore()
 const notifications = useNotificationStore()
-const activeCategory = ref<NotificationCategory>('INTERACTION')
+const activeTab = ref<MessageTabKey>('INTERACTION')
+const userSelectedTab = ref(false)
 const readingIds = ref<string[]>([])
 const deletingIds = ref<string[]>([])
+const deletingConversationIds = ref<string[]>([])
 const markingAll = ref(false)
 const states = ref<Record<NotificationCategory, NotificationListState>>({
   INTERACTION: createListState(),
@@ -50,18 +66,28 @@ const states = ref<Record<NotificationCategory, NotificationListState>>({
   SYSTEM: createListState(),
   ORDER: createListState()
 })
+const imState = ref<ImListState>(createImListState())
 
+const isImTab = computed(() => activeTab.value === 'IM')
+const activeCategory = computed<NotificationCategory>(() => (
+  isNotificationCategory(activeTab.value) ? activeTab.value : 'INTERACTION'
+))
 const currentState = computed(() => states.value[activeCategory.value])
-const unreadTotalText = computed(() => (notifications.totalUnread > 99 ? '99+' : String(notifications.totalUnread)))
-const imUnreadText = computed(() => im.badgeText)
-const activeUnreadCount = computed(() => notifications.categoryUnread(activeCategory.value))
-const activeUnreadText = computed(() => (activeUnreadCount.value > 99 ? '99+' : String(activeUnreadCount.value)))
+const activeUnreadCount = computed(() => (
+  isImTab.value ? im.totalUnread : notifications.categoryUnread(activeCategory.value)
+))
 const hasUnreadInCurrentTab = computed(() => activeUnreadCount.value > 0)
 
 onLoad((options) => {
   const category = String(options?.category ?? '').toUpperCase()
+  if (category === 'IM') {
+    activeTab.value = 'IM'
+    userSelectedTab.value = true
+    return
+  }
   if (isNotificationCategory(category)) {
-    activeCategory.value = category
+    activeTab.value = category
+    userSelectedTab.value = true
   }
 })
 
@@ -69,11 +95,7 @@ onShow(() => {
   if (!auth.isAuthenticated) {
     return
   }
-  void notifications.refreshUnread().catch(() => undefined)
-  void im.refreshUnread().catch(() => undefined)
-  if (!currentState.value.loaded && !currentState.value.loading) {
-    void loadCurrent(true)
-  }
+  void syncUnreadAndLoad()
 })
 
 onPullDownRefresh(async () => {
@@ -85,7 +107,11 @@ onPullDownRefresh(async () => {
 })
 
 onReachBottom(() => {
-  if (currentState.value.loaded && currentState.value.hasMore) {
+  if (isImTab.value && imState.value.loaded && imState.value.hasMore) {
+    void loadImConversations(false)
+    return
+  }
+  if (!isImTab.value && currentState.value.loaded && currentState.value.hasMore) {
     void loadCurrent(false)
   }
 })
@@ -101,16 +127,69 @@ function createListState(): NotificationListState {
   }
 }
 
-async function switchTab(category: NotificationCategory) {
-  activeCategory.value = category
-  const state = states.value[category]
-  if (auth.isAuthenticated && !state.loaded && !state.loading) {
+function createImListState(): ImListState {
+  return {
+    items: [],
+    nextCursor: null,
+    hasMore: false,
+    loading: false,
+    loaded: false,
+    errorText: ''
+  }
+}
+
+async function syncUnreadAndLoad() {
+  await Promise.all([
+    notifications.refreshUnread().catch(() => undefined),
+    im.refreshUnread().catch(() => undefined)
+  ])
+  if (!userSelectedTab.value || shouldPreferUnreadTab()) {
+    activeTab.value = preferredTab()
+  }
+  if (isImTab.value) {
+    await loadImConversations(true)
+    return
+  }
+  if (!currentState.value.loaded && !currentState.value.loading) {
+    await loadCurrent(true)
+  }
+}
+
+function preferredTab(): MessageTabKey {
+  if (im.totalUnread > 0) {
+    return 'IM'
+  }
+  return notificationCategories.find((category) => notifications.categoryUnread(category) > 0) ?? 'INTERACTION'
+}
+
+function shouldPreferUnreadTab() {
+  return activeUnreadCount.value <= 0 && im.totalUnread > 0 && notifications.totalUnread <= 0
+}
+
+async function switchTab(tab: MessageTabKey) {
+  activeTab.value = tab
+  userSelectedTab.value = true
+  if (!auth.isAuthenticated) {
+    return
+  }
+  if (tab === 'IM') {
+    if (!imState.value.loaded && !imState.value.loading) {
+      await loadImConversations(true)
+    }
+    return
+  }
+  const state = states.value[tab]
+  if (!state.loaded && !state.loading) {
     await loadCurrent(true)
   }
 }
 
 async function refreshCurrent() {
   if (!auth.isAuthenticated) {
+    return
+  }
+  if (isImTab.value) {
+    await Promise.all([loadImConversations(true), im.refreshUnread().catch(() => undefined)])
     return
   }
   await Promise.all([loadCurrent(true), notifications.refreshUnread().catch(() => undefined)])
@@ -143,6 +222,29 @@ async function loadCurrent(reset = false) {
   }
 }
 
+async function loadImConversations(reset = false) {
+  if (!auth.isAuthenticated || imState.value.loading) {
+    return
+  }
+  if (!reset && imState.value.loaded && !imState.value.hasMore) {
+    return
+  }
+  imState.value.loading = true
+  imState.value.errorText = ''
+  try {
+    const page = await getImConversations(reset ? null : imState.value.nextCursor, 20)
+    imState.value.items = reset ? page.items : mergeConversations(imState.value.items, page.items)
+    imState.value.nextCursor = page.nextCursor
+    imState.value.hasMore = page.hasMore
+    imState.value.loaded = true
+  } catch (error) {
+    imState.value.errorText = '私信加载失败'
+    showApiError(error, '私信加载失败')
+  } finally {
+    imState.value.loading = false
+  }
+}
+
 async function openNotification(item: NotificationItem) {
   if (readingIds.value.includes(item.notificationId)) {
     return
@@ -165,7 +267,7 @@ async function openNotification(item: NotificationItem) {
 }
 
 async function markCurrentRead() {
-  if (markingAll.value || !hasUnreadInCurrentTab.value) {
+  if (isImTab.value || markingAll.value || !hasUnreadInCurrentTab.value) {
     return
   }
   markingAll.value = true
@@ -184,6 +286,43 @@ async function markCurrentRead() {
     showApiError(error, '操作失败')
   } finally {
     markingAll.value = false
+  }
+}
+
+function openConversation(item: ImConversationItem) {
+  const title = item.peerUser?.nickname ? encodeURIComponent(item.peerUser.nickname) : ''
+  uni.navigateTo({
+    url: `/pages/im/chat?conversationId=${item.conversationId}&title=${title}`
+  })
+}
+
+function confirmDeleteConversation(item: ImConversationItem) {
+  if (deletingConversationIds.value.includes(item.conversationId)) {
+    return
+  }
+  uni.showModal({
+    title: '删除会话',
+    content: '确定从列表里删除这个会话吗？',
+    confirmText: '删除',
+    success: (result) => {
+      if (result.confirm) {
+        void performDeleteConversation(item)
+      }
+    }
+  })
+}
+
+async function performDeleteConversation(item: ImConversationItem) {
+  deletingConversationIds.value = [...deletingConversationIds.value, item.conversationId]
+  try {
+    await deleteImConversation(item.conversationId)
+    imState.value.items = imState.value.items.filter((conversation) => conversation.conversationId !== item.conversationId)
+    await im.refreshUnread().catch(() => undefined)
+    uni.showToast({ title: '已删除', icon: 'none' })
+  } catch (error) {
+    showApiError(error, '删除失败')
+  } finally {
+    deletingConversationIds.value = deletingConversationIds.value.filter((id) => id !== item.conversationId)
   }
 }
 
@@ -234,14 +373,6 @@ function goLogin() {
   uni.navigateTo({ url: '/pages/login/index' })
 }
 
-function openIm() {
-  if (!auth.isAuthenticated) {
-    goLogin()
-    return
-  }
-  uni.navigateTo({ url: '/pages/im/conversations' })
-}
-
 function jumpByNotification(item: NotificationItem) {
   const page = String(item.jump?.page ?? '')
   if (page === 'NOTE_DETAIL' && item.jump?.noteId) {
@@ -252,7 +383,16 @@ function jumpByNotification(item: NotificationItem) {
     return
   }
   if (page === 'USER_PROFILE') {
-    uni.showToast({ title: '用户主页后续接入', icon: 'none' })
+    const userId = String(item.jump?.userId ?? item.actors?.[0]?.userId ?? '')
+    if (userId && userId === auth.userId) {
+      uni.switchTab({ url: '/pages/profile/index' })
+      return
+    }
+    if (userId) {
+      uni.navigateTo({ url: `/pages/profile/user?userId=${encodeURIComponent(userId)}` })
+      return
+    }
+    uni.showToast({ title: '暂时无法打开用户主页', icon: 'none' })
     return
   }
   if (page === 'SYSTEM_NOTICE') {
@@ -260,7 +400,7 @@ function jumpByNotification(item: NotificationItem) {
     return
   }
   if (page === 'ORDER_ACTIVITY') {
-    uni.navigateTo({ url: '/pages/order/activity' })
+    uni.switchTab({ url: '/pages/order/activity' })
     return
   }
   uni.showToast({ title: '暂时无法打开目标内容', icon: 'none' })
@@ -281,8 +421,28 @@ function mergeNotifications(current: NotificationItem[], incoming: NotificationI
   return [...current, ...incoming.filter((item) => !exists.has(item.notificationId))]
 }
 
+function mergeConversations(current: ImConversationItem[], incoming: ImConversationItem[]) {
+  const map = new Map(current.map((item) => [item.conversationId, item]))
+  for (const item of incoming) {
+    map.set(item.conversationId, item)
+  }
+  return Array.from(map.values())
+}
+
 function isNotificationCategory(value: string): value is NotificationCategory {
   return value === 'INTERACTION' || value === 'FOLLOW' || value === 'SYSTEM' || value === 'ORDER'
+}
+
+function tabUnread(tab: MessageTabKey) {
+  return tab === 'IM' ? im.totalUnread : notifications.categoryUnread(tab)
+}
+
+function tabUnreadText(tab: MessageTabKey) {
+  const count = tabUnread(tab)
+  if (count <= 0) {
+    return ''
+  }
+  return count > 99 ? '99+' : String(count)
 }
 
 function notificationIcon(type: string) {
@@ -306,6 +466,31 @@ function notificationIcon(type: string) {
 
 function targetTitle(item: NotificationItem) {
   return item.target?.title || item.content
+}
+
+function messageSummary(item: ImConversationItem) {
+  return item.lastMessage?.summary || '还没有消息'
+}
+
+function formatConversationTime(value: string) {
+  if (!value) {
+    return ''
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+  const diff = Math.max(0, Date.now() - date.getTime())
+  const minute = 60 * 1000
+  const hour = 60 * minute
+  const day = 24 * hour
+  if (diff < hour) {
+    return `${Math.max(1, Math.floor(diff / minute))}分钟前`
+  }
+  if (diff < day) {
+    return `${Math.floor(diff / hour)}小时前`
+  }
+  return `${date.getMonth() + 1}月${date.getDate()}日`
 }
 
 function formatNotificationTime(value: string) {
@@ -337,42 +522,23 @@ function formatNotificationTime(value: string) {
 <template>
   <view class="screen notification-screen top-safe">
     <view class="notification-appbar">
-      <button class="back-button" @tap="back">‹</button>
-      <view class="appbar-title">
-        <view class="title-row">
-          <text>消息</text>
-          <text v-if="notifications.totalUnread" class="total-badge">{{ unreadTotalText }}</text>
-        </view>
-        <view class="appbar-subtitle">最近通知</view>
+      <view class="title-row">消息</view>
+      <view class="message-search">
+        <text class="search-mark">⌕</text>
+        <text class="search-copy">搜索消息</text>
       </view>
-      <button
-        class="im-button"
-        @tap="openIm"
-      >
-        <text>私信</text>
-        <text v-if="imUnreadText" class="mini-badge">{{ imUnreadText }}</text>
-      </button>
-      <button
-        class="read-all-button"
-        :disabled="!auth.isAuthenticated || !hasUnreadInCurrentTab || markingAll"
-        @tap="markCurrentRead"
-      >
-        已读
-      </button>
     </view>
 
     <view class="notification-tabs">
       <button
         v-for="tab in tabs"
-        :key="tab.category"
+        :key="tab.key"
         class="notification-tab"
-        :class="{ active: activeCategory === tab.category }"
-        @tap="switchTab(tab.category)"
+        :class="{ active: activeTab === tab.key }"
+        @tap="switchTab(tab.key)"
       >
-        <text>{{ tab.label }}</text>
-        <text v-if="notifications.categoryUnread(tab.category)" class="tab-badge">
-          {{ formatCount(notifications.categoryUnread(tab.category)) }}
-        </text>
+        <text class="tab-label">{{ tab.label }}</text>
+        <text v-if="tabUnreadText(tab.key)" class="tab-badge">{{ tabUnreadText(tab.key) }}</text>
       </button>
     </view>
 
@@ -384,13 +550,55 @@ function formatNotificationTime(value: string) {
       <button class="primary-button empty-action" @tap="goLogin">去登录</button>
     </EmptyState>
 
-    <view v-else-if="currentState.loading && !currentState.loaded" class="loading-copy">正在读取消息</view>
+    <view v-else-if="isImTab && imState.loading && !imState.loaded" class="loading-copy">正在读取私信</view>
 
-    <EmptyState v-else-if="currentState.errorText" title="消息加载失败" subtitle="稍后刷新，或检查本地网关是否正在运行。">
+    <view v-else-if="!isImTab && currentState.loading && !currentState.loaded" class="loading-copy">正在读取消息</view>
+
+    <EmptyState v-else-if="isImTab && imState.errorText" title="私信加载失败" subtitle="稍后刷新，或检查本地服务是否正在运行。">
       <button class="secondary-button empty-action" @tap="refreshCurrent">重新加载</button>
     </EmptyState>
 
-    <EmptyState v-else-if="currentState.loaded && !currentState.items.length" title="暂时没有消息" subtitle="新的互动会在这里出现。" />
+    <EmptyState v-else-if="!isImTab && currentState.errorText" title="消息加载失败" subtitle="稍后刷新，或检查本地网关是否正在运行。">
+      <button class="secondary-button empty-action" @tap="refreshCurrent">重新加载</button>
+    </EmptyState>
+
+    <EmptyState v-else-if="isImTab && imState.loaded && !imState.items.length" title="暂时没有私信" subtitle="从用户主页发起聊天后，会话会出现在这里。" />
+
+    <EmptyState v-else-if="!isImTab && currentState.loaded && !currentState.items.length" title="暂时没有消息" subtitle="新的互动会在这里出现。" />
+
+    <view v-else-if="isImTab" class="conversation-list">
+      <view
+        v-for="item in imState.items"
+        :key="item.conversationId"
+        class="conversation-item"
+        :class="{ unread: item.unreadCount > 0 }"
+        @tap="openConversation(item)"
+      >
+        <AvatarCircle :src="item.peerUser?.avatarUrl" :name="item.peerUser?.nickname || '用户'" size="large" />
+        <view class="conversation-main">
+          <view class="conversation-head">
+            <view class="peer-name">{{ item.peerUser?.nickname || '用户' }}</view>
+            <text class="conversation-time">{{ formatConversationTime(item.updatedAt) }}</text>
+          </view>
+          <view class="message-summary">{{ messageSummary(item) }}</view>
+        </view>
+        <view class="conversation-side">
+          <text v-if="item.unreadCount" class="unread-badge">{{ item.unreadCount > 99 ? '99+' : item.unreadCount }}</text>
+          <button
+            class="conversation-delete-button"
+            :disabled="deletingConversationIds.includes(item.conversationId)"
+            @tap.stop="confirmDeleteConversation(item)"
+          >
+            ×
+          </button>
+        </view>
+      </view>
+
+      <button v-if="imState.hasMore" class="load-more-button" :disabled="imState.loading" @tap="loadImConversations(false)">
+        {{ imState.loading ? '加载中' : '加载更多' }}
+      </button>
+      <view v-else-if="imState.loaded && imState.items.length" class="list-end">没有更多私信</view>
+    </view>
 
     <view v-else class="notification-list">
       <view
@@ -446,30 +654,12 @@ function formatNotificationTime(value: string) {
 .notification-appbar {
   display: flex;
   align-items: center;
-  gap: 18rpx;
-  min-height: 86rpx;
-}
-
-.back-button {
-  flex: 0 0 auto;
-  width: 62rpx;
-  height: 62rpx;
-  border-radius: 50%;
-  color: var(--bn-ink);
-  background: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 48rpx;
-  box-shadow: var(--bn-shadow-soft);
-}
-
-.appbar-title {
-  flex: 1;
-  min-width: 0;
+  gap: 20rpx;
+  min-height: 68rpx;
 }
 
 .title-row {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 12rpx;
@@ -479,60 +669,89 @@ function formatNotificationTime(value: string) {
   line-height: 1.2;
 }
 
-.total-badge,
-.tab-badge {
-  min-width: 34rpx;
-  height: 34rpx;
-  padding: 0 10rpx;
+.message-search {
+  flex: 1;
+  min-width: 0;
+  height: 66rpx;
+  margin: 0;
+  padding: 0 22rpx;
   border-radius: 999rpx;
-  background: var(--bn-coral);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20rpx;
-  font-weight: 820;
-  line-height: 1;
-}
-
-.appbar-subtitle {
-  margin-top: 4rpx;
-  color: var(--bn-muted);
-  font-size: 23rpx;
-}
-
-.read-all-button {
-  flex: 0 0 auto;
-  width: 96rpx;
-  height: 58rpx;
-  border-radius: 999rpx;
-  color: var(--bn-coral);
-  background: rgba(255, 95, 87, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24rpx;
-  font-weight: 780;
-}
-
-.im-button {
-  flex: 0 0 auto;
-  min-width: 112rpx;
-  height: 58rpx;
-  padding: 0 16rpx;
-  border-radius: 999rpx;
-  color: var(--bn-ink);
   background: #fff;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8rpx;
+  gap: 12rpx;
+  color: var(--bn-muted);
   font-size: 24rpx;
-  font-weight: 780;
   box-shadow: var(--bn-shadow-soft);
 }
 
-.mini-badge {
+.search-mark {
+  color: var(--bn-coral);
+  font-size: 28rpx;
+  font-weight: 820;
+}
+
+.search-copy {
+  color: var(--bn-muted);
+  font-size: 24rpx;
+}
+
+.notification-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  margin: 8rpx 0 20rpx;
+  border-bottom: 1rpx solid var(--bn-line);
+}
+
+.notification-tab {
+  position: relative;
+  width: 100%;
+  min-height: 70rpx;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  border-radius: 0;
+  background: transparent;
+  color: #676d76;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  font-size: 27rpx;
+  font-weight: 760;
+  box-shadow: none;
+  overflow: visible;
+  line-height: 1;
+}
+
+.tab-label {
+  display: inline-block;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.notification-tab.active {
+  color: var(--bn-ink);
+  background: transparent;
+  font-weight: 900;
+}
+
+.notification-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 34rpx;
+  height: 6rpx;
+  border-radius: 999rpx;
+  background: var(--bn-coral);
+  transform: translateX(-50%);
+}
+
+.tab-badge,
+.unread-badge {
   min-width: 30rpx;
   height: 30rpx;
   padding: 0 8rpx;
@@ -544,61 +763,111 @@ function formatNotificationTime(value: string) {
   justify-content: center;
   font-size: 18rpx;
   font-weight: 820;
-}
-
-.read-all-button[disabled] {
-  color: var(--bn-faint);
-  background: #edf0f2;
-}
-
-.notification-tabs {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14rpx;
-  margin: 22rpx 0;
-}
-
-.notification-tab {
-  position: relative;
-  min-height: 70rpx;
-  border-radius: 8rpx;
-  background: #fff;
-  color: #676d76;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10rpx;
-  font-size: 27rpx;
-  font-weight: 760;
-  box-shadow: var(--bn-shadow-soft);
-}
-
-.notification-tab.active {
-  color: var(--bn-ink);
-  background: #fff7f6;
-}
-
-.notification-tab.active::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 8rpx;
-  width: 34rpx;
-  height: 5rpx;
-  border-radius: 999rpx;
-  background: var(--bn-coral);
-  transform: translateX(-50%);
+  line-height: 1;
 }
 
 .tab-badge {
-  height: 30rpx;
-  min-width: 30rpx;
-  font-size: 18rpx;
+  position: absolute;
+  top: 10rpx;
+  right: 14rpx;
+  min-width: 26rpx;
+  height: 26rpx;
+  padding: 0 7rpx;
+  font-size: 16rpx;
 }
 
 .empty-action {
   width: 250rpx;
   margin-top: 10rpx;
+}
+
+.conversation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+  padding-bottom: calc(28rpx + env(safe-area-inset-bottom));
+}
+
+.conversation-item {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  min-height: 124rpx;
+  padding: 18rpx;
+  border: 1rpx solid rgba(236, 238, 240, 0.95);
+  border-radius: 8rpx;
+  background: #fff;
+  box-shadow: var(--bn-shadow-soft);
+}
+
+.conversation-item.unread {
+  border-color: rgba(255, 95, 87, 0.22);
+  background: linear-gradient(90deg, rgba(255, 95, 87, 0.055), #fff 34%);
+}
+
+.conversation-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.conversation-head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.peer-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--bn-ink);
+  font-size: 29rpx;
+  font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-time {
+  flex: 0 0 auto;
+  color: var(--bn-faint);
+  font-size: 22rpx;
+}
+
+.message-summary {
+  margin-top: 8rpx;
+  color: #6b717b;
+  font-size: 24rpx;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-side {
+  flex: 0 0 auto;
+  width: 64rpx;
+  min-height: 86rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8rpx;
+}
+
+.conversation-delete-button {
+  width: 42rpx;
+  height: 42rpx;
+  border-radius: 50%;
+  background: #f0f2f4;
+  color: #828893;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+}
+
+.conversation-delete-button[disabled] {
+  opacity: 0.45;
 }
 
 .notification-list {

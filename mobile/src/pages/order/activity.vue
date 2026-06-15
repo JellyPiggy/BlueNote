@@ -23,6 +23,7 @@ const actionLoading = ref(false)
 const paying = ref(false)
 const loaded = ref(false)
 const errorText = ref('')
+const couponDrawerOpen = ref(false)
 let pollTimer: ReturnType<typeof setTimeout> | null = null
 
 const activityStatusText = computed(() => {
@@ -181,8 +182,16 @@ function goLogin() {
   uni.navigateTo({ url: '/pages/login/index' })
 }
 
-function goHome() {
-  uni.switchTab({ url: '/pages/home/index' })
+function openCouponDrawer() {
+  if (!auth.isAuthenticated) {
+    goLogin()
+    return
+  }
+  couponDrawerOpen.value = true
+}
+
+function closeCouponDrawer() {
+  couponDrawerOpen.value = false
 }
 
 function clientRequestId() {
@@ -202,9 +211,8 @@ function dateText(value: string | null) {
 <template>
   <view class="screen order-screen top-safe">
     <view class="order-appbar">
-      <button class="back-button" @tap="goHome">‹</button>
       <view class="page-title">神券</view>
-      <button class="refresh-button" @tap="refresh">刷新</button>
+      <button class="coupon-entry-button" @tap="openCouponDrawer">我的神券</button>
     </view>
 
     <view v-if="loading && !loaded" class="loading-copy">正在读取神券</view>
@@ -267,21 +275,29 @@ function dateText(value: string | null) {
         </view>
       </view>
 
-      <view class="coupon-section">
-        <view class="section-title">我的神券</view>
-        <view v-if="coupons.length" class="coupon-list">
-          <view v-for="coupon in coupons" :key="coupon.userCouponId" class="coupon-card panel">
-            <view class="coupon-main">
-              <view class="coupon-value">{{ moneyText(coupon.faceValue) }}</view>
-              <view>
-                <view class="coupon-name">{{ coupon.templateName }}</view>
-                <view class="coupon-rule">{{ coupon.thresholdAmount > 0 ? `满 ${moneyText(coupon.thresholdAmount)} 可用` : '无门槛' }}</view>
-              </view>
+      <view v-if="couponDrawerOpen" class="coupon-drawer-mask" @tap="closeCouponDrawer">
+        <view class="coupon-drawer" @tap.stop>
+          <view class="drawer-head">
+            <view>
+              <view class="drawer-title">我的神券</view>
+              <view class="drawer-subtitle">抢到的神券会放在这里</view>
             </view>
-            <view class="coupon-time">{{ dateText(coupon.validEndAt) }} 到期</view>
+            <button class="drawer-close" @tap="closeCouponDrawer">×</button>
           </view>
+          <view v-if="coupons.length" class="coupon-list">
+            <view v-for="coupon in coupons" :key="coupon.userCouponId" class="coupon-card panel">
+              <view class="coupon-main">
+                <view class="coupon-value">{{ moneyText(coupon.faceValue) }}</view>
+                <view>
+                  <view class="coupon-name">{{ coupon.templateName }}</view>
+                  <view class="coupon-rule">{{ coupon.thresholdAmount > 0 ? `满 ${moneyText(coupon.thresholdAmount)} 可用` : '无门槛' }}</view>
+                </view>
+              </view>
+              <view class="coupon-time">{{ dateText(coupon.validEndAt) }} 到期</view>
+            </view>
+          </view>
+          <EmptyState v-else title="卡包还是空的" subtitle="抢到的神券会放在这里。" />
         </view>
-        <EmptyState v-else title="卡包还是空的" subtitle="抢到的神券会放在这里。" />
       </view>
     </template>
   </view>
@@ -295,41 +311,35 @@ function dateText(value: string | null) {
 
 .order-appbar {
   display: grid;
-  grid-template-columns: 68rpx 1fr 96rpx;
+  grid-template-columns: 1fr auto;
   align-items: center;
   min-height: 76rpx;
 }
 
-.back-button,
-.refresh-button {
+.coupon-entry-button {
+  min-width: 168rpx;
   min-height: 60rpx;
+  padding: 0 18rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--bn-ink);
   background: #fff;
   border-radius: 16rpx;
+  color: var(--bn-coral);
+  font-size: 24rpx;
+  font-weight: 760;
+  white-space: nowrap;
   box-shadow: var(--bn-shadow-soft);
 }
 
-.back-button {
-  font-size: 46rpx;
-}
-
-.refresh-button {
-  font-size: 24rpx;
-  color: var(--bn-muted);
-}
-
 .page-title {
-  text-align: center;
+  text-align: left;
   font-size: 32rpx;
   font-weight: 860;
 }
 
 .activity-panel,
-.result-panel,
-.coupon-section {
+.result-panel {
   margin-top: 24rpx;
 }
 
@@ -465,10 +475,6 @@ function dateText(value: string | null) {
   font-size: 24rpx;
 }
 
-.coupon-section {
-  padding-bottom: 44rpx;
-}
-
 .coupon-list {
   margin-top: 18rpx;
   display: flex;
@@ -510,5 +516,57 @@ function dateText(value: string | null) {
 .empty-action {
   min-width: 220rpx;
   margin-top: 8rpx;
+}
+
+.coupon-drawer-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(17, 19, 24, 0.28);
+  display: flex;
+  align-items: flex-end;
+}
+
+.coupon-drawer {
+  width: 100%;
+  max-height: 78vh;
+  padding: 28rpx 22rpx calc(32rpx + env(safe-area-inset-bottom));
+  border-radius: 24rpx 24rpx 0 0;
+  background: #fff;
+  box-shadow: 0 -18rpx 42rpx rgba(18, 22, 28, 0.14);
+  overflow-y: auto;
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.drawer-title {
+  color: var(--bn-ink);
+  font-size: 32rpx;
+  font-weight: 860;
+}
+
+.drawer-subtitle {
+  margin-top: 6rpx;
+  color: var(--bn-muted);
+  font-size: 23rpx;
+}
+
+.drawer-close {
+  flex: 0 0 auto;
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+  background: #f1f2f4;
+  color: var(--bn-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 38rpx;
+  line-height: 1;
 }
 </style>

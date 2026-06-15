@@ -38,6 +38,7 @@
 | POST | `/api/notes/{noteId}/publish` | 是 | 作者 | 是 | 用户 | 发布草稿 |
 | PUT | `/api/notes/{noteId}` | 是 | 作者 | 是 | 用户 | 编辑笔记 |
 | DELETE | `/api/notes/{noteId}` | 是 | 作者 | 是 | 用户 | 删除笔记 |
+| GET | `/api/notes` | 可选 | 公开列表 | 否 | 用户 / IP | 公开笔记时间流 |
 | GET | `/api/notes/{noteId}` | 可选 | 可见性校验 | 否 | 用户 / IP | 详情 |
 | GET | `/api/notes/users/{userId}` | 可选 | 公开列表 | 否 | 用户 / IP | 作者笔记 |
 | GET | `/api/notes/me` | 是 | 当前用户 | 否 | 用户 | 我的笔记 |

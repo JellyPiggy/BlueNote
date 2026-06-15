@@ -2,20 +2,20 @@
 import { computed, ref } from 'vue'
 import { onPullDownRefresh, onReachBottom, onShow } from '@dcloudio/uni-app'
 import { feedCardToNoteCard, getFollowingFeed } from '@/api/feed'
-import { getMyNotes } from '@/api/note'
+import { getPublicTimeline } from '@/api/note'
 import { showApiError } from '@/api/request'
 import type { NoteCard } from '@/api/types'
 import EmptyState from '@/components/EmptyState.vue'
 import NoteCardView from '@/components/NoteCard.vue'
 import { useAuthStore } from '@/stores/auth'
-import { useNotificationStore } from '@/stores/notification'
 
 const auth = useAuthStore()
-const notifications = useNotificationStore()
 type HomeChannel = 'recommend' | 'following'
 
 const activeChannel = ref<HomeChannel>('recommend')
 const notes = ref<NoteCard[]>([])
+const notesCursor = ref<string | null>(null)
+const notesHasMore = ref(false)
 const followingNotes = ref<NoteCard[]>([])
 const followingCursor = ref<string | null>(null)
 const followingHasMore = ref(false)
@@ -34,19 +34,13 @@ const emptyTitle = computed(() => activeChannel.value === 'following' ? '关注�
 const emptySubtitle = computed(() =>
   activeChannel.value === 'following'
     ? '去发现喜欢的创作者，关注后这里会出现他们的公开笔记。'
-    : '选一张图片，写下标题和正文，BlueNote 会把它发布到你的主页。'
+    : '公开发布的笔记会按时间出现在这里。'
 )
-const unauthTitle = computed(() => activeChannel.value === 'following' ? '登录后查看关注页' : '登录后查看你的笔记流')
-const unauthSubtitle = computed(() =>
-  activeChannel.value === 'following'
-    ? '关注创作者后，可以在这里按时间看到他们的新笔记。'
-    : '注册或登录后，可以上传图片、发布笔记，并在这里看到已发布内容。'
-)
+const unauthTitle = '登录后查看关注页'
+const unauthSubtitle = '关注创作者后，可以在这里按时间看到他们的新笔记。'
 
 onShow(() => {
-  if (auth.isAuthenticated) {
-    void refreshActive()
-  }
+  void refreshActive()
 })
 
 onPullDownRefresh(async () => {
@@ -60,6 +54,8 @@ onPullDownRefresh(async () => {
 onReachBottom(() => {
   if (activeChannel.value === 'following') {
     void loadMoreFollowing()
+  } else {
+    void loadMoreRecommend()
   }
 })
 
@@ -74,7 +70,7 @@ async function refreshActive() {
 async function switchChannel(channel: HomeChannel) {
   activeChannel.value = channel
   errorText.value = ''
-  if (!auth.isAuthenticated) {
+  if (channel === 'following' && !auth.isAuthenticated) {
     return
   }
   if (channel === 'following' && !followingLoaded.value) {
@@ -86,16 +82,13 @@ async function switchChannel(channel: HomeChannel) {
 }
 
 async function refreshRecommend() {
-  if (!auth.isAuthenticated) {
-    notesLoaded.value = true
-    notes.value = []
-    return
-  }
   loading.value = true
   errorText.value = ''
   try {
-    const page = await getMyNotes('PUBLISHED', null, 30)
+    const page = await getPublicTimeline(null, 30)
     notes.value = page.items
+    notesCursor.value = page.nextCursor
+    notesHasMore.value = page.hasMore
     notesLoaded.value = true
   } catch (error) {
     errorText.value = '信息流加载失败'
@@ -158,28 +151,23 @@ function goPublish() {
   uni.switchTab({ url: '/pages/publish/index' })
 }
 
-function openNotifications() {
-  if (!auth.isAuthenticated) {
-    goLogin()
-    return
-  }
-  uni.navigateTo({ url: '/pages/notifications/index' })
-}
-
-function openOrderActivity() {
-  if (!auth.isAuthenticated) {
-    goLogin()
-    return
-  }
-  uni.navigateTo({ url: '/pages/order/activity' })
-}
-
 function openRank() {
   uni.navigateTo({ url: '/pages/rank/index' })
 }
 
-function goProfile() {
-  uni.switchTab({ url: '/pages/profile/index' })
+async function loadMoreRecommend() {
+  if (loadingMore.value || loading.value || !notesHasMore.value) return
+  loadingMore.value = true
+  try {
+    const page = await getPublicTimeline(notesCursor.value, 30)
+    notes.value = mergeNotes(notes.value, page.items)
+    notesCursor.value = page.nextCursor
+    notesHasMore.value = page.hasMore
+  } catch (error) {
+    showApiError(error, '加载更多失败')
+  } finally {
+    loadingMore.value = false
+  }
 }
 
 function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
@@ -200,30 +188,22 @@ function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
   <view class="screen feed-screen top-safe">
     <view class="feed-appbar">
       <view class="brand-word">BlueNote</view>
-      <button class="search-pill" @tap="goPublish">
+      <view class="search-pill">
         <text class="search-mark">⌕</text>
         <text class="search-copy">搜索笔记、话题</text>
-      </button>
-      <button class="message-button" @tap="openNotifications">
-        <text class="message-icon">◌</text>
-        <text v-if="notifications.badgeText" class="message-badge">{{ notifications.badgeText }}</text>
-      </button>
-      <button class="rank-button" @tap="openRank">榜</button>
-      <button class="coupon-button" @tap="openOrderActivity">券</button>
-      <button class="new-button" @tap="goPublish">+</button>
+      </view>
     </view>
 
     <view class="channel-tabs">
       <button :class="['channel', { active: activeChannel === 'recommend' }]" @tap="switchChannel('recommend')">推荐</button>
       <button :class="['channel', { active: activeChannel === 'following' }]" @tap="switchChannel('following')">关注</button>
       <button class="channel" @tap="openRank">榜单</button>
-      <button class="channel" @tap="goProfile">我的</button>
     </view>
 
     <view v-if="loading && !currentLoaded" class="loading-copy">正在整理笔记</view>
 
     <EmptyState
-      v-else-if="!auth.isAuthenticated"
+      v-else-if="activeChannel === 'following' && !auth.isAuthenticated"
       :title="unauthTitle"
       :subtitle="unauthSubtitle"
     >
@@ -256,7 +236,11 @@ function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
       <button v-if="activeChannel === 'following' && followingHasMore" class="load-more-button" :disabled="loadingMore" @tap="loadMoreFollowing">
         {{ loadingMore ? '加载中' : '加载更多' }}
       </button>
+      <button v-else-if="activeChannel === 'recommend' && notesHasMore" class="load-more-button" :disabled="loadingMore" @tap="loadMoreRecommend">
+        {{ loadingMore ? '加载中' : '加载更多' }}
+      </button>
       <view v-else-if="activeChannel === 'following' && followingLoaded" class="list-end">没有更多了</view>
+      <view v-else-if="activeChannel === 'recommend' && notesLoaded" class="list-end">没有更多了</view>
     </view>
   </view>
 </template>
@@ -308,89 +292,6 @@ function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
   white-space: nowrap;
 }
 
-.new-button {
-  flex: 0 0 auto;
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  color: #fff;
-  background: linear-gradient(135deg, var(--bn-coral), #ff9b62);
-  box-shadow: 0 12rpx 24rpx rgba(255, 95, 87, 0.22);
-  font-size: 38rpx;
-  font-weight: 520;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.message-button {
-  position: relative;
-  flex: 0 0 auto;
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  color: var(--bn-ink);
-  background: #fff;
-  box-shadow: 0 6rpx 18rpx rgba(18, 22, 28, 0.05);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.coupon-button {
-  flex: 0 0 auto;
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  color: #7a4d00;
-  background: #fff4cf;
-  box-shadow: 0 6rpx 18rpx rgba(243, 190, 62, 0.18);
-  font-size: 27rpx;
-  font-weight: 860;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.rank-button {
-  flex: 0 0 auto;
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  color: #164c7a;
-  background: #e5f3ff;
-  box-shadow: 0 6rpx 18rpx rgba(44, 116, 214, 0.14);
-  font-size: 27rpx;
-  font-weight: 860;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.message-icon {
-  font-size: 38rpx;
-  line-height: 1;
-}
-
-.message-badge {
-  position: absolute;
-  right: -8rpx;
-  top: -8rpx;
-  min-width: 30rpx;
-  height: 30rpx;
-  padding: 0 8rpx;
-  border-radius: 999rpx;
-  background: var(--bn-coral);
-  color: #fff;
-  border: 3rpx solid #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18rpx;
-  font-weight: 820;
-  line-height: 1;
-}
-
 .channel-tabs {
   display: flex;
   align-items: center;
@@ -409,20 +310,6 @@ function mergeNotes(current: NoteCard[], incoming: NoteCard[]) {
 
 .channel.active {
   color: var(--bn-ink);
-  font-size: 31rpx;
-  font-weight: 900;
-}
-
-.channel.active::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 34rpx;
-  height: 6rpx;
-  border-radius: 999rpx;
-  background: var(--bn-coral);
-  transform: translateX(-50%);
 }
 
 .empty-action {

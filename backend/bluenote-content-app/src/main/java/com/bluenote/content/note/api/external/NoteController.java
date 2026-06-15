@@ -60,6 +60,17 @@ public class NoteController {
         );
     }
 
+    @GetMapping
+    public ApiResponse<CursorPage<NoteCardResponse>> publicTimeline(
+            @RequestParam(value = "cursor", required = false) String cursor,
+            @RequestParam(value = "size", required = false) Integer size
+    ) {
+        return ApiResponse.success(
+                noteApplicationService.publicTimeline(cursor, size),
+                TraceIdHolder.currentOrNew()
+        );
+    }
+
     @PostMapping("/{noteId}/publish")
     public ApiResponse<PublishNoteResponse> publishDraft(
             @PathVariable("noteId") String noteId,
