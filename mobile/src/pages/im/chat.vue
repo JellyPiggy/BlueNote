@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
-import { onLoad, onPullDownRefresh, onShow } from '@dcloudio/uni-app'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { onHide, onLoad, onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 import {
   createSingleConversation,
   getImMessages,
@@ -14,9 +14,11 @@ import AvatarCircle from '@/components/AvatarCircle.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useImStore } from '@/stores/im'
+import { useRealtimeStore } from '@/stores/realtime'
 
 const auth = useAuthStore()
 const im = useImStore()
+const realtime = useRealtimeStore()
 const conversationId = ref('')
 const targetUserId = ref('')
 const title = ref('私信')
@@ -29,8 +31,15 @@ const errorText = ref('')
 const draft = ref('')
 const scrollIntoView = ref('')
 const peer = ref<ImConversationItem['peerUser']>(null)
+const pageVisible = ref(false)
+const pullingLatest = ref(false)
+const pendingPull = ref(false)
+const handledPushRequestIds = ref<string[]>([])
+let pendingPullTimer: ReturnType<typeof setTimeout> | null = null
+let liveSyncTimer: ReturnType<typeof setInterval> | null = null
 
 const canSend = computed(() => draft.value.trim().length > 0 && !sending.value && auth.isAuthenticated)
+const latestSeq = computed(() => messages.value[messages.value.length - 1]?.conversationSeq ?? 0)
 
 onLoad((options) => {
   conversationId.value = String(options?.conversationId ?? '')
@@ -42,6 +51,8 @@ onLoad((options) => {
 })
 
 onShow(() => {
+  pageVisible.value = true
+  startLiveSync()
   if (!auth.isAuthenticated) {
     return
   }
@@ -51,8 +62,40 @@ onShow(() => {
   }
   if (conversationId.value && !messages.value.length && !loading.value) {
     void loadLatest()
+    return
+  }
+  if (conversationId.value && messages.value.length) {
+    void pullNewMessages()
   }
 })
+
+onHide(() => {
+  pageVisible.value = false
+  stopLiveSync()
+})
+
+onBeforeUnmount(() => {
+  pageVisible.value = false
+  stopLiveSync()
+  clearPendingPullTimer()
+})
+
+watch(
+  () => realtime.lastPushMessage,
+  (message) => {
+    if (!message || message.scene !== 'IM_MESSAGE') {
+      return
+    }
+    if (handledPushRequestIds.value.includes(message.requestId)) {
+      return
+    }
+    handledPushRequestIds.value = [...handledPushRequestIds.value.slice(-20), message.requestId]
+    if (!isCurrentConversationPush(message.data)) {
+      return
+    }
+    void pullNewMessages()
+  }
+)
 
 onPullDownRefresh(async () => {
   try {
@@ -82,6 +125,9 @@ async function ensureConversation() {
     showApiError(error, '会话加载失败')
   } finally {
     loading.value = false
+    if (pendingPull.value) {
+      schedulePendingPull(100)
+    }
   }
 }
 
@@ -106,6 +152,34 @@ async function loadLatest() {
   }
 }
 
+async function pullNewMessages() {
+  if (!auth.isAuthenticated || !pageVisible.value || !conversationId.value) {
+    return
+  }
+  if (pullingLatest.value || loading.value) {
+    schedulePendingPull()
+    return
+  }
+  pullingLatest.value = true
+  try {
+    const page = await getImMessages(conversationId.value, { afterSeq: latestSeq.value, limit: 50 })
+    if (page.items.length) {
+      messages.value = mergeMessages(messages.value, page.items)
+      await markSeen()
+      await scrollToBottom()
+    } else {
+      await im.refreshUnread().catch(() => undefined)
+    }
+  } catch {
+    await im.refreshUnread().catch(() => undefined)
+  } finally {
+    pullingLatest.value = false
+    if (pendingPull.value) {
+      schedulePendingPull(600)
+    }
+  }
+}
+
 async function loadHistory() {
   if (!conversationId.value || loading.value || beforeSeq.value == null) {
     return
@@ -120,6 +194,9 @@ async function loadHistory() {
     showApiError(error, '历史消息加载失败')
   } finally {
     loading.value = false
+    if (pendingPull.value) {
+      schedulePendingPull(100)
+    }
   }
 }
 
@@ -180,6 +257,62 @@ function mergeMessages(left: ImMessageItem[], right: ImMessageItem[]) {
     map.set(item.messageId, item)
   }
   return Array.from(map.values()).sort((a, b) => a.conversationSeq - b.conversationSeq)
+}
+
+function startLiveSync() {
+  stopLiveSync()
+  if (!auth.isAuthenticated) {
+    return
+  }
+  liveSyncTimer = setInterval(() => {
+    void pullNewMessages()
+  }, 4000)
+}
+
+function stopLiveSync() {
+  if (liveSyncTimer) {
+    clearInterval(liveSyncTimer)
+    liveSyncTimer = null
+  }
+}
+
+function schedulePendingPull(delay = 600) {
+  pendingPull.value = true
+  if (pendingPullTimer) {
+    return
+  }
+  pendingPullTimer = setTimeout(() => {
+    pendingPullTimer = null
+    if (!pendingPull.value) {
+      return
+    }
+    pendingPull.value = false
+    void pullNewMessages()
+  }, delay)
+}
+
+function clearPendingPullTimer() {
+  if (pendingPullTimer) {
+    clearTimeout(pendingPullTimer)
+    pendingPullTimer = null
+  }
+  pendingPull.value = false
+}
+
+function isCurrentConversationPush(data: Record<string, unknown>) {
+  const pushedConversationId = stringData(data.conversationId)
+  if (pushedConversationId && conversationId.value) {
+    return pushedConversationId === conversationId.value
+  }
+  const pushedSenderId = stringData(data.senderId)
+  return Boolean(pushedSenderId && targetUserId.value && pushedSenderId === targetUserId.value)
+}
+
+function stringData(value: unknown) {
+  if (value == null) {
+    return ''
+  }
+  return String(value)
 }
 
 function back() {

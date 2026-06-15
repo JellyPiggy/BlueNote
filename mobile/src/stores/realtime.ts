@@ -15,6 +15,7 @@ interface RealtimeState {
   deviceId: string | null
   websocketUrl: string | null
   lastMessageAt: string | null
+  lastPushMessage: RealtimePushMessage | null
   lastError: string | null
 }
 
@@ -29,6 +30,7 @@ export const useRealtimeStore = defineStore('realtime', {
     deviceId: null,
     websocketUrl: null,
     lastMessageAt: null,
+    lastPushMessage: null,
     lastError: null
   }),
   getters: {
@@ -135,6 +137,7 @@ export const useRealtimeStore = defineStore('realtime', {
       if (payload.type === 'PUSH_MESSAGE') {
         const message = payload as unknown as RealtimePushMessage
         this.lastMessageAt = message.sentAt
+        this.lastPushMessage = message
         this.send({ type: 'ACK', requestId: message.requestId, receivedAt: new Date().toISOString() })
         if (message.scene === 'IM_MESSAGE') {
           const im = useImStore()
