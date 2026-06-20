@@ -5,6 +5,7 @@ import com.bluenote.common.mq.RocketMqMessageHandler;
 import com.bluenote.common.observability.TraceIdHolder;
 import com.bluenote.order.api.dto.OrderDtos.OrderConsumeEventRequest;
 import com.bluenote.order.application.OrderApplicationService;
+import com.bluenote.order.infrastructure.mq.OrderConsumerExecutor.PoolKind;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,17 +24,23 @@ abstract class AbstractOrderMqMessageHandler implements RocketMqMessageHandler {
     private final List<String> topics;
     private final OrderApplicationService orderApplicationService;
     private final ObjectMapper objectMapper;
+    private final OrderConsumerExecutor consumerExecutor;
+    private final PoolKind poolKind;
 
     AbstractOrderMqMessageHandler(
             String consumerGroup,
             List<String> topics,
             OrderApplicationService orderApplicationService,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            OrderConsumerExecutor consumerExecutor,
+            PoolKind poolKind
     ) {
         this.consumerGroup = consumerGroup;
         this.topics = topics;
         this.orderApplicationService = orderApplicationService;
         this.objectMapper = objectMapper;
+        this.consumerExecutor = consumerExecutor;
+        this.poolKind = poolKind;
     }
 
     @Override
@@ -49,6 +56,10 @@ abstract class AbstractOrderMqMessageHandler implements RocketMqMessageHandler {
     @Override
     public void handle(MqInboundMessage message) {
         OrderConsumeEventRequest request = toRequest(message);
+        consumerExecutor.execute(poolKind, () -> consumeInExecutor(message, request));
+    }
+
+    private void consumeInExecutor(MqInboundMessage message, OrderConsumeEventRequest request) {
         String previousTraceId = TraceIdHolder.current();
         if (request.traceId() != null && !request.traceId().isBlank()) {
             TraceIdHolder.set(request.traceId());

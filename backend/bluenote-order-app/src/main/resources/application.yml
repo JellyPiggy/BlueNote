@@ -37,6 +37,19 @@ bluenote:
     seckill-token-ttl-seconds: ${BLUENOTE_ORDER_TOKEN_TTL_SECONDS:30}
     redis-retain-minutes: ${BLUENOTE_ORDER_REDIS_RETAIN_MINUTES:60}
     timeout-scan-batch-size: ${BLUENOTE_ORDER_TIMEOUT_SCAN_BATCH_SIZE:50}
+    consumer-executor:
+      seckill:
+        core-size: ${BLUENOTE_ORDER_SECKILL_CONSUMER_CORE_SIZE:4}
+        max-size: ${BLUENOTE_ORDER_SECKILL_CONSUMER_MAX_SIZE:4}
+        queue-capacity: ${BLUENOTE_ORDER_SECKILL_CONSUMER_QUEUE_CAPACITY:100}
+        keep-alive-seconds: ${BLUENOTE_ORDER_SECKILL_CONSUMER_KEEP_ALIVE_SECONDS:60}
+        await-timeout-seconds: ${BLUENOTE_ORDER_SECKILL_CONSUMER_AWAIT_TIMEOUT_SECONDS:60}
+      timeout:
+        core-size: ${BLUENOTE_ORDER_TIMEOUT_CONSUMER_CORE_SIZE:1}
+        max-size: ${BLUENOTE_ORDER_TIMEOUT_CONSUMER_MAX_SIZE:2}
+        queue-capacity: ${BLUENOTE_ORDER_TIMEOUT_CONSUMER_QUEUE_CAPACITY:50}
+        keep-alive-seconds: ${BLUENOTE_ORDER_TIMEOUT_CONSUMER_KEEP_ALIVE_SECONDS:60}
+        await-timeout-seconds: ${BLUENOTE_ORDER_TIMEOUT_CONSUMER_AWAIT_TIMEOUT_SECONDS:60}
   mq:
     enabled: ${BLUENOTE_MQ_ENABLED:true}
     name-server: ${BLUENOTE_ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
