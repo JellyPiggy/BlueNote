@@ -219,7 +219,7 @@ GET /api/comments/notes/{noteId}?sort=HOT&cursor=xxx&size=20
         "degraded": false
       }
     ],
-    "nextCursor": "HOT_12_2026-06-11T10:20:00+08:00_30001",
+    "nextCursor": "HOT_66_2026-06-11T10:20:00+08:00_30001",
     "hasMore": true,
     "degraded": false
   },
@@ -232,6 +232,8 @@ GET /api/comments/notes/{noteId}?sort=HOT&cursor=xxx&size=20
 1. 默认 `sort=HOT`。
 2. 一级评论列表只返回一级评论；回复通过二级回复接口分页获取。
 3. 计数降级时 `likeCount` 和 `replyCount` 返回 0，`degraded=true`。
+4. 热度分第一阶段为 `likeCount * 4 + replyCount * 6`，仅一级评论进入热评榜；二级评论点赞只影响该二级评论自身点赞数，不提升根评论热度。
+5. `sort=HOT` 查询优先读取 Redis 热评榜，不足部分按 MySQL 时间倒序分页补齐，并异步重建热评和时间序缓存。
 
 ## 7. 查询回复列表
 
@@ -242,6 +244,8 @@ GET /api/comments/{rootCommentId}/replies?cursor=xxx&size=20
 鉴权：可选。
 
 响应结构同评论列表，`items` 中均为 `level=2` 的评论。
+
+后端要求：回复列表按 `rootId + level + createdAt + commentId` 正序游标分页，Redis 回复列表缓存缺失后必须回源 MySQL。
 
 ## 8. 评论点赞和取消点赞
 
@@ -373,6 +377,32 @@ POST /internal/comments/counter-source
   ]
 }
 ```
+
+### 10.3 重建笔记评论热评缓存
+
+```text
+POST /internal/comments/notes/{noteId}/hot/rebuild
+```
+
+调用方：admin、运维任务。
+
+成功响应：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "noteId": "800001",
+    "hotCount": 1000,
+    "timeCount": 1000,
+    "rebuiltAt": "2026-06-11T10:40:00+08:00"
+  },
+  "traceId": "trace-id"
+}
+```
+
+说明：该接口从 MySQL 重建 `comment:hot:{noteId}` 和 `comment:time:{noteId}:level1`，不改变评论事实数据。
 
 成功响应：
 

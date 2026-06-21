@@ -15,6 +15,7 @@ public class ContentCommentEntity {
     private String commentStatus;
     private Long likeCountSnapshot;
     private Long replyCountSnapshot;
+    private Long hotScoreSnapshot;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -40,6 +41,8 @@ public class ContentCommentEntity {
     public void setLikeCountSnapshot(Long likeCountSnapshot) { this.likeCountSnapshot = likeCountSnapshot; }
     public Long getReplyCountSnapshot() { return replyCountSnapshot; }
     public void setReplyCountSnapshot(Long replyCountSnapshot) { this.replyCountSnapshot = replyCountSnapshot; }
+    public Long getHotScoreSnapshot() { return hotScoreSnapshot; }
+    public void setHotScoreSnapshot(Long hotScoreSnapshot) { this.hotScoreSnapshot = hotScoreSnapshot; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

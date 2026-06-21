@@ -124,6 +124,7 @@
 | `comment_status` | VARCHAR(32) | NOT NULL | `VISIBLE` / `DELETED` / `HIDDEN` |
 | `like_count_snapshot` | BIGINT | NOT NULL DEFAULT 0 | 降级展示快照 |
 | `reply_count_snapshot` | BIGINT | NOT NULL DEFAULT 0 | 降级展示快照 |
+| `hot_score_snapshot` | BIGINT | NOT NULL DEFAULT 0 | 热门评论排序分，第一阶段为 `reply_count_snapshot * 6 + like_count_snapshot * 4` |
 | `created_at` | DATETIME(3) | NOT NULL | 创建时间 |
 | `updated_at` | DATETIME(3) | NOT NULL | 更新时间 |
 
@@ -133,6 +134,7 @@
 |---|---|
 | `uk_content_comment_id(comment_id)` | 评论 ID 唯一 |
 | `idx_note_level_time(note_id, level, comment_status, created_at, comment_id)` | 查询一级评论 |
+| `idx_note_level_hot(note_id, level, comment_status, hot_score_snapshot, created_at, comment_id)` | 查询热门一级评论 |
 | `idx_root_level_time(root_id, level, comment_status, created_at, comment_id)` | 查询回复 |
 | `idx_reply_comment(parent_comment_id)` | 排查回复关系 |
 | `idx_note_status(note_id, comment_status, updated_at)` | 管理和补偿扫描 |

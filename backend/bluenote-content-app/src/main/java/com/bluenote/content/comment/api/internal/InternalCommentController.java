@@ -6,8 +6,10 @@ import com.bluenote.content.comment.api.dto.BatchCommentSummaryRequest;
 import com.bluenote.content.comment.api.dto.BatchCommentSummaryResponse;
 import com.bluenote.content.comment.api.dto.CommentCounterSourceRequest;
 import com.bluenote.content.comment.api.dto.CommentCounterSourceResponse;
+import com.bluenote.content.comment.api.dto.CommentHotRebuildResponse;
 import com.bluenote.content.comment.application.CommentApplicationService;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,5 +33,10 @@ public class InternalCommentController {
     @PostMapping("/counter-source")
     public ApiResponse<CommentCounterSourceResponse> counterSource(@Valid @RequestBody CommentCounterSourceRequest request) {
         return ApiResponse.success(commentApplicationService.counterSource(request), TraceIdHolder.currentOrNew());
+    }
+
+    @PostMapping("/notes/{noteId}/hot/rebuild")
+    public ApiResponse<CommentHotRebuildResponse> rebuildHot(@PathVariable("noteId") String noteId) {
+        return ApiResponse.success(commentApplicationService.rebuildNoteCommentCaches(noteId), TraceIdHolder.currentOrNew());
     }
 }

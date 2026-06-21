@@ -274,7 +274,11 @@ comment 已完成：
 8. 我的评论：`GET /api/comments/me`
 9. 内部批量评论摘要：`POST /internal/comments/batch-summary`
 10. 内部评论计数来源：`POST /internal/comments/counter-source`
-11. 评论事实、个人评论读模型、评论正文、评论点赞、幂等、操作日志、outbox 已落 MySQL。
+11. 内部评论热评缓存重建：`POST /internal/comments/notes/{noteId}/hot/rebuild`
+12. 评论事实、个人评论读模型、评论正文、评论点赞、幂等、操作日志、outbox、consume record 已落 MySQL。
+13. 笔记评论区支持 HOT / TIME_DESC / TIME_ASC；HOT 优先 Redis 热评榜，不足时按 MySQL 时间倒序补齐并重建缓存。
+14. 已通过 RocketMQ listener 自动消费 `comment-event` 刷新评论热评和时间序缓存：
+    - `bluenote-comment-hot-consumer`：`comment-event`
 
 计数说明：counter 查询失败不会阻断笔记主内容展示；详情页会返回降级计数并标记 `degraded=true`，列表卡片会回退到 note 互动明细中的点赞/收藏计数。
 

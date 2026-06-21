@@ -33,8 +33,8 @@ bluenote:{env}:{service}:{biz}:{id}
 | Key | 类型 | TTL | 写入方 | 读取方 | 用途 |
 |---|---|---|---|---|---|
 | `bluenote:{env}:comment:hot:{noteId}` | ZSET | 10 分钟 | comment | comment | 热门一级评论，score 为热度分，member 为 commentId |
-| `bluenote:{env}:comment:time:{noteId}:level1` | ZSET | 10 分钟 | comment | comment | 一级评论时间序列表 |
-| `bluenote:{env}:comment:replies:{rootCommentId}` | ZSET | 10 分钟 | comment | comment | 二级回复列表 |
+| `bluenote:{env}:comment:time:{noteId}:level1` | ZSET | 10 分钟 | comment | comment | 一级评论时间序列表，score 为 createdAtMillis，member 为 commentId |
+| `bluenote:{env}:comment:replies:{rootCommentId}` | ZSET | 10 分钟 | comment | comment | 二级回复列表，score 为 createdAtMillis，member 为 commentId |
 | `bluenote:{env}:comment:meta:{commentId}` | String(JSON) | 10 分钟 | comment | comment / notification | 评论元信息和摘要缓存 |
 | `bluenote:{env}:comment:liked:{userId}:{commentId}` | String | 10 分钟 | comment | comment | 当前用户是否点赞评论 |
 | `bluenote:{env}:comment:liked:batch:{userId}` | Hash | 5 分钟 | comment | comment | 批量点赞状态短缓存 |
@@ -44,9 +44,11 @@ bluenote:{env}:{service}:{biz}:{id}
 
 失效策略：
 
-1. 评论发布后删除或增量更新 `hot`、`time`、`replies`。
-2. 评论删除后删除 `meta`，并从列表 ZSET 移除。
-3. 评论点赞后删除 `liked` 和批量状态缓存，热门分可异步调整。
+1. 评论写入事务只落 MySQL 和 comment outbox；`comment-event` 被 `bluenote-comment-hot-consumer` 消费后增量更新 `hot`、`time`、`replies`。
+2. 评论删除后删除 `meta`，并从 `hot`、`time` 或 `replies` ZSET 移除；删除一级评论时同步清理对应回复列表。
+3. 评论点赞后删除 `liked` 和批量状态缓存，并由异步消费刷新根评论热度分；二级评论点赞不提升根评论热度。
+4. `comment:hot:{noteId}` 热度分第一阶段为 `一级评论点赞数 * 4 + 一级评论回复数 * 6`，事实值持久化在 `content_comment.hot_score_snapshot`。
+5. `sort=HOT` 读取热榜不足时按 MySQL 时间倒序补齐，并触发热评榜和一级时间序列表重建。
 
 ## 3. counter keys
 
