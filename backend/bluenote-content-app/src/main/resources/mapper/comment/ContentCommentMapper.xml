@@ -15,6 +15,7 @@
         <result column="comment_status" property="commentStatus"/>
         <result column="like_count_snapshot" property="likeCountSnapshot"/>
         <result column="reply_count_snapshot" property="replyCountSnapshot"/>
+        <result column="hot_score_snapshot" property="hotScoreSnapshot"/>
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
@@ -22,18 +23,18 @@
     <sql id="ContentCommentColumns">
         comment_id, note_id, note_author_id, user_id, root_id, parent_comment_id,
         reply_to_user_id, level, comment_status, like_count_snapshot,
-        reply_count_snapshot, created_at, updated_at
+        reply_count_snapshot, hot_score_snapshot, created_at, updated_at
     </sql>
 
     <insert id="insert" parameterType="com.bluenote.content.comment.infrastructure.entity.ContentCommentEntity">
         INSERT INTO bluenote_comment.content_comment (
             comment_id, note_id, note_author_id, user_id, root_id, parent_comment_id,
             reply_to_user_id, level, comment_status, like_count_snapshot,
-            reply_count_snapshot, created_at, updated_at
+            reply_count_snapshot, hot_score_snapshot, created_at, updated_at
         ) VALUES (
             #{commentId}, #{noteId}, #{noteAuthorId}, #{userId}, #{rootId}, #{parentCommentId},
             #{replyToUserId}, #{level}, #{commentStatus}, #{likeCountSnapshot},
-            #{replyCountSnapshot}, #{createdAt}, #{updatedAt}
+            #{replyCountSnapshot}, #{hotScoreSnapshot}, #{createdAt}, #{updatedAt}
         )
     </insert>
 
@@ -52,6 +53,17 @@
         </foreach>
     </select>
 
+    <select id="selectVisibleRootsByCommentIds" resultMap="ContentCommentResultMap">
+        SELECT <include refid="ContentCommentColumns"/>
+        FROM bluenote_comment.content_comment
+        WHERE level = 1
+          AND comment_status = 'VISIBLE'
+          AND comment_id IN
+        <foreach collection="commentIds" item="commentId" open="(" separator="," close=")">
+            #{commentId}
+        </foreach>
+    </select>
+
     <select id="selectRootPage" resultMap="ContentCommentResultMap">
         SELECT <include refid="ContentCommentColumns"/>
         FROM bluenote_comment.content_comment
@@ -60,6 +72,20 @@
           AND comment_status = 'VISIBLE'
         <if test="cursorCreatedAt != null and cursorCommentId != null">
           <choose>
+            <when test="sort == 'HOT'">
+              AND (
+                hot_score_snapshot &lt; #{cursorHotScore}
+                OR (
+                  hot_score_snapshot = #{cursorHotScore}
+                  AND created_at &lt; #{cursorCreatedAt}
+                )
+                OR (
+                  hot_score_snapshot = #{cursorHotScore}
+                  AND created_at = #{cursorCreatedAt}
+                  AND comment_id &lt; #{cursorCommentId}
+                )
+              )
+            </when>
             <when test="sort == 'TIME_ASC'">
               AND (
                 created_at &gt; #{cursorCreatedAt}
@@ -75,6 +101,11 @@
           </choose>
         </if>
         <choose>
+          <when test="sort == 'HOT'">
+            ORDER BY hot_score_snapshot DESC,
+                     created_at DESC,
+                     comment_id DESC
+          </when>
           <when test="sort == 'TIME_ASC'">
             ORDER BY created_at ASC, comment_id ASC
           </when>
@@ -120,6 +151,7 @@
     <update id="incrementReplySnapshot">
         UPDATE bluenote_comment.content_comment
         SET reply_count_snapshot = GREATEST(reply_count_snapshot + #{delta}, 0),
+            hot_score_snapshot = GREATEST(hot_score_snapshot + #{hotDelta}, 0),
             updated_at = #{updatedAt}
         WHERE comment_id = #{rootId}
     </update>
@@ -127,6 +159,7 @@
     <update id="incrementLikeSnapshot">
         UPDATE bluenote_comment.content_comment
         SET like_count_snapshot = GREATEST(like_count_snapshot + #{delta}, 0),
+            hot_score_snapshot = GREATEST(hot_score_snapshot + #{hotDelta}, 0),
             updated_at = #{updatedAt}
         WHERE comment_id = #{commentId}
     </update>
@@ -151,5 +184,17 @@
         WHERE root_id = #{rootId}
           AND level = 2
           AND comment_status = 'VISIBLE'
+    </select>
+
+    <select id="selectHotRootCandidates" resultMap="ContentCommentResultMap">
+        SELECT <include refid="ContentCommentColumns"/>
+        FROM bluenote_comment.content_comment
+        WHERE note_id = #{noteId}
+          AND level = 1
+          AND comment_status = 'VISIBLE'
+        ORDER BY hot_score_snapshot DESC,
+                 created_at DESC,
+                 comment_id DESC
+        LIMIT #{size}
     </select>
 </mapper>

@@ -209,6 +209,7 @@ Topic：`comment-event`
 
 | 服务 | 用途 |
 |---|---|
+| comment | 刷新根评论热评分、一级评论时间序和回复列表 Redis 缓存 |
 | counter | 笔记评论数 +1，二级回复还增加一级评论回复数 |
 | notification | 评论笔记或回复评论通知 |
 
@@ -240,6 +241,13 @@ Topic：`comment-event`
 
 `affectedCommentCount` 表示本次删除对笔记可见评论数的影响。计数服务必须优先使用该字段。
 
+消费者：
+
+| 服务 | 用途 |
+|---|---|
+| comment | 一级评论删除时移除热评和时间序缓存，二级回复删除时移除回复列表并刷新根评论热度 |
+| counter | 按 `affectedCommentCount` / `affectedReplyCount` 扣减笔记评论数和根评论回复数 |
+
 ## 8. CommentLiked / CommentUnliked
 
 Topic：`comment-event`
@@ -258,6 +266,7 @@ Topic：`comment-event`
     "commentUserId": "10002",
     "userId": "10003",
     "noteId": "800001",
+    "rootId": "30001",
     "occurredActionAt": "2026-06-11T11:00:00+08:00"
   }
 }
@@ -268,7 +277,7 @@ Topic：`comment-event`
 1. `CommentLiked`
 2. `CommentUnliked`
 
-消费者：counter。通知服务第一阶段不为评论点赞生成通知。
+消费者：comment、counter。通知服务第一阶段不为评论点赞生成通知。
 
 ## 9. CounterDeltaCreated
 
@@ -646,6 +655,7 @@ Topic：`push-event`
 | `bluenote-counter-note-consumer` | `note-event` / `interaction-event` | counter |
 | `bluenote-counter-comment-consumer` | `comment-event` | counter |
 | `bluenote-counter-relation-consumer` | `relation-event` | counter |
+| `bluenote-comment-hot-consumer` | `comment-event` | comment |
 | `bluenote-counter-delta-updater` | `counter-delta-event` | counter |
 | `bluenote-feed-note-consumer` | `note-event` | feed |
 | `bluenote-feed-relation-consumer` | `relation-event` | feed |

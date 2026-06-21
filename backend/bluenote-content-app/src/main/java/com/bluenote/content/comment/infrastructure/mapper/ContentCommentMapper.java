@@ -13,9 +13,12 @@ public interface ContentCommentMapper {
 
     List<ContentCommentEntity> selectByCommentIds(@Param("commentIds") List<Long> commentIds);
 
+    List<ContentCommentEntity> selectVisibleRootsByCommentIds(@Param("commentIds") List<Long> commentIds);
+
     List<ContentCommentEntity> selectRootPage(
             @Param("noteId") Long noteId,
             @Param("sort") String sort,
+            @Param("cursorHotScore") Long cursorHotScore,
             @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
             @Param("cursorCommentId") Long cursorCommentId,
             @Param("size") int size
@@ -35,12 +38,14 @@ public interface ContentCommentMapper {
     int incrementReplySnapshot(
             @Param("rootId") Long rootId,
             @Param("delta") long delta,
+            @Param("hotDelta") long hotDelta,
             @Param("updatedAt") LocalDateTime updatedAt
     );
 
     int incrementLikeSnapshot(
             @Param("commentId") Long commentId,
             @Param("delta") long delta,
+            @Param("hotDelta") long hotDelta,
             @Param("updatedAt") LocalDateTime updatedAt
     );
 
@@ -49,4 +54,6 @@ public interface ContentCommentMapper {
     long countVisibleByRoot(@Param("rootId") Long rootId);
 
     long countVisibleReplies(@Param("rootId") Long rootId);
+
+    List<ContentCommentEntity> selectHotRootCandidates(@Param("noteId") Long noteId, @Param("size") int size);
 }

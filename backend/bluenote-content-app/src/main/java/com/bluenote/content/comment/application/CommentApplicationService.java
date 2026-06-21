@@ -10,7 +10,9 @@ import com.bluenote.content.comment.api.dto.CommentAuthorResponse;
 import com.bluenote.content.comment.api.dto.CommentCounterSourceItem;
 import com.bluenote.content.comment.api.dto.CommentCounterSourceRequest;
 import com.bluenote.content.comment.api.dto.CommentCounterSourceResponse;
+import com.bluenote.content.comment.api.dto.CommentConsumeEventRequest;
 import com.bluenote.content.comment.api.dto.CommentCursorPage;
+import com.bluenote.content.comment.api.dto.CommentHotRebuildResponse;
 import com.bluenote.content.comment.api.dto.CommentItemResponse;
 import com.bluenote.content.comment.api.dto.CommentLikeResponse;
 import com.bluenote.content.comment.api.dto.CommentSummaryItem;
@@ -21,6 +23,7 @@ import com.bluenote.content.comment.api.dto.DeleteCommentResponse;
 import com.bluenote.content.comment.api.dto.MyCommentItemResponse;
 import com.bluenote.content.comment.api.dto.MyCommentNoteResponse;
 import com.bluenote.content.comment.infrastructure.client.MemberInternalClient;
+import com.bluenote.content.comment.infrastructure.entity.CommentConsumeRecordEntity;
 import com.bluenote.content.comment.infrastructure.entity.CommentContentEntity;
 import com.bluenote.content.comment.infrastructure.entity.CommentIdempotentRequestEntity;
 import com.bluenote.content.comment.infrastructure.entity.CommentLikeEntity;
@@ -28,6 +31,7 @@ import com.bluenote.content.comment.infrastructure.entity.CommentOperationLogEnt
 import com.bluenote.content.comment.infrastructure.entity.CommentOutboxEventEntity;
 import com.bluenote.content.comment.infrastructure.entity.ContentCommentEntity;
 import com.bluenote.content.comment.infrastructure.entity.UserCommentEntity;
+import com.bluenote.content.comment.infrastructure.mapper.CommentConsumeRecordMapper;
 import com.bluenote.content.comment.infrastructure.mapper.CommentContentMapper;
 import com.bluenote.content.comment.infrastructure.mapper.CommentIdempotentRequestMapper;
 import com.bluenote.content.comment.infrastructure.mapper.CommentLikeMapper;
@@ -35,6 +39,9 @@ import com.bluenote.content.comment.infrastructure.mapper.CommentOperationLogMap
 import com.bluenote.content.comment.infrastructure.mapper.CommentOutboxEventMapper;
 import com.bluenote.content.comment.infrastructure.mapper.ContentCommentMapper;
 import com.bluenote.content.comment.infrastructure.mapper.UserCommentMapper;
+import com.bluenote.content.comment.infrastructure.redis.CommentRedisStore;
+import com.bluenote.content.comment.infrastructure.redis.CommentRedisStore.CommentTimeMember;
+import com.bluenote.content.comment.infrastructure.redis.CommentRedisStore.HotCommentMember;
 import com.bluenote.content.common.ContentIdGenerator;
 import com.bluenote.content.common.JsonPayloads;
 import com.bluenote.content.note.api.dto.BatchNoteSummaryRequest;
@@ -50,6 +57,8 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -75,8 +84,15 @@ public class CommentApplicationService {
     private static final String SORT_TIME_ASC = "TIME_ASC";
     private static final String OP_CREATE_COMMENT = "COMMENT_CREATE";
     private static final String OP_REPLY_COMMENT = "COMMENT_REPLY";
+    private static final int HOT_COMMENT_LIMIT = 1000;
+    private static final int TIME_COMMENT_LIMIT = 1000;
+    private static final int REPLY_COMMENT_LIMIT = 1000;
+    private static final long HOT_LIKE_WEIGHT = 4L;
+    private static final long HOT_REPLY_WEIGHT = 6L;
     private static final int LEVEL_ROOT = 1;
     private static final int LEVEL_REPLY = 2;
+    private static final String CONSUME_SUCCESS = "SUCCESS";
+    private static final String CONSUME_PROCESSING = "PROCESSING";
 
     private final ContentCommentMapper contentCommentMapper;
     private final UserCommentMapper userCommentMapper;
@@ -85,8 +101,10 @@ public class CommentApplicationService {
     private final CommentIdempotentRequestMapper idempotentRequestMapper;
     private final CommentOperationLogMapper operationLogMapper;
     private final CommentOutboxEventMapper outboxEventMapper;
+    private final CommentConsumeRecordMapper consumeRecordMapper;
     private final MemberInternalClient memberInternalClient;
     private final NoteApplicationService noteApplicationService;
+    private final CommentRedisStore commentRedisStore;
     private final ContentIdGenerator idGenerator;
     private final JsonPayloads jsonPayloads;
     private final ObjectMapper objectMapper;
@@ -99,8 +117,10 @@ public class CommentApplicationService {
             CommentIdempotentRequestMapper idempotentRequestMapper,
             CommentOperationLogMapper operationLogMapper,
             CommentOutboxEventMapper outboxEventMapper,
+            CommentConsumeRecordMapper consumeRecordMapper,
             MemberInternalClient memberInternalClient,
             NoteApplicationService noteApplicationService,
+            CommentRedisStore commentRedisStore,
             ContentIdGenerator idGenerator,
             JsonPayloads jsonPayloads,
             ObjectMapper objectMapper
@@ -112,8 +132,10 @@ public class CommentApplicationService {
         this.idempotentRequestMapper = idempotentRequestMapper;
         this.operationLogMapper = operationLogMapper;
         this.outboxEventMapper = outboxEventMapper;
+        this.consumeRecordMapper = consumeRecordMapper;
         this.memberInternalClient = memberInternalClient;
         this.noteApplicationService = noteApplicationService;
+        this.commentRedisStore = commentRedisStore;
         this.idGenerator = idGenerator;
         this.jsonPayloads = jsonPayloads;
         this.objectMapper = objectMapper;
@@ -197,7 +219,7 @@ public class CommentApplicationService {
                             noteSnapshot,
                             now
                     );
-                    contentCommentMapper.incrementReplySnapshot(rootId, 1, now);
+                    contentCommentMapper.incrementReplySnapshot(rootId, 1, HOT_REPLY_WEIGHT, now);
                     insertOperationLog(comment.getCommentId(), userId, "REPLY", null, STATUS_VISIBLE, now);
                     insertCommentCreatedOutbox(comment, contentPreview(content), now);
                     CreateCommentResponse response = createResponse(comment, now);
@@ -228,10 +250,10 @@ public class CommentApplicationService {
             userCommentMapper.markDeletedByRoot(comment.getRootId(), now);
         } else {
             affectedCommentCount = 1;
-            affectedReplyCount = 0;
+            affectedReplyCount = 1;
             contentCommentMapper.markDeleted(comment.getCommentId(), now);
             userCommentMapper.markDeleted(comment.getCommentId(), now);
-            contentCommentMapper.incrementReplySnapshot(comment.getRootId(), -1, now);
+            contentCommentMapper.incrementReplySnapshot(comment.getRootId(), -1, -HOT_REPLY_WEIGHT, now);
         }
         insertOperationLog(comment.getCommentId(), userId, "DELETE", STATUS_VISIBLE, STATUS_DELETED, now);
         insertCommentDeletedOutbox(comment, affectedCommentCount, affectedReplyCount, now);
@@ -249,15 +271,11 @@ public class CommentApplicationService {
         Long parsedNoteId = parseId(noteId, ApiErrorCode.NOTE_NOT_FOUND);
         String normalizedSort = normalizeSort(sort);
         ensureNoteVisible(parsedNoteId, viewerId);
-        PageCursor pageCursor = parseCursor(cursor);
+        PageCursor pageCursor = parseCursor(cursor, normalizedSort);
         int pageSize = normalizePageSize(size);
-        List<ContentCommentEntity> comments = contentCommentMapper.selectRootPage(
-                parsedNoteId,
-                normalizedSort,
-                pageCursor.sortAt(),
-                pageCursor.commentId(),
-                pageSize + 1
-        );
+        List<ContentCommentEntity> comments = SORT_HOT.equals(normalizedSort)
+                ? hotRootComments(parsedNoteId, pageCursor, pageSize + 1)
+                : timeRootComments(parsedNoteId, normalizedSort, pageCursor, pageSize + 1);
         return toCommentPage(comments, pageSize, normalizedSort, viewerId);
     }
 
@@ -274,14 +292,9 @@ public class CommentApplicationService {
             throw new BusinessException(ApiErrorCode.COMMENT_REPLY_TARGET_INVALID);
         }
         ensureNoteVisible(root.getNoteId(), viewerId);
-        PageCursor pageCursor = parseCursor(cursor);
+        PageCursor pageCursor = parseCursor(cursor, SORT_TIME_ASC);
         int pageSize = normalizePageSize(size);
-        List<ContentCommentEntity> replies = contentCommentMapper.selectReplyPage(
-                parsedRootId,
-                pageCursor.sortAt(),
-                pageCursor.commentId(),
-                pageSize + 1
-        );
+        List<ContentCommentEntity> replies = replyComments(parsedRootId, pageCursor, pageSize + 1);
         return toCommentPage(replies, pageSize, SORT_TIME_ASC, viewerId);
     }
 
@@ -318,7 +331,7 @@ public class CommentApplicationService {
             changed = commentLikeMapper.activate(existing.getId(), now, now) > 0;
         }
         if (changed) {
-            contentCommentMapper.incrementLikeSnapshot(parsedCommentId, 1, now);
+            contentCommentMapper.incrementLikeSnapshot(parsedCommentId, 1, hotLikeDelta(comment, 1), now);
             insertCommentLikeOutbox("CommentLiked", comment, userId, now);
         }
         return new CommentLikeResponse(commentId, true);
@@ -336,7 +349,7 @@ public class CommentApplicationService {
         LocalDateTime now = now();
         boolean changed = commentLikeMapper.cancel(existing.getId(), now, now) > 0;
         if (changed) {
-            contentCommentMapper.incrementLikeSnapshot(parsedCommentId, -1, now);
+            contentCommentMapper.incrementLikeSnapshot(parsedCommentId, -1, hotLikeDelta(comment, -1), now);
             insertCommentLikeOutbox("CommentUnliked", comment, userId, now);
         }
         return new CommentLikeResponse(commentId, false);
@@ -345,7 +358,7 @@ public class CommentApplicationService {
     @Transactional(readOnly = true)
     public CursorPage<MyCommentItemResponse> myComments(String currentUserId, String cursor, Integer size) {
         Long userId = parseId(currentUserId, ApiErrorCode.ACCESS_TOKEN_INVALID);
-        PageCursor pageCursor = parseCursor(cursor);
+        PageCursor pageCursor = parseCursor(cursor, SORT_TIME_DESC);
         int pageSize = normalizePageSize(size);
         List<UserCommentEntity> comments = userCommentMapper.selectByUserPage(
                 userId,
@@ -437,6 +450,48 @@ public class CommentApplicationService {
         return new CommentCounterSourceResponse(items);
     }
 
+    @Transactional(readOnly = true)
+    public CommentHotRebuildResponse rebuildNoteCommentCaches(String noteId) {
+        Long parsedNoteId = parseId(noteId, ApiErrorCode.PARAM_INVALID);
+        int hotCount = rebuildHotComments(parsedNoteId);
+        int timeCount = rebuildRootTimeComments(parsedNoteId);
+        return new CommentHotRebuildResponse(noteId, hotCount, timeCount, toOffsetString(now()));
+    }
+
+    @Transactional
+    public void consumeEvent(CommentConsumeEventRequest request) {
+        LocalDateTime now = now();
+        CommentConsumeRecordEntity existing = consumeRecordMapper.selectByGroupAndEvent(
+                request.consumerGroup(),
+                request.eventId()
+        );
+        if (existing != null && CONSUME_SUCCESS.equals(existing.getConsumeStatus())) {
+            return;
+        }
+
+        reserveConsumeRecord(request, now);
+        try {
+            switch (request.eventType()) {
+                case "CommentCreated" -> consumeCommentCreated(request);
+                case "CommentDeleted" -> consumeCommentDeleted(request);
+                case "CommentLiked", "CommentUnliked", "CommentStatusChanged" -> refreshRootCaches(
+                        id(request.payload(), "noteId"),
+                        id(request.payload(), "rootId")
+                );
+                default -> {
+                }
+            }
+            consumeRecordMapper.markSuccess(request.consumerGroup(), request.eventId());
+        } catch (RuntimeException exception) {
+            consumeRecordMapper.markFail(
+                    request.consumerGroup(),
+                    request.eventId(),
+                    truncate(exception.getMessage(), 512)
+            );
+            throw exception;
+        }
+    }
+
     private ContentCommentEntity insertComment(
             Long noteId,
             Long noteAuthorId,
@@ -462,6 +517,7 @@ public class CommentApplicationService {
         comment.setCommentStatus(STATUS_VISIBLE);
         comment.setLikeCountSnapshot(0L);
         comment.setReplyCountSnapshot(0L);
+        comment.setHotScoreSnapshot(0L);
         comment.setCreatedAt(now);
         comment.setUpdatedAt(now);
         contentCommentMapper.insert(comment);
@@ -533,6 +589,370 @@ public class CommentApplicationService {
                 })
                 .toList();
         return new CommentCursorPage<>(items, pageCursor(pageItems, hasMore, sort), hasMore, degraded);
+    }
+
+    private List<ContentCommentEntity> hotRootComments(Long noteId, PageCursor cursor, int limit) {
+        List<ContentCommentEntity> hotComments = List.of();
+        try {
+            hotComments = hotRootCommentsFromRedis(noteId, cursor, limit);
+            if (hotComments.size() >= limit) {
+                return hotComments;
+            }
+        } catch (RuntimeException exception) {
+            // Redis only accelerates hot comments. MySQL remains the source of truth.
+        }
+
+        if (hotComments.isEmpty()) {
+            List<ContentCommentEntity> comments = contentCommentMapper.selectRootPage(
+                    noteId,
+                    SORT_HOT,
+                    cursor.hotScore(),
+                    cursor.sortAt(),
+                    cursor.commentId(),
+                    limit
+            );
+            rebuildHotComments(noteId);
+            rebuildRootTimeComments(noteId);
+            return comments;
+        }
+
+        List<ContentCommentEntity> fillers = timeRootCommentsFromMysql(
+                noteId,
+                SORT_TIME_DESC,
+                cursor.sortAt(),
+                cursor.commentId(),
+                limit + hotComments.size() + 1
+        );
+        List<ContentCommentEntity> merged = mergeUnique(hotComments, fillers, limit);
+        rebuildHotComments(noteId);
+        rebuildRootTimeComments(noteId);
+        return merged;
+    }
+
+    private List<ContentCommentEntity> hotRootCommentsFromRedis(Long noteId, PageCursor cursor, int limit) {
+        int fetchLimit = Math.max(limit * 3, limit + 20);
+        List<HotCommentMember> members = commentRedisStore.hotComments(noteId, fetchLimit);
+        if (members.isEmpty()) {
+            return List.of();
+        }
+        List<Long> commentIds = members.stream().map(HotCommentMember::commentId).toList();
+        Map<Long, ContentCommentEntity> comments = visibleRootMap(commentIds, noteId);
+        List<ContentCommentEntity> sorted = members.stream()
+                .map(member -> comments.get(member.commentId()))
+                .filter(comment -> comment != null && afterHotCursor(comment, cursor))
+                .sorted(hotCommentComparator())
+                .limit(limit)
+                .toList();
+        if (sorted.size() < Math.min(limit, members.size())) {
+            rebuildHotComments(noteId);
+        }
+        return sorted;
+    }
+
+    private List<ContentCommentEntity> timeRootComments(Long noteId, String sort, PageCursor cursor, int limit) {
+        if (SORT_TIME_DESC.equals(sort)) {
+            try {
+                List<ContentCommentEntity> cached = timeRootCommentsFromRedis(noteId, sort, cursor, limit);
+                if (cached.size() >= limit) {
+                    return cached;
+                }
+            } catch (RuntimeException exception) {
+                // Redis is a read-through acceleration path only.
+            }
+        }
+        List<ContentCommentEntity> comments = timeRootCommentsFromMysql(
+                noteId,
+                sort,
+                cursor.sortAt(),
+                cursor.commentId(),
+                limit
+        );
+        rebuildRootTimeComments(noteId);
+        return comments;
+    }
+
+    private List<ContentCommentEntity> timeRootCommentsFromRedis(
+            Long noteId,
+            String sort,
+            PageCursor cursor,
+            int limit
+    ) {
+        int fetchLimit = Math.max(limit * 3, limit + 20);
+        boolean descending = !SORT_TIME_ASC.equals(sort);
+        List<Long> commentIds = commentRedisStore.rootTimeComments(noteId, descending, fetchLimit);
+        if (commentIds.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, ContentCommentEntity> comments = visibleRootMap(commentIds, noteId);
+        List<ContentCommentEntity> sorted = commentIds.stream()
+                .map(comments::get)
+                .filter(comment -> comment != null && afterTimeCursor(comment, cursor, sort))
+                .sorted(timeCommentComparator(sort))
+                .limit(limit)
+                .toList();
+        if (sorted.size() < Math.min(limit, commentIds.size())) {
+            rebuildRootTimeComments(noteId);
+        }
+        return sorted;
+    }
+
+    private List<ContentCommentEntity> timeRootCommentsFromMysql(
+            Long noteId,
+            String sort,
+            LocalDateTime cursorCreatedAt,
+            Long cursorCommentId,
+            int limit
+    ) {
+        return contentCommentMapper.selectRootPage(
+                noteId,
+                sort,
+                null,
+                cursorCreatedAt,
+                cursorCommentId,
+                limit
+        );
+    }
+
+    private List<ContentCommentEntity> replyComments(Long rootId, PageCursor cursor, int limit) {
+        try {
+            List<ContentCommentEntity> cached = replyCommentsFromRedis(rootId, cursor, limit);
+            if (cached.size() >= limit) {
+                return cached;
+            }
+        } catch (RuntimeException exception) {
+            // Redis is a read-through acceleration path only.
+        }
+        List<ContentCommentEntity> replies = contentCommentMapper.selectReplyPage(
+                rootId,
+                cursor.sortAt(),
+                cursor.commentId(),
+                limit
+        );
+        rebuildReplyComments(rootId);
+        return replies;
+    }
+
+    private List<ContentCommentEntity> replyCommentsFromRedis(Long rootId, PageCursor cursor, int limit) {
+        int fetchLimit = Math.max(limit * 3, limit + 20);
+        List<Long> commentIds = commentRedisStore.replyComments(rootId, fetchLimit);
+        if (commentIds.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, ContentCommentEntity> comments = visibleCommentMap(commentIds);
+        List<ContentCommentEntity> sorted = commentIds.stream()
+                .map(comments::get)
+                .filter(comment -> comment != null
+                        && rootId.equals(comment.getRootId())
+                        && LEVEL_REPLY == safeInt(comment.getLevel())
+                        && STATUS_VISIBLE.equals(comment.getCommentStatus())
+                        && afterTimeCursor(comment, cursor, SORT_TIME_ASC))
+                .sorted(timeCommentComparator(SORT_TIME_ASC))
+                .limit(limit)
+                .toList();
+        if (sorted.size() < Math.min(limit, commentIds.size())) {
+            rebuildReplyComments(rootId);
+        }
+        return sorted;
+    }
+
+    private Comparator<ContentCommentEntity> hotCommentComparator() {
+        return Comparator.comparingLong(this::hotScore).reversed()
+                .thenComparing(ContentCommentEntity::getCreatedAt, Comparator.reverseOrder())
+                .thenComparing(ContentCommentEntity::getCommentId, Comparator.reverseOrder());
+    }
+
+    private boolean afterHotCursor(ContentCommentEntity comment, PageCursor cursor) {
+        if (cursor.hotScore() == null || cursor.sortAt() == null || cursor.commentId() == null) {
+            return true;
+        }
+        long score = hotScore(comment);
+        int scoreCompare = Long.compare(score, cursor.hotScore());
+        if (scoreCompare != 0) {
+            return scoreCompare < 0;
+        }
+        int timeCompare = comment.getCreatedAt().compareTo(cursor.sortAt());
+        if (timeCompare != 0) {
+            return timeCompare < 0;
+        }
+        return comment.getCommentId() < cursor.commentId();
+    }
+
+    private boolean afterTimeCursor(ContentCommentEntity comment, PageCursor cursor, String sort) {
+        if (cursor.sortAt() == null || cursor.commentId() == null) {
+            return true;
+        }
+        int timeCompare = comment.getCreatedAt().compareTo(cursor.sortAt());
+        if (SORT_TIME_ASC.equals(sort)) {
+            return timeCompare > 0 || (timeCompare == 0 && comment.getCommentId() > cursor.commentId());
+        }
+        return timeCompare < 0 || (timeCompare == 0 && comment.getCommentId() < cursor.commentId());
+    }
+
+    private Comparator<ContentCommentEntity> timeCommentComparator(String sort) {
+        Comparator<ContentCommentEntity> comparator = Comparator.comparing(ContentCommentEntity::getCreatedAt)
+                .thenComparing(ContentCommentEntity::getCommentId);
+        return SORT_TIME_ASC.equals(sort) ? comparator : comparator.reversed();
+    }
+
+    private List<ContentCommentEntity> mergeUnique(
+            List<ContentCommentEntity> preferred,
+            List<ContentCommentEntity> fillers,
+            int limit
+    ) {
+        List<ContentCommentEntity> merged = new ArrayList<>(Math.min(limit, preferred.size() + fillers.size()));
+        Set<Long> seen = new LinkedHashSet<>();
+        for (ContentCommentEntity comment : preferred) {
+            if (seen.add(comment.getCommentId())) {
+                merged.add(comment);
+            }
+            if (merged.size() >= limit) {
+                return merged;
+            }
+        }
+        for (ContentCommentEntity comment : fillers) {
+            if (seen.add(comment.getCommentId())) {
+                merged.add(comment);
+            }
+            if (merged.size() >= limit) {
+                break;
+            }
+        }
+        return merged;
+    }
+
+    private Map<Long, ContentCommentEntity> visibleRootMap(List<Long> commentIds, Long noteId) {
+        List<Long> ids = distinctIds(commentIds);
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return contentCommentMapper.selectVisibleRootsByCommentIds(ids).stream()
+                .filter(comment -> noteId.equals(comment.getNoteId()))
+                .collect(Collectors.toMap(ContentCommentEntity::getCommentId, item -> item, (left, right) -> left));
+    }
+
+    private Map<Long, ContentCommentEntity> visibleCommentMap(List<Long> commentIds) {
+        List<Long> ids = distinctIds(commentIds);
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return contentCommentMapper.selectByCommentIds(ids).stream()
+                .filter(comment -> STATUS_VISIBLE.equals(comment.getCommentStatus()))
+                .collect(Collectors.toMap(ContentCommentEntity::getCommentId, item -> item, (left, right) -> left));
+    }
+
+    private List<Long> distinctIds(List<Long> ids) {
+        return ids.stream().distinct().toList();
+    }
+
+    private int rebuildHotComments(Long noteId) {
+        try {
+            List<HotCommentMember> members = contentCommentMapper
+                    .selectHotRootCandidates(noteId, HOT_COMMENT_LIMIT)
+                    .stream()
+                    .map(comment -> new HotCommentMember(comment.getCommentId(), (double) hotScore(comment)))
+                    .toList();
+            commentRedisStore.replaceHotComments(noteId, members, HOT_COMMENT_LIMIT);
+            return members.size();
+        } catch (RuntimeException exception) {
+            return 0;
+        }
+    }
+
+    private int rebuildRootTimeComments(Long noteId) {
+        try {
+            List<CommentTimeMember> members = contentCommentMapper
+                    .selectRootPage(noteId, SORT_TIME_DESC, null, null, null, TIME_COMMENT_LIMIT)
+                    .stream()
+                    .map(comment -> new CommentTimeMember(comment.getCommentId(), comment.getCreatedAt()))
+                    .toList();
+            commentRedisStore.replaceRootTimeComments(noteId, members);
+            return members.size();
+        } catch (RuntimeException exception) {
+            return 0;
+        }
+    }
+
+    private int rebuildReplyComments(Long rootId) {
+        try {
+            List<CommentTimeMember> members = contentCommentMapper
+                    .selectReplyPage(rootId, null, null, REPLY_COMMENT_LIMIT)
+                    .stream()
+                    .map(comment -> new CommentTimeMember(comment.getCommentId(), comment.getCreatedAt()))
+                    .toList();
+            commentRedisStore.replaceReplyComments(rootId, members);
+            return members.size();
+        } catch (RuntimeException exception) {
+            return 0;
+        }
+    }
+
+    private void refreshRootCaches(Long noteId, Long rootId) {
+        ContentCommentEntity root = contentCommentMapper.selectByCommentId(rootId);
+        if (root == null || LEVEL_ROOT != safeInt(root.getLevel()) || !STATUS_VISIBLE.equals(root.getCommentStatus())) {
+            commentRedisStore.removeHotComment(noteId, rootId);
+            commentRedisStore.removeRootTimeComment(noteId, rootId);
+            commentRedisStore.removeReplyList(rootId);
+            return;
+        }
+        commentRedisStore.updateHotComment(root.getNoteId(), root.getCommentId(), hotScore(root), HOT_COMMENT_LIMIT);
+        commentRedisStore.updateRootTimeComment(root.getNoteId(), root.getCommentId(), root.getCreatedAt());
+    }
+
+    private long hotScore(ContentCommentEntity comment) {
+        return safeLong(comment.getHotScoreSnapshot());
+    }
+
+    private long hotLikeDelta(ContentCommentEntity comment, long likeDelta) {
+        return LEVEL_ROOT == safeInt(comment.getLevel()) ? likeDelta * HOT_LIKE_WEIGHT : 0L;
+    }
+
+    private void consumeCommentCreated(CommentConsumeEventRequest request) {
+        Map<String, Object> payload = request.payload();
+        Long noteId = id(payload, "noteId");
+        Long commentId = id(payload, "commentId");
+        Long rootId = id(payload, "rootId");
+        ContentCommentEntity comment = contentCommentMapper.selectByCommentId(commentId);
+        if (comment == null || !STATUS_VISIBLE.equals(comment.getCommentStatus())) {
+            refreshRootCaches(noteId, rootId);
+            return;
+        }
+        if (LEVEL_ROOT == safeInt(comment.getLevel())) {
+            refreshRootCaches(comment.getNoteId(), comment.getRootId());
+        } else {
+            commentRedisStore.updateReplyComment(comment.getRootId(), comment.getCommentId(), comment.getCreatedAt());
+            refreshRootCaches(comment.getNoteId(), comment.getRootId());
+        }
+    }
+
+    private void consumeCommentDeleted(CommentConsumeEventRequest request) {
+        Map<String, Object> payload = request.payload();
+        Long noteId = id(payload, "noteId");
+        Long commentId = id(payload, "commentId");
+        Long rootId = id(payload, "rootId");
+        int level = intValue(payload.get("level"));
+        if (LEVEL_ROOT == level) {
+            commentRedisStore.removeHotComment(noteId, rootId);
+            commentRedisStore.removeRootTimeComment(noteId, rootId);
+            commentRedisStore.removeReplyList(rootId);
+            return;
+        }
+        commentRedisStore.removeReplyComment(rootId, commentId);
+        refreshRootCaches(noteId, rootId);
+    }
+
+    private void reserveConsumeRecord(CommentConsumeEventRequest request, LocalDateTime now) {
+        CommentConsumeRecordEntity entity = new CommentConsumeRecordEntity();
+        entity.setId(idGenerator.nextId());
+        entity.setConsumerGroup(request.consumerGroup());
+        entity.setEventId(request.eventId());
+        entity.setTopic(request.topic());
+        entity.setEventType(request.eventType());
+        entity.setBizKey(request.bizKey());
+        entity.setConsumeStatus(CONSUME_PROCESSING);
+        entity.setRetryCount(0);
+        entity.setCreatedAt(now);
+        entity.setUpdatedAt(now);
+        consumeRecordMapper.insertIgnore(entity);
     }
 
     private Map<Long, CommentContentEntity> commentContentMap(List<Long> commentIds) {
@@ -696,7 +1116,7 @@ public class CommentApplicationService {
         payload.put("commentUserId", String.valueOf(comment.getUserId()));
         payload.put("userId", String.valueOf(userId));
         payload.put("rootId", String.valueOf(comment.getRootId()));
-        payload.put("occurredAt", toOffsetString(now));
+        payload.put("occurredActionAt", toOffsetString(now));
         insertOutbox(eventType, comment.getCommentId(), comment.getCommentId() + ":" + userId, payload, now);
     }
 
@@ -820,17 +1240,25 @@ public class CommentApplicationService {
         return key.trim();
     }
 
-    private PageCursor parseCursor(String cursor) {
+    private PageCursor parseCursor(String cursor, String sort) {
         if (cursor == null || cursor.isBlank()) {
-            return new PageCursor(null, null);
+            return new PageCursor(null, null, null);
         }
         String normalized = cursor;
+        Long hotScore = null;
         if (normalized.startsWith("HOT_")) {
             int first = normalized.indexOf('_');
             int second = normalized.indexOf('_', first + 1);
             if (second > 0 && second < normalized.length() - 1) {
+                try {
+                    hotScore = Long.valueOf(normalized.substring(first + 1, second));
+                } catch (NumberFormatException exception) {
+                    throw new BusinessException(ApiErrorCode.PARAM_INVALID);
+                }
                 normalized = normalized.substring(second + 1);
             }
+        } else if (SORT_HOT.equals(sort)) {
+            throw new BusinessException(ApiErrorCode.PARAM_INVALID);
         }
         int separator = normalized.lastIndexOf('_');
         if (separator <= 0 || separator == normalized.length() - 1) {
@@ -841,7 +1269,7 @@ public class CommentApplicationService {
                     .atZoneSameInstant(CHINA_ZONE)
                     .toLocalDateTime();
             Long commentId = Long.valueOf(normalized.substring(separator + 1));
-            return new PageCursor(sortAt, commentId);
+            return new PageCursor(hotScore, sortAt, commentId);
         } catch (RuntimeException exception) {
             throw new BusinessException(ApiErrorCode.PARAM_INVALID);
         }
@@ -854,7 +1282,7 @@ public class CommentApplicationService {
         ContentCommentEntity last = items.get(items.size() - 1);
         String base = toOffsetString(last.getCreatedAt()) + "_" + last.getCommentId();
         if (SORT_HOT.equals(sort)) {
-            return "HOT_" + safeLong(last.getLikeCountSnapshot()) + "_" + base;
+            return "HOT_" + hotScore(last) + "_" + base;
         }
         return base;
     }
@@ -918,6 +1346,25 @@ public class CommentApplicationService {
         }
     }
 
+    private Long id(Map<String, Object> payload, String field) {
+        return longValue(payload.get(field));
+    }
+
+    private int intValue(Object value) {
+        return (int) longValue(value);
+    }
+
+    private long longValue(Object value) {
+        try {
+            if (value instanceof Number number) {
+                return number.longValue();
+            }
+            return Long.parseLong(String.valueOf(value));
+        } catch (RuntimeException exception) {
+            throw new BusinessException(ApiErrorCode.PARAM_INVALID);
+        }
+    }
+
     private LocalDateTime now() {
         return LocalDateTime.now(CHINA_ZONE);
     }
@@ -934,10 +1381,21 @@ public class CommentApplicationService {
         return value == null ? 0L : value;
     }
 
+    private int safeInt(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
+    }
+
     private record IdempotentResult<T>(Long bizId, T response) {
     }
 
-    private record PageCursor(LocalDateTime sortAt, Long commentId) {
+    private record PageCursor(Long hotScore, LocalDateTime sortAt, Long commentId) {
     }
 
     private record NoteSnapshot(String title, String coverUrl) {

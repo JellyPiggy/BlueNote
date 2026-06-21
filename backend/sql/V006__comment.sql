@@ -19,10 +19,12 @@ CREATE TABLE IF NOT EXISTS content_comment (
   comment_status VARCHAR(32) NOT NULL COMMENT 'VISIBLE / DELETED / HIDDEN',
   like_count_snapshot BIGINT NOT NULL DEFAULT 0,
   reply_count_snapshot BIGINT NOT NULL DEFAULT 0,
+  hot_score_snapshot BIGINT NOT NULL DEFAULT 0 COMMENT 'reply_count_snapshot * 6 + like_count_snapshot * 4',
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   PRIMARY KEY (comment_id),
   KEY idx_comment_note_root_time (note_id, level, comment_status, created_at, comment_id),
+  KEY idx_comment_note_root_hot (note_id, level, comment_status, hot_score_snapshot, created_at, comment_id),
   KEY idx_comment_root_time (root_id, level, comment_status, created_at, comment_id),
   KEY idx_comment_user_time (user_id, created_at, comment_id),
   KEY idx_comment_note_author (note_author_id, created_at)
